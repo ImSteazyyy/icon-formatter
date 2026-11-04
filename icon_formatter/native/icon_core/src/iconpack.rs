@@ -1,0 +1,174 @@
+//! Android icon pack export (resources layout used by launcher icon packs).
+//!
+//! Produces:
+//!   res/drawable-nodpi/<drawable>.png
+//!   res/xml/appfilter.xml, assets/appfilter.xml
+//!   res/xml/drawable.xml,  assets/drawable.xml
+//!   icons/<Label> (<package>).png      (plain PNGs, human readable)
+//!   mapping.json                         (label/package/activity/drawable)
+//! The layout matches what icon-pack templates (e.g. Blueprint, CandyBar) and
+//! launchers that read appfilter.xml expect. Building the final APK requires
+//! an Android build of that template; this module does not sign APKs.
+
+use crate::error::Result;
+use crate::pack::zip_dir;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IconPackEntry {
+    pub label: String,
+    pub package: String,
+    /// Fully qualified launcher activity, may be empty.
+    pub activity: String,
+    pub png: PathBuf,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct IconPackReport {
+    pub out_dir: String,
+    pub zip: Option<String>,
+    pub icons: u32,
+    pub notes: Vec<String>,
+}
+
+/// Valid Android resource name from a package name.
+pub fn sanitize_drawable(s: &str) -> String {
+    let mut o: String = s
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_lowercase() || c.is_ascii_digit() { c } else { '_' })
+        .collect();
+    while o.contains("__") {
+        o = o.replace("__", "_");
+    }
+    let o = o.trim_matches('_').to_string();
+    if o.is_empty() || !o.chars().next().unwrap().is_ascii_lowercase() {
+        format!("ic_{o}")
+    } else {
+        o
+    }
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+fn file_safe(s: &str) -> String {
+    s.chars()
+        .map(|c| if "<>:\"/\\|?*".contains(c) || c.is_control() { '_' } else { c })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_path: Option<&Path>) -> Result<IconPackReport> {
+    let mut notes = Vec::new();
+    fs::create_dir_all(out_dir.join("res/drawable-nodpi"))?;
+    fs::create_dir_all(out_dir.join("res/xml"))?;
+    fs::create_dir_all(out_dir.join("assets"))?;
+    fs::create_dir_all(out_dir.join("icons"))?;
+    let mut used = HashSet::new();
+    let mut appfilter = String::from("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources>\n");
+    appfilter.push_str(&format!("    <!-- {} -->\n", xml_escape(pack_name)));
+    let mut drawable = String::from(
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources>\n    <version>1</version>\n    <category title=\"All\" />\n",
+    );
+    let mut mapping = Vec::new();
+    let mut count = 0;
+    for e in entries {
+        if !e.png.exists() {
+            notes.push(format!("{}: processed icon missing, skipped", e.package));
+            continue;
+        }
+        let mut name = sanitize_drawable(&e.package);
+        let base = name.clone();
+        let mut k = 2;
+        while !used.insert(name.clone()) {
+            name = format!("{base}_{k}");
+            k += 1;
+        }
+        fs::copy(&e.png, out_dir.join(format!("res/drawable-nodpi/{name}.png")))?;
+        fs::copy(&e.png, out_dir.join(format!("icons/{} ({}).png", file_safe(&e.label), file_safe(&e.package))))?;
+        if e.activity.is_empty() {
+            appfilter.push_str(&format!(
+                "    <item component=\"ComponentInfo{{{}}}\" drawable=\"{}\" />\n",
+                xml_escape(&e.package),
+                name
+            ));
+            notes.push(format!("{}: no launcher activity known, package-only mapping", e.package));
+        } else {
+            appfilter.push_str(&format!(
+                "    <item component=\"ComponentInfo{{{}/{}}}\" drawable=\"{}\" />\n",
+                xml_escape(&e.package),
+                xml_escape(&e.activity),
+                name
+            ));
+        }
+        drawable.push_str(&format!("    <item drawable=\"{name}\" />\n"));
+        mapping.push(serde_json::json!({
+            "label": e.label, "package": e.package, "activity": e.activity, "drawable": name
+        }));
+        count += 1;
+    }
+    appfilter.push_str("</resources>\n");
+    drawable.push_str("</resources>\n");
+    fs::write(out_dir.join("res/xml/appfilter.xml"), &appfilter)?;
+    fs::write(out_dir.join("assets/appfilter.xml"), &appfilter)?;
+    fs::write(out_dir.join("res/xml/drawable.xml"), &drawable)?;
+    fs::write(out_dir.join("assets/drawable.xml"), &drawable)?;
+    fs::write(
+        out_dir.join("mapping.json"),
+        serde_json::to_string_pretty(&mapping).unwrap_or_default(),
+    )?;
+    fs::write(
+        out_dir.join("README.txt"),
+        format!(
+            "{pack_name}\n\nGenerated by Icon Formatter.\n\n\
+             res/ and assets/ follow the standard Android icon pack layout (appfilter.xml + drawable-nodpi).\n\
+             Copy them into an icon pack template project (e.g. Blueprint or CandyBar) and build the APK,\n\
+             then apply the pack from a launcher that supports icon packs.\n\
+             icons/ contains the same icons as plain PNG files named after the apps.\n\
+             Compatibility depends on the launcher; system launchers without icon pack support cannot use it.\n"
+        ),
+    )?;
+    let zip = if let Some(z) = zip_path {
+        zip_dir(out_dir, z)?;
+        Some(z.to_string_lossy().to_string())
+    } else {
+        None
+    };
+    Ok(IconPackReport { out_dir: out_dir.to_string_lossy().to_string(), zip, icons: count, notes })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize() {
+        assert_eq!(sanitize_drawable("com.WhatsApp"), "com_whatsapp");
+        assert_eq!(sanitize_drawable("9gag.app"), "ic_9gag_app");
+    }
+
+    #[test]
+    fn build_pack() {
+        let t = tempfile::tempdir().unwrap();
+        let png = t.path().join("x.png");
+        image::RgbaImage::new(4, 4).save(&png).unwrap();
+        let entries = vec![
+            IconPackEntry { label: "A".into(), package: "com.a".into(), activity: "com.a.Main".into(), png: png.clone() },
+            IconPackEntry { label: "A2".into(), package: "com.a".into(), activity: "com.a.Other".into(), png },
+        ];
+        let out = t.path().join("pack");
+        let r = build(&entries, &out, "Test", Some(&t.path().join("pack.zip"))).unwrap();
+        assert_eq!(r.icons, 2);
+        let xml = fs::read_to_string(out.join("res/xml/appfilter.xml")).unwrap();
+        assert!(xml.contains("ComponentInfo{com.a/com.a.Main}"));
+        assert!(xml.contains("drawable=\"com_a_2\""));
+        let parsed = crate::pack::parse_appfilter(&xml).unwrap();
+        assert_eq!(parsed.len(), 2);
+    }
+}

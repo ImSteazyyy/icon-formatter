@@ -1,0 +1,13 @@
+# Build outputs (published as GitHub Release assets, not committed)
+/release/
+**/target/
+icon_formatter/build/
+icon_formatter/native/icon_core/examples/dbg.rs
+icon_formatter/native/icon_core/examples/refcal.rs
+
+# Local machine config
+**/local.properties
+**/key.properties
+*.jks
+*.keystore
+Thumbs.db

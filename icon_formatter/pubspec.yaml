@@ -1,0 +1,39 @@
+name: icon_formatter
+description: "Icon Formatter: icon composition, Nothing Translucent styling, AI theming, pack cleanup and Android icon packs."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  icon_bridge:
+    path: rust_builder
+  flutter_rust_bridge: 2.13.0
+  freezed_annotation: ^3.0.0
+  file_picker: ^10.0.0
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  flutter_secure_storage: ^9.2.0
+  http: ^1.2.0
+  share_plus: ^11.0.0
+  desktop_drop: ^0.6.0
+  url_launcher: ^6.3.0
+  window_manager: ^0.5.1
+  liquid_glass_widgets: ^1.16.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.0
+  freezed: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/bases/
