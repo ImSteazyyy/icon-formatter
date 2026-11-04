@@ -225,12 +225,6 @@ class BaseIcon {
 
 /// UI appearance settings.
 class Appearance {
-  double blur = 18;
-  double transparency = 0.55;
-  double brightness = 0.5;
-  double frosting = 0.35;
-  double reflections = 0.4;
-  double borders = 0.5;
   double radius = 18;
   /// Default accent: pink sampled from the user's Windows Start icon.
   static const defaultAccent = 0xFFBA4CD4;
@@ -239,37 +233,20 @@ class Appearance {
   bool animations = true;
   bool compact = false;
 
-  /// Liquid glass surfaces (refraction rim, vibrancy); off = flat frosted.
-  bool liquid = true;
-
   Color get accentColor => Color(accent);
 
   Map<String, dynamic> toJson() => {
-        'blur': blur,
-        'transparency': transparency,
-        'brightness': brightness,
-        'frosting': frosting,
-        'reflections': reflections,
-        'borders': borders,
         'radius': radius,
         'accent': accent,
         'animations': animations,
         'compact': compact,
-        'liquid': liquid,
       };
 
   void load(Map<String, dynamic> j) {
-    blur = _d(j['blur'], blur);
-    transparency = _d(j['transparency'], transparency);
-    brightness = _d(j['brightness'], brightness);
-    frosting = _d(j['frosting'], frosting);
-    reflections = _d(j['reflections'], reflections);
-    borders = _d(j['borders'], borders);
     radius = _d(j['radius'], radius);
     accent = (j['accent'] as num?)?.toInt() ?? accent;
     animations = j['animations'] as bool? ?? animations;
     compact = j['compact'] as bool? ?? compact;
-    liquid = j['liquid'] as bool? ?? liquid;
   }
 }
 

@@ -23,10 +23,15 @@ class GlassInsets extends InheritedWidget {
 /// `liquid_glass_widgets`. [chromatic] scales the configured aberration.
 LiquidGlassSettings appGlassSettings({bool dark = false, double chromatic = 0.5}) {
   final g = AppState.I.glass;
-  final tint = dark ? Colors.black.withValues(alpha: g.lensDarkness) : Colors.white.withValues(alpha: g.tint);
+  // Frost is applied as extra diffusion + milky tint so it is visible in
+  // every quality mode (the package's own frost/aberration exist only in the
+  // Premium Impeller pipeline). Aberration is also drawn by GlossOverlay.
+  final tint = dark
+      ? Colors.black.withValues(alpha: g.lensDarkness)
+      : Colors.white.withValues(alpha: (g.tint + g.frost * 0.14).clamp(0.0, 0.8));
   return LiquidGlassSettings(
     glassColor: tint,
-    blur: g.blur,
+    blur: g.blur + g.frost * 12,
     thickness: g.thickness,
     frost: g.frost,
     chromaticAberration: g.chromatic * (0.5 + chromatic),
@@ -84,16 +89,21 @@ class LiquidGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlossOverlay(
-      radius: radius,
-      child: GlassContainer(
-        shape: LiquidRoundedSuperellipse(borderRadius: radius),
-        padding: padding,
-        settings: appGlassSettings(dark: dark, chromatic: chromatic),
-        useOwnLayer: true,
-        quality: appGlassQuality,
-        clipBehavior: Clip.antiAlias,
-        child: withGlassShadows(child),
+    // Listens to the settings itself: glass redraws live even when created
+    // as a const widget inside a parent that does not rebuild.
+    return ListenableBuilder(
+      listenable: AppState.I,
+      builder: (context, _) => GlossOverlay(
+        radius: radius,
+        child: GlassContainer(
+          shape: LiquidRoundedSuperellipse(borderRadius: radius),
+          padding: padding,
+          settings: appGlassSettings(dark: dark, chromatic: chromatic),
+          useOwnLayer: true,
+          quality: appGlassQuality,
+          clipBehavior: Clip.antiAlias,
+          child: withGlassShadows(child),
+        ),
       ),
     );
   }
@@ -111,20 +121,31 @@ class GlossOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final g = AppState.I.glass;
-    if (!g.gloss || g.glossIntensity <= 0.01) return child;
-    return CustomPaint(
-      foregroundPainter: GlossPainter(radius: radius, intensity: g.glossIntensity, lightAngle: g.lightAngle),
+    return ListenableBuilder(
+      listenable: AppState.I,
       child: child,
+      builder: (context, child) {
+        final g = AppState.I.glass;
+        final gloss = g.gloss ? g.glossIntensity : 0.0;
+        final chroma = (g.chromatic / 0.05).clamp(0.0, 1.0);
+        if (gloss <= 0.01 && chroma <= 0.01) return child!;
+        return CustomPaint(
+          foregroundPainter: GlossPainter(radius: radius, intensity: gloss, lightAngle: g.lightAngle, chroma: chroma),
+          child: child,
+        );
+      },
     );
   }
 }
 
 class GlossPainter extends CustomPainter {
-  GlossPainter({required this.radius, required this.intensity, required this.lightAngle});
+  GlossPainter({required this.radius, required this.intensity, required this.lightAngle, this.chroma = 0});
 
   final double radius;
   final double intensity;
+
+  /// 0..1 chromatic fringes along the edge (aberration).
+  final double chroma;
 
   /// Degrees, same convention as the glass light (135 = top-left).
   final double lightAngle;
@@ -138,6 +159,28 @@ class GlossPainter extends CustomPainter {
     final begin = Alignment(math.cos(a), -math.sin(a));
     final end = Alignment(-math.cos(a), math.sin(a));
     final i = intensity.clamp(0.0, 1.0);
+    if (chroma > 0.01) {
+      // dispersion: cool fringe on the lit side, warm/magenta on the far side
+      final c = chroma.clamp(0.0, 1.0);
+      canvas.drawRRect(
+        rr.deflate(1.0),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 + 3.5 * c
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 1.2 + 2.5 * c)
+          ..shader = SweepGradient(
+            colors: [
+              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c),
+              const Color(0xFFFF4FD8).withValues(alpha: 0.55 * c),
+              const Color(0xFFFFA43A).withValues(alpha: 0.70 * c),
+              const Color(0xFF7A5CFF).withValues(alpha: 0.55 * c),
+              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c),
+            ],
+            transform: GradientRotation(a + math.pi),
+          ).createShader(rect),
+      );
+    }
+    if (i <= 0.01) return;
     // crisp rim: brightest on the lit side, faint echo on the opposite side
     canvas.drawRRect(
       rr,
@@ -186,5 +229,5 @@ class GlossPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant GlossPainter old) =>
-      old.radius != radius || old.intensity != intensity || old.lightAngle != lightAngle;
+      old.radius != radius || old.intensity != intensity || old.lightAngle != lightAngle || old.chroma != chroma;
 }

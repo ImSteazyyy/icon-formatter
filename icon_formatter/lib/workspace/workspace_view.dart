@@ -341,9 +341,9 @@ class WorkspaceView extends StatelessWidget {
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-            IconButton.filledTonal(
+            GlassIconButton(
               tooltip: 'Regolazioni',
-              icon: const Icon(Icons.tune),
+              icon: Icons.tune,
               onPressed: () => showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
@@ -371,7 +371,10 @@ class WorkspaceView extends StatelessWidget {
       listenable: c,
       builder: (context, _) {
         if (c.items.isEmpty) {
-          return Center(child: emptyHint ?? const Text('Nessuna icona', style: TextStyle(color: Palette.text3)));
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomPad),
+            child: Center(child: emptyHint ?? const Text('Nessuna icona', style: TextStyle(color: Palette.text3))),
+          );
         }
         return GridView.builder(
           padding: EdgeInsets.fromLTRB(4, 4, 4, 4 + bottomPad),

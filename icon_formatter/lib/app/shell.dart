@@ -95,7 +95,8 @@ class _ShellState extends State<Shell> {
         final h = _navKey.currentContext?.size?.height;
         if (h != null && (h - _navCovered).abs() > 0.5 && mounted) setState(() => _navCovered = h);
       });
-      final covered = _navCovered;
+      final inset = MediaQuery.of(context).viewPadding.bottom;
+      final covered = _navCovered + inset;
       final accent = Theme.of(context).colorScheme.primary;
       return Scaffold(
         body: Backdrop(
@@ -106,8 +107,9 @@ class _ShellState extends State<Shell> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 0,
-              child: Stack(children: [
+              bottom: inset,
+              // nav redraws on every settings change (glass, accent, shadows)
+              child: ListenableBuilder(listenable: AppState.I, builder: (context, _) => Stack(children: [
                 GlassTabBar.bottom(
                 key: _navKey,
                 barHeight: navH,
@@ -140,7 +142,7 @@ class _ShellState extends State<Shell> {
                   height: navH,
                   child: IgnorePointer(child: GlossOverlay(radius: navH / 2, child: SizedBox.expand())),
                 ),
-              ]),
+              ])),
             ),
           ]),
         ),

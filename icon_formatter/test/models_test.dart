@@ -43,10 +43,26 @@ void main() {
 
   test('appearance persistence', () {
     final a = Appearance()
-      ..blur = 7
+      ..radius = 7
+      ..accent = 0xFF112233
       ..compact = true;
     final b = Appearance()..load(a.toJson());
-    expect(b.blur, 7);
+    expect(b.radius, 7);
+    expect(b.accent, 0xFF112233);
     expect(b.compact, true);
+  });
+
+  test('liquid glass settings persistence and reset', () {
+    final g = GlassConfig()
+      ..blur = 21
+      ..gloss = false
+      ..textShadow = 0.2;
+    final h = GlassConfig()..load(g.toJson());
+    expect(h.blur, 21);
+    expect(h.gloss, false);
+    expect(h.textShadow, 0.2);
+    h.reset();
+    expect(h.blur, GlassConfig().blur);
+    expect(h.gloss, true);
   });
 }

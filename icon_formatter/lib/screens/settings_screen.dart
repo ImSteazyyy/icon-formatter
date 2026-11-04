@@ -15,12 +15,11 @@ import 'bases_screen.dart';
 
 const appVersion = '1.0.0';
 
-enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
+enum SettingsCat { appearance, processing, bases, ai, pack, export, system }
 
 extension on SettingsCat {
   String get label => switch (this) {
         SettingsCat.appearance => 'Appearance',
-        SettingsCat.glass => 'Liquid Glass',
         SettingsCat.processing => 'Processing',
         SettingsCat.bases => 'Base Icons',
         SettingsCat.ai => 'AI Provider',
@@ -31,7 +30,6 @@ extension on SettingsCat {
 
   IconData get icon => switch (this) {
         SettingsCat.appearance => Icons.palette_outlined,
-        SettingsCat.glass => Icons.water_drop_outlined,
         SettingsCat.processing => Icons.tune,
         SettingsCat.bases => Icons.crop_square_rounded,
         SettingsCat.ai => Icons.auto_awesome_outlined,
@@ -114,15 +112,16 @@ class _Page extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppState.I,
+      // Pages are created fresh on every change (not const): they read
+      // AppState directly in build, so a const instance would never redraw.
       builder: (context, _) => switch (cat) {
-        SettingsCat.appearance => const _AppearancePage(),
-        SettingsCat.glass => const _GlassPage(),
-        SettingsCat.processing => const _ProcessingPage(),
-        SettingsCat.bases => const SingleChildScrollView(padding: EdgeInsets.all(20), child: BasesScreen(embedded: true)),
-        SettingsCat.ai => const _AiPage(),
-        SettingsCat.pack => const _PackPage(),
-        SettingsCat.export => const _ExportPage(),
-        SettingsCat.system => const _SystemPage(),
+        SettingsCat.appearance => _AppearancePage(),
+        SettingsCat.processing => _ProcessingPage(),
+        SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
+        SettingsCat.ai => _AiPage(),
+        SettingsCat.pack => _PackPage(),
+        SettingsCat.export => _ExportPage(),
+        SettingsCat.system => _SystemPage(),
       },
     );
   }
@@ -137,46 +136,17 @@ class _AppearancePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final a = st.appearance;
-    return ListView(padding: const EdgeInsets.all(20), children: [
-      const SectionTitle('Anteprima live'),
-      SizedBox(
-        height: 170,
-        child: Backdrop(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Glass(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Pannello di esempio', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 6),
-                const Text('Componenti reali con i parametri attuali.', style: TextStyle(color: Palette.text2, fontSize: 12)),
-                const Spacer(),
-                Row(children: [
-                  FilledButton(onPressed: () {}, child: const Text('Primario')),
-                  const SizedBox(width: 8),
-                  OutlinedButton(onPressed: () {}, child: const Text('Secondario')),
-                  const SizedBox(width: 8),
-                  Switch(value: true, onChanged: (_) {}),
-                ]),
-              ]),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 18),
-      const SectionTitle('Vetro'),
-      SliderRow(label: 'Blur', value: a.blur, min: 0, max: 40, format: (v) => v.round().toString(), onChanged: (v) => st.update(() => a.blur = v)),
-      SliderRow(label: 'Trasparenza', value: a.transparency, onChanged: (v) => st.update(() => a.transparency = v)),
-      SliderRow(label: 'Luminosità', value: a.brightness, onChanged: (v) => st.update(() => a.brightness = v)),
-      SliderRow(label: 'Frosting', value: a.frosting, onChanged: (v) => st.update(() => a.frosting = v)),
-      SliderRow(label: 'Riflessi', value: a.reflections, onChanged: (v) => st.update(() => a.reflections = v)),
-      SliderRow(label: 'Bordi', value: a.borders, onChanged: (v) => st.update(() => a.borders = v)),
-      SliderRow(label: 'Curvatura', value: a.radius, min: 4, max: 32, format: (v) => v.round().toString(), onChanged: (v) => st.update(() => a.radius = v)),
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+      const SectionTitle('Curvatura pannelli'),
+      SliderRow(label: 'Raggio', value: a.radius, min: 4, max: 32, format: (v) => v.round().toString(), onChanged: (v) => st.update(() => a.radius = v)),
       const SizedBox(height: 10),
       const SectionTitle('Accento'),
       const _AccentPicker(),
       const SizedBox(height: 10),
       SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Animazioni'), value: a.animations, onChanged: (v) => st.update(() => a.animations = v)),
       SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Densità compatta'), value: a.compact, onChanged: (v) => st.update(() => a.compact = v)),
+      const SizedBox(height: 18),
+      ...glassControls(context),
     ]);
   }
 }
@@ -188,7 +158,7 @@ class _ProcessingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final s = st.segment;
-    return ListView(padding: const EdgeInsets.all(20), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
       const SectionTitle('Dimensioni'),
       Text('Original Composition usa la dimensione del base selezionato; Translucent/Preset usano:', style: const TextStyle(fontSize: 12, color: Palette.text2)),
       Wrap(spacing: 8, children: [
@@ -249,7 +219,7 @@ class _ProcessingPage extends StatelessWidget {
                   height: MediaQuery.of(ctx).size.height * 0.7,
                   child: ListenableBuilder(
                     listenable: st,
-                    builder: (ctx, _) => ListView(padding: const EdgeInsets.all(20), children: [
+                    builder: (ctx, _) => ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
                       Text(pr.name, style: Theme.of(ctx).textTheme.titleMedium),
                       const SizedBox(height: 10),
                       ...translucentSliders(st.presetById(pr.id).params, (t) => st.setPresetParams(pr.id, t)),
@@ -302,7 +272,7 @@ class _AiPageState extends State<_AiPage> {
     final st = AppState.I;
     final ai = st.ai;
     final info = aiProviders[ai.provider]!;
-    return ListView(padding: const EdgeInsets.all(20), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
       const SectionTitle('Provider'),
       DropdownButtonFormField<AiProviderKind>(
         key: ValueKey(ai.provider),
@@ -421,7 +391,7 @@ class _PackPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final s = st.packSegment;
-    return ListView(padding: const EdgeInsets.all(20), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
       const SectionTitle('Segmentazione per Pack Cleanup'),
       DropdownButtonFormField<SegMode>(
         key: ValueKey(s.mode),
@@ -468,7 +438,7 @@ class _ExportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final ex = st.export;
-    return ListView(padding: const EdgeInsets.all(20), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
       const SectionTitle('Formato'),
       const Text('PNG RGBA con trasparenza reale (8 bit per canale).', style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
@@ -540,7 +510,7 @@ class _SystemPageState extends State<_SystemPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: const EdgeInsets.all(20), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
       const SectionTitle('Cache'),
       ListTile(
         contentPadding: EdgeInsets.zero,
@@ -619,7 +589,7 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
   @override
   Widget build(BuildContext context) {
     final st = AppState.I;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return ListenableBuilder(listenable: st, builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       DropdownButtonFormField<BgProvider>(
         key: ValueKey(st.bgProvider),
         initialValue: st.bgProvider,
@@ -691,7 +661,7 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
         const SizedBox(height: 4),
         const Text(BgRemovalService.costNote, style: TextStyle(fontSize: 11, color: Palette.text3)),
       ],
-    ]);
+    ]));
   }
 }
 
@@ -800,18 +770,15 @@ class _AccentPickerState extends State<_AccentPicker> {
 }
 
 
-/// Liquid glass material controls with a live preview over coloured content.
-class _GlassPage extends StatelessWidget {
-  const _GlassPage();
-
-  @override
-  Widget build(BuildContext context) {
+/// Liquid glass controls (part of Appearance) with a live preview over
+/// coloured content so refraction and blur are visible.
+List<Widget> glassControls(BuildContext context) {
     final st = AppState.I;
     final g = st.glass;
     final accent = st.appearance.accentColor;
     void set(VoidCallback f) => st.update(f);
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
-      const SectionTitle('Anteprima live'),
+    return [
+      const SectionTitle('Liquid Glass · anteprima'),
       ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: SizedBox(
@@ -877,7 +844,7 @@ class _GlassPage extends StatelessWidget {
       ),
       const SizedBox(height: 18),
       Row(children: [
-        const Expanded(child: SectionTitle('Materiale')),
+        const Expanded(child: SectionTitle('Liquid Glass · materiale')),
         TextButton(onPressed: () => set(g.reset), child: const Text('Ripristina')),
       ]),
       SliderRow(label: 'Blur', value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
@@ -919,13 +886,5 @@ class _GlassPage extends StatelessWidget {
         value: g.premium,
         onChanged: (v) => set(() => g.premium = v),
       ),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Liquid Glass sui pannelli'),
-        subtitle: const Text('Disattivato: pannelli in vetro smerigliato piatto (barre sempre in liquid glass)'),
-        value: st.appearance.liquid,
-        onChanged: (v) => set(() => st.appearance.liquid = v),
-      ),
-    ]);
-  }
+    ];
 }

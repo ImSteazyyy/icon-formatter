@@ -8,45 +8,17 @@ import '../app/state.dart';
 import '../app/theme.dart';
 import 'liquid_glass.dart';
 
-/// Frosted glass panel driven by the Appearance settings.
+/// Liquid glass panel (Impostazioni › Appearance › Liquid Glass).
 class Glass extends StatelessWidget {
-  const Glass({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius, this.blur = true});
+  const Glass({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius});
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double? radius;
-  final bool blur;
 
   @override
-  Widget build(BuildContext context) {
-    final a = AppState.I.appearance;
-    if (a.liquid) {
-      return LiquidGlass(radius: radius ?? a.radius, padding: padding, chromatic: 0.3, child: child);
-    }
-    final r = BorderRadius.circular(radius ?? a.radius);
-    final fill = 0.025 + a.brightness * 0.05 + (1 - a.transparency) * 0.06;
-    final panel = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        borderRadius: r,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: fill + a.reflections * 0.05),
-            Colors.white.withValues(alpha: fill * 0.6 + a.frosting * 0.02),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.03 + a.borders * 0.09)),
-      ),
-      child: withGlassShadows(child),
-    );
-    if (!blur || a.blur <= 0.5) return ClipRRect(borderRadius: r, child: panel);
-    return ClipRRect(
-      borderRadius: r,
-      child: BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: a.blur, sigmaY: a.blur), child: panel),
-    );
-  }
+  Widget build(BuildContext context) =>
+      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, child: child);
 }
 
 /// Soft ambient background so the glass panels have something to frost.
@@ -403,6 +375,7 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
   );
 }
 
+/// Toolbar action as a liquid glass pill.
 class ToolButton extends StatelessWidget {
   const ToolButton({super.key, required this.icon, required this.label, required this.onTap});
 
@@ -411,8 +384,61 @@ class ToolButton extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: TextButton.icon(onPressed: onTap, icon: Icon(icon, size: 18), label: Text(label)),
-      );
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final enabled = onTap != null;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+      child: LiquidGlass(
+        radius: 22,
+        chromatic: 0.3,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(icon, size: 18, color: enabled ? accent : Palette.text3),
+                const SizedBox(width: 8),
+                Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: enabled ? Palette.text : Palette.text3)),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Round liquid glass icon button.
+class GlassIconButton extends StatelessWidget {
+  const GlassIconButton({super.key, required this.icon, required this.onPressed, this.tooltip, this.size = 48});
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = SizedBox(
+      width: size,
+      height: size,
+      child: LiquidGlass(
+        radius: size / 2,
+        chromatic: 0.5,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: Center(child: Icon(icon, color: Colors.white)),
+          ),
+        ),
+      ),
+    );
+    return tooltip == null ? b : Tooltip(message: tooltip!, child: b);
+  }
 }

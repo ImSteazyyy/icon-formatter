@@ -420,14 +420,14 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
             radius: 32,
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             child: Row(children: [
-              IconButton.filledTonal(
+              GlassIconButton(
                 tooltip: 'Regolazioni',
                 onPressed: () => showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
                   builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.78, child: AdjustPanel(c: c, showModes: false, onOpenBases: widget.onOpenBases)),
                 ),
-                icon: const Icon(Icons.tune),
+                icon: Icons.tune,
               ),
               const SizedBox(width: 8),
               Expanded(
