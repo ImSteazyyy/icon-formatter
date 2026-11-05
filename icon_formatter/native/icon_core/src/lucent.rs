@@ -490,8 +490,15 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     let fallback = bare || notes.iter().any(|n| n == FALLBACK_NOTE);
     // "icon inside the icon": strip the inner tile's own background too and
     // map the tile onto the plate box (cover), clipped by the plate below
-    let tile_dims = glyph.dimensions();
-    let unwrapped = if fallback { None } else { crate::compose::unwrap_tile(glyph) };
+    // the source itself may be the tile (launcher / adaptive icons are a
+    // full rounded square): unwrap it directly instead of the isolated glyph
+    let src_unwrap = if crate::compose::is_tile(src) { crate::compose::unwrap_tile(src) } else { None };
+    let (tile_dims, unwrapped) = if src_unwrap.is_some() {
+        (src.dimensions(), src_unwrap)
+    } else {
+        (glyph.dimensions(), if fallback { None } else { crate::compose::unwrap_tile(glyph) })
+    };
+    let fallback = fallback && unwrapped.is_none();
     let inner_box = unwrapped.as_ref().map(|u| u.1);
     let glyph: &RgbaImage = match &unwrapped {
         Some((g, _)) => g,

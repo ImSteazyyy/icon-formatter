@@ -284,11 +284,20 @@ pub fn place_on_plate(canvas: &mut RgbaImage, src: &RgbaImage, res: &SegmentResu
     let covered = plate.iter().filter(|&&a| a > 127).count() as f32 / plate.len().max(1) as f32;
     let mut layer = RgbaImage::new(size, canvas.height());
     let tile = is_tile(&res.glyph);
-    let unwrapped = if covered > 0.2 { unwrap_tile(&res.glyph) } else { None };
+    // a full-tile source (launcher icon) is unwrapped as a whole
+    let src_tile = covered > 0.2 && is_tile(src);
+    let unwrapped = if !(covered > 0.2) {
+        None
+    } else if src_tile {
+        unwrap_tile(src)
+    } else {
+        unwrap_tile(&res.glyph)
+    };
+    let tile_img = if src_tile && unwrapped.is_some() { src } else { &res.glyph };
     if let Some((inner, ib)) = &unwrapped {
         // tile box -> plate box (cover); inner content keeps its position in the tile
         let (px0, py0, px1, py1) = crate::imageops::alpha_bbox(canvas, (level * 0.6) as u8).unwrap_or((0, 0, size, canvas.height()));
-        let (tw0, th0) = (res.glyph.width() as f32, res.glyph.height() as f32);
+        let (tw0, th0) = (tile_img.width() as f32, tile_img.height() as f32);
         // the content box (tile minus its glossy rim) covers the plate box
         let (bw, bh) = ((ib.2 - ib.0).max(1) as f32, (ib.3 - ib.1).max(1) as f32);
         let k = ((px1 - px0) as f32 / bw).max((py1 - py0) as f32 / bh) * pl.scale_mul.clamp(0.1, 4.0);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 — 2026-11-05
+
+### Fixed
+- Lucent: icons taken from installed apps (adaptive icons rendered as a full rounded tile, e.g. Google Maps or Gboard) lost most of their content, because the outer segmentation treated the whole tile as a bare logo. When the source is itself a full tile, its inner background is now removed directly. Content (roads, keys, figures) is kept whole, reaches the plate edge and is clipped to it, both in the preview and in the export.
+
 ## 1.1.0 — 2026-11-05
 
 ### Added
