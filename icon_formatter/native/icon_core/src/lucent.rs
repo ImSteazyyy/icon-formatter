@@ -66,6 +66,23 @@ pub struct LucentParams {
     pub launcher_shadow: bool,
     /// Apply IconGen's PackIconEncoder (only for packs used by Nothing Launcher).
     pub nothing_encode: bool,
+    /// How the symbol is taken from the source (per-app override).
+    pub strategy: GlyphStrategy,
+}
+
+/// Per-app choice of how the symbol is taken from the original icon.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum GlyphStrategy {
+    /// Decided per icon: full tiles are unwrapped, dark symbols on a coloured
+    /// plate take the plate colour, everything else keeps its colours.
+    #[default]
+    Auto,
+    /// The symbol takes the colour of the original plate (holes transparent).
+    PlateColor,
+    /// The whole original icon fills the plate edge to edge (Maps, Gboard...).
+    FullBleed,
+    /// The isolated symbol as it is, no unwrap and no recolouring.
+    AsIs,
 }
 
 impl LucentParams {
@@ -84,6 +101,7 @@ impl LucentParams {
             lift_greys: true,
             launcher_shadow: false,
             nothing_encode: false,
+            strategy: GlyphStrategy::Auto,
         }
     }
 
@@ -492,9 +510,53 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // map the tile onto the plate box (cover), clipped by the plate below
     // the source itself may be the tile (launcher / adaptive icons are a
     // full rounded square): unwrap it directly instead of the isolated glyph
-    let src_unwrap = if crate::compose::is_tile(src) { crate::compose::unwrap_tile(src) } else { None };
-    let (tile_dims, unwrapped) = if src_unwrap.is_some() {
-        (src.dimensions(), src_unwrap)
+    use GlyphStrategy as G;
+    let st = p.strategy;
+    // launcher icons often carry a transparent margin around the tile:
+    // detect the tile on the icon cropped to its visible box
+    let src_tile = crate::compose::crop_to_content(src);
+    let src_unwrap = match st {
+        G::Auto | G::FullBleed if crate::compose::is_tile(&src_tile) => crate::compose::unwrap_tile(&src_tile),
+        _ => None,
+    };
+    // dark symbol on a coloured disc/tile: the symbol takes the plate colour
+    let recolored = match st {
+        G::Auto if src_unwrap.is_none() => crate::compose::recolor_on_colored_plate(src, false),
+        G::PlateColor => crate::compose::recolor_on_colored_plate(src, true),
+        _ => None,
+    };
+    if recolored.is_some() {
+        notes.push("Simbolo ricolorato con il colore del piatto originale".to_string());
+    } else if st == G::PlateColor {
+        notes.push("Colore del piatto: nessun piatto colorato pieno trovato, simbolo lasciato com'è".to_string());
+    }
+    // a recoloured symbol keeps its size relative to the original plate; an
+    // unwrapped tile's content is stretched to the plate edge
+    let keep_tile_scale = recolored.is_some();
+    let (tile_dims, unwrapped) = if let Some((g, gb, pb)) = recolored {
+        ((pb.2 - pb.0, pb.3 - pb.1), Some((g, gb)))
+    } else if src_unwrap.is_some() {
+        (src_tile.dimensions(), src_unwrap)
+    } else if st == G::FullBleed {
+        // forced edge to edge: the isolated symbol keeps its place inside the
+        // original icon box, and that box is mapped onto the whole plate
+        let unw = crate::compose::unwrap_tile(glyph);
+        match unw {
+            Some(u) => (glyph.dimensions(), Some(u)),
+            None => {
+                let (bx0, by0, bx1, by1) = crate::imageops::alpha_bbox(src, 16).unwrap_or((0, 0, src.width(), src.height()));
+                let gb = (
+                    glyph_bbox.0.saturating_sub(bx0),
+                    glyph_bbox.1.saturating_sub(by0),
+                    glyph_bbox.0.saturating_sub(bx0) + glyph.width(),
+                    glyph_bbox.1.saturating_sub(by0) + glyph.height(),
+                );
+                notes.push("Bordo pieno: icona originale estesa a tutto il piatto".to_string());
+                ((bx1 - bx0, by1 - by0), Some((glyph.clone(), gb)))
+            }
+        }
+    } else if st == G::AsIs {
+        (glyph.dimensions(), None)
     } else {
         (glyph.dimensions(), if fallback { None } else { crate::compose::unwrap_tile(glyph) })
     };
@@ -557,7 +619,11 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     let (cx, cy, scale) = if let (Some(ib), Some((x0, y0, x1, y1))) = (inner_box, plate_box) {
         let (tw0, th0) = (tile_dims.0.max(1) as f32, tile_dims.1.max(1) as f32);
         let (bw, bh) = ((ib.2 - ib.0).max(1) as f32, (ib.3 - ib.1).max(1) as f32);
-        let k = ((x1 - x0) as f32 / bw).max((y1 - y0) as f32 / bh);
+        let k = if keep_tile_scale {
+            ((x1 - x0) as f32 / tw0).min((y1 - y0) as f32 / th0)
+        } else {
+            ((x1 - x0) as f32 / bw).max((y1 - y0) as f32 / bh)
+        };
         let icx = (ib.0 + ib.2) as f32 / 2.0 - tw0 / 2.0;
         let icy = (ib.1 + ib.3) as f32 / 2.0 - th0 / 2.0;
         ((x0 + x1) as f32 / 2.0 + icx * k, (y0 + y1) as f32 / 2.0 + icy * k, k)

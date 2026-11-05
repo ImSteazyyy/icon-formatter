@@ -41,10 +41,13 @@ class WorkItem {
   bool excluded = false;
   SegmentSettings? segOverride;
   PlacementSettings? placementOverride;
+
+  /// Per-app symbol mode (Rigenera › Modalità); null = Automatica.
+  LucentStrategy? strategyOverride;
   ItemResult? result;
 
   String? get outputPath => result?.ok == true ? result!.output : null;
-  bool get hasOverride => segOverride != null || placementOverride != null;
+  bool get hasOverride => segOverride != null || placementOverride != null || strategyOverride != null;
 }
 
 /// Shared processing state: items, selection, mode, preview, batch.
@@ -196,9 +199,28 @@ class WorkspaceController extends ChangeNotifier {
 
   ProcessSettings settingsForItem(WorkItem it) {
     final s = settings;
+    var bg = s.background;
+    final st = it.strategyOverride;
+    if (st != null && bg is BackgroundSettings_Lucent) {
+      final l = bg.params;
+      bg = BackgroundSettings.lucent(
+        params: LucentSettings(
+          ink: l.ink,
+          backdrop: l.backdrop,
+          shape: l.shape,
+          monochrome: l.monochrome,
+          keepComposition: l.keepComposition,
+          glyphScale: l.glyphScale,
+          rim: l.rim,
+          launcherShadow: l.launcherShadow,
+          nothingEncode: l.nothingEncode,
+          strategy: st,
+        ),
+      );
+    }
     return ProcessSettings(
       size: s.size,
-      background: s.background,
+      background: bg,
       placement: it.placementOverride ?? s.placement,
       segment: it.segOverride ?? s.segment,
     );
@@ -249,9 +271,18 @@ class WorkspaceController extends ChangeNotifier {
     }
   }
 
+  /// Rigenera › Modalità: forces how the symbol is taken for one icon.
+  void setStrategy(WorkItem it, LucentStrategy? st) {
+    it.strategyOverride = st == LucentStrategy.auto ? null : st;
+    notifyListeners();
+    process(only: [it]);
+    schedulePreview(immediate: true);
+  }
+
   void clearOverrides(WorkItem it) {
     it.segOverride = null;
     it.placementOverride = null;
+    it.strategyOverride = null;
     notifyListeners();
     schedulePreview();
   }

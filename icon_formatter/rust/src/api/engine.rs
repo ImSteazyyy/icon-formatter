@@ -81,6 +81,17 @@ pub struct LucentSettings {
     pub rim: f32,
     pub launcher_shadow: bool,
     pub nothing_encode: bool,
+    /// How the symbol is taken from the original (per-app override).
+    pub strategy: LucentStrategy,
+}
+
+/// Per-app choice in "Rigenera" (Automatica / Colore del piatto / Bordo pieno / Normale).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LucentStrategy {
+    Auto,
+    PlateColor,
+    FullBleed,
+    AsIs,
 }
 
 #[derive(Clone, Debug)]
@@ -112,6 +123,12 @@ impl From<&LucentSettings> for lucent::LucentParams {
             lift_greys: true,
             launcher_shadow: l.launcher_shadow,
             nothing_encode: l.nothing_encode,
+            strategy: match l.strategy {
+                LucentStrategy::Auto => lucent::GlyphStrategy::Auto,
+                LucentStrategy::PlateColor => lucent::GlyphStrategy::PlateColor,
+                LucentStrategy::FullBleed => lucent::GlyphStrategy::FullBleed,
+                LucentStrategy::AsIs => lucent::GlyphStrategy::AsIs,
+            },
         }
     }
 }
@@ -311,6 +328,7 @@ pub fn default_lucent_settings(dark: bool) -> LucentSettings {
         rim: d.rim,
         launcher_shadow: d.launcher_shadow,
         nothing_encode: d.nothing_encode,
+        strategy: LucentStrategy::Auto,
     }
 }
 

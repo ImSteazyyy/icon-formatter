@@ -15,13 +15,14 @@ import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
 import '../l10n/strings.dart';
 
-const appVersion = '1.0.0';
+const appVersion = '1.2.0';
 
-enum SettingsCat { appearance, processing, bases, ai, pack, export, system }
+enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
 
 extension on SettingsCat {
   String get label => switch (this) {
         SettingsCat.appearance => S.appearance,
+        SettingsCat.glass => S.vetro,
         SettingsCat.processing => S.processing,
         SettingsCat.bases => S.baseIcons,
         SettingsCat.ai => S.aiProvider,
@@ -30,17 +31,32 @@ extension on SettingsCat {
         SettingsCat.system => S.system,
       };
 
+  String get description => switch (this) {
+        SettingsCat.appearance => S.catAspettoDesc,
+        SettingsCat.glass => S.catVetroDesc,
+        SettingsCat.processing => S.catElaborazioneDesc,
+        SettingsCat.bases => S.catBaseDesc,
+        SettingsCat.ai => S.catAiDesc,
+        SettingsCat.pack => S.catPackDesc,
+        SettingsCat.export => S.catExportDesc,
+        SettingsCat.system => S.catSistemaDesc,
+      };
+
   IconData get icon => switch (this) {
         SettingsCat.appearance => Icons.palette_outlined,
-        SettingsCat.processing => Icons.tune,
+        SettingsCat.glass => Icons.blur_on_rounded,
+        SettingsCat.processing => Icons.tune_rounded,
         SettingsCat.bases => Icons.crop_square_rounded,
         SettingsCat.ai => Icons.auto_awesome_outlined,
         SettingsCat.pack => Icons.cleaning_services_outlined,
-        SettingsCat.export => Icons.ios_share,
+        SettingsCat.export => Icons.ios_share_rounded,
         SettingsCat.system => Icons.memory_outlined,
       };
 }
 
+/// Impostazioni: home (title, profile card, two-column grid of categories)
+/// and category pages pushed on a nested navigator, so the floating bar /
+/// sidebar stay visible and Android back returns to the home.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.initial});
 
@@ -51,55 +67,173 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class SettingsScreenState extends State<SettingsScreen> {
-  late SettingsCat cat = widget.initial ?? SettingsCat.appearance;
+  final _nav = GlobalKey<NavigatorState>();
 
-  void open(SettingsCat c) => setState(() => cat = c);
+  void open(SettingsCat c) {
+    final nav = _nav.currentState;
+    if (nav == null) return;
+    nav.popUntil((r) => r.isFirst);
+    nav.push(_route(c));
+  }
+
+  Route<void> _route(SettingsCat c) => MaterialPageRoute(settings: RouteSettings(name: c.name), builder: (_) => _CatPage(cat: c));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initial != null) WidgetsBinding.instance.addPostFrameCallback((_) => open(widget.initial!));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 900;
-    if (wide) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          SizedBox(
-            width: 220,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(S.impostazioni, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 14),
-              for (final c in SettingsCat.values)
-                ListTile(
-                  dense: true,
-                  selected: c == cat,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  leading: Icon(c.icon, size: 20),
-                  title: Text(c.label),
-                  onTap: () => setState(() => cat = c),
+    return NavigatorPopHandler(
+      onPopWithResult: (_) => _nav.currentState?.maybePop(),
+      child: Navigator(
+        key: _nav,
+        onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => _SettingsHome(onOpen: (c) => _nav.currentState!.push(_route(c)))),
+      ),
+    );
+  }
+}
+
+class _SettingsHome extends StatelessWidget {
+  const _SettingsHome({required this.onOpen});
+
+  final ValueChanged<SettingsCat> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: ListenableBuilder(
+        listenable: AppState.I,
+        builder: (context, _) => LayoutBuilder(builder: (context, box) {
+          final cols = box.maxWidth >= 1100 ? 4 : (box.maxWidth >= 720 ? 3 : 2);
+          return CustomScrollView(slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverList.list(children: [
+                const LargeHeader(S.impostazioni),
+                const _ProfileCard(),
+                const SizedBox(height: 18),
+              ]),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + GlassInsets.of(context)),
+              sliver: SliverGrid.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: 150,
                 ),
+                itemCount: SettingsCat.values.length,
+                itemBuilder: (context, i) => _CatTile(cat: SettingsCat.values[i], onTap: () => onOpen(SettingsCat.values[i])),
+              ),
+            ),
+          ]);
+        }),
+      ),
+    );
+  }
+}
+
+/// App "profile": identity, version, active base and accent.
+class _ProfileCard extends StatelessWidget {
+  const _ProfileCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final st = AppState.I;
+    final base = st.selectedBase;
+    return Glass(
+      key: const ValueKey('settings-profile'),
+      radius: st.appearance.radius + 8,
+      padding: const EdgeInsets.all(16),
+      child: Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset('assets/branding/app_icon.png', width: 60, height: 60, filterQuality: FilterQuality.medium),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text(S.iconFormatter, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.text)),
+            const SizedBox(height: 2),
+            Text(S.versioneBreve(appVersion), style: const TextStyle(fontSize: 12.5, color: Palette.text2)),
+            const SizedBox(height: 6),
+            Row(children: [
+              Container(width: 10, height: 10, decoration: BoxDecoration(color: st.appearance.accentColor, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('${S.baseAttivo}: ${base?.name ?? '—'}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+              ),
+            ]),
+          ]),
+        ),
+        if (base != null) SizedBox(width: 44, height: 44, child: IconImage(path: base.path)),
+      ]),
+    );
+  }
+}
+
+class _CatTile extends StatelessWidget {
+  const _CatTile({required this.cat, required this.onTap});
+
+  final SettingsCat cat;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = AppState.I.appearance.radius + 6;
+    return Glass(
+      radius: r,
+      padding: EdgeInsets.zero,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: ValueKey('cat-${cat.name}'),
+          borderRadius: BorderRadius.circular(r),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              IconChip(icon: cat.icon, size: 40),
+              const Spacer(),
+              Text(cat.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
+              const SizedBox(height: 3),
+              Text(cat.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, color: Palette.text2)),
             ]),
           ),
-          const SizedBox(width: 16),
-          Expanded(child: Glass(padding: EdgeInsets.zero, child: _Page(cat: cat))),
-        ]),
-      );
-    }
-    return SafeArea(
-      bottom: false,
-      child: ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + GlassInsets.of(context)), children: [
-        Text(S.impostazioni, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        for (final c in SettingsCat.values)
-          ListTile(
-            leading: Icon(c.icon),
-            title: Text(c.label),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(c.label), backgroundColor: Colors.transparent),
-                body: SafeArea(child: _Page(cat: c)),
-              ),
-            )),
+        ),
+      ),
+    );
+  }
+}
+
+/// Category page: round back button + large title, then the page body.
+class _CatPage extends StatelessWidget {
+  const _CatPage({required this.cat});
+
+  final SettingsCat cat;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: LargeHeader(
+            cat.label,
+            onBack: () => Navigator.of(context).maybePop(),
+            trailing: cat == SettingsCat.glass
+                ? TextButton(onPressed: () => AppState.I.update(AppState.I.glass.reset), child: const Text(S.ripristina))
+                : null,
           ),
+        ),
+        Expanded(child: _Page(cat: cat)),
       ]),
     );
   }
@@ -118,8 +252,9 @@ class _Page extends StatelessWidget {
       // AppState directly in build, so a const instance would never redraw.
       builder: (context, _) => switch (cat) {
         SettingsCat.appearance => _AppearancePage(),
+        SettingsCat.glass => SettingsList(header: const GlassPreview(), children: glassControls(context)),
         SettingsCat.processing => _ProcessingPage(),
-        SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
+        SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
         SettingsCat.ai => _AiPage(),
         SettingsCat.pack => _PackPage(),
         SettingsCat.export => _ExportPage(),
@@ -138,17 +273,23 @@ class _AppearancePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final a = st.appearance;
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
-      const SectionTitle(S.curvaturaPannelli),
-      SliderRow(label: S.raggio, value: a.radius, min: 4, max: 32, format: (v) => v.round().toString(), onChanged: (v) => st.update(() => a.radius = v)),
-      const SizedBox(height: 10),
+    return SettingsList(children: [
       const SectionTitle(S.accento),
       const _AccentPicker(),
-      const SizedBox(height: 10),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.animazioni), value: a.animations, onChanged: (v) => st.update(() => a.animations = v)),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.densitaCompatta), value: a.compact, onChanged: (v) => st.update(() => a.compact = v)),
-      const SizedBox(height: 18),
-      ...glassControls(context),
+      const SectionTitle(S.interfaccia),
+      SettingSwitch(icon: Icons.animation_rounded, title: S.animazioni, value: a.animations, onChanged: (v) => st.update(() => a.animations = v)),
+      SettingSwitch(icon: Icons.density_medium_rounded, title: S.densitaCompatta, value: a.compact, onChanged: (v) => st.update(() => a.compact = v)),
+      SettingsCard(children: [
+        Row(children: [
+          const IconChip(icon: Icons.blur_on_rounded),
+          const SizedBox(width: 12),
+          const Expanded(child: Text(S.catVetroDesc, style: TextStyle(fontSize: 13, color: Palette.text2))),
+          TextButton(
+            onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const _CatPage(cat: SettingsCat.glass))),
+            child: const Text(S.apri),
+          ),
+        ]),
+      ]),
     ]);
   }
 }
@@ -160,7 +301,7 @@ class _ProcessingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final s = st.segment;
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+    return SettingsList(children: [
       const SectionTitle(S.dimensioni),
       Text(S.originalCompositionUsaDimensioneDel, style: const TextStyle(fontSize: 12, color: Palette.text2)),
       Wrap(spacing: 8, children: [
@@ -194,6 +335,13 @@ class _ProcessingPage extends StatelessWidget {
       ),
       const SizedBox(height: 14),
       const SectionTitle(S.batch),
+      SettingSwitch(
+        icon: Icons.dashboard_customize_outlined,
+        title: S.autoMandaAlPack,
+        subtitle: S.autoMandaAlPackSub,
+        value: st.autoSendToPack,
+        onChanged: (v) => st.update(() => st.autoSendToPack = v),
+      ),
       SliderRow(
         label: S.thread,
         value: st.threads.toDouble(),
@@ -274,7 +422,7 @@ class _AiPageState extends State<_AiPage> {
     final st = AppState.I;
     final ai = st.ai;
     final info = aiProviders[ai.provider]!;
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+    return SettingsList(children: [
       const SectionTitle(S.provider),
       DropdownButtonFormField<AiProviderKind>(
         key: ValueKey(ai.provider),
@@ -393,7 +541,7 @@ class _PackPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final s = st.packSegment;
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+    return SettingsList(children: [
       const SectionTitle(S.segmentazionePackCleanup),
       DropdownButtonFormField<SegMode>(
         key: ValueKey(s.mode),
@@ -440,7 +588,7 @@ class _ExportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final ex = st.export;
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+    return SettingsList(children: [
       const SectionTitle(S.formato),
       const Text(S.pngRgbaTrasparenzaReale8, style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
@@ -512,7 +660,7 @@ class _SystemPageState extends State<_SystemPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
+    return SettingsList(children: [
       const SectionTitle(S.cache),
       ListTile(
         contentPadding: EdgeInsets.zero,
@@ -772,121 +920,218 @@ class _AccentPickerState extends State<_AccentPicker> {
 }
 
 
-/// Liquid glass controls (part of Appearance) with a live preview over
-/// coloured content so refraction and blur are visible.
-List<Widget> glassControls(BuildContext context) {
-    final st = AppState.I;
-    final g = st.glass;
-    final accent = st.appearance.accentColor;
-    void set(VoidCallback f) => st.update(f);
-    return [
-      const SectionTitle(S.liquidGlassAnteprima),
-      ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: 220,
-          child: Stack(children: [
-            // coloured content behind the glass, to show refraction and blur
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accent, const Color(0xFF2A6CF0), const Color(0xFFF2994A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+/// Live Liquid Glass preview over coloured content (sticky at the top of
+/// Impostazioni › Vetro). It uses the same [LiquidGlass] surfaces as the
+/// rest of the app, so what it shows is what every screen gets.
+class GlassPreview extends StatelessWidget {
+  const GlassPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = AppState.I.appearance.accentColor;
+    return ClipRRect(
+      key: const ValueKey('glass-preview'),
+      borderRadius: BorderRadius.circular(AppState.I.appearance.radius + 10),
+      child: SizedBox(
+        height: 146,
+        child: Stack(children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [accent, const Color(0xFFF2784B), const Color(0xFF2EC4B6), const Color(0xFF1B3A4B)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
               ),
             ),
-            Positioned.fill(
-              child: Wrap(spacing: 18, runSpacing: 10, alignment: WrapAlignment.center, children: [
-                for (var i = 0; i < 18; i++)
-                  Icon(
-                    const [Icons.apps_rounded, Icons.music_note_rounded, Icons.camera_alt_rounded, Icons.star_rounded][i % 4],
-                    size: 40,
-                    color: Colors.white.withValues(alpha: 0.9),
+          ),
+          // stripes behind the glass make refraction and aberration visible
+          Positioned.fill(
+            child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+              for (var i = 0; i < 6; i++)
+                Container(height: 5, margin: EdgeInsets.only(right: i.isEven ? 40 : 0), color: Colors.white.withValues(alpha: i.isEven ? 0.85 : 0.35)),
+            ]),
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            top: 10,
+            height: 56,
+            // Studio action bar, same layout as the real one
+            child: LiquidGlass(
+              radius: 28,
+              role: GlassRole.panel,
+              padding: const EdgeInsets.all(6),
+              child: Row(children: [
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(22)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Text(S.elaboraTutte, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13, shadows: glassTextShadows())),
+                    ]),
                   ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(border: Border.all(color: Colors.white.withValues(alpha: 0.30)), borderRadius: BorderRadius.circular(22)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.drive_folder_upload_outlined, color: Colors.white, size: 18),
+                      const SizedBox(width: 6),
+                      Flexible(child: Text(S.esportaCartella, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13, shadows: glassTextShadows()))),
+                    ]),
+                  ),
+                ),
               ]),
             ),
-            const Positioned(
-              left: 16,
-              right: 16,
-              top: 28,
-              child: LiquidGlass(
-                radius: 30,
-                padding: EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                child: Row(children: [
-                  Icon(Icons.blur_on, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text(S.barraVetro, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
-                ]),
-              ),
-            ),
-            const Positioned(
-              left: 16,
-              right: 16,
-              bottom: 24,
-              height: 64,
-              child: LiquidGlass(
-                radius: 32,
-                child: Row(children: [
-                  SizedBox(width: 6),
-                  SizedBox(
-                    width: 96,
-                    height: 54,
-                    child: LiquidGlass(radius: 27, dark: true, chromatic: 1, child: Center(child: Icon(Icons.home_rounded, color: Colors.white))),
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 10,
+            height: 62,
+            child: LiquidGlass(
+              radius: 31,
+              role: GlassRole.nav,
+              child: Row(children: [
+                const SizedBox(width: 5),
+                SizedBox(
+                  width: 74,
+                  height: 52,
+                  child: LiquidGlass(
+                    radius: 26,
+                    dark: true,
+                    chromatic: 1,
+                    role: GlassRole.lens,
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.auto_awesome_mosaic_outlined, color: Colors.white, size: 20),
+                      Text(S.studio, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, shadows: glassTextShadows())),
+                    ]),
                   ),
-                  Expanded(child: Icon(Icons.grid_view_rounded, color: Colors.white70)),
-                  Expanded(child: Icon(Icons.search_rounded, color: Colors.white70)),
-                ]),
+                ),
+                for (final i in const [Icons.auto_awesome_outlined, Icons.dashboard_customize_outlined, Icons.apps_rounded, Icons.settings_outlined])
+                  Expanded(child: Icon(i, color: Colors.white70, size: 20, shadows: glassTextShadows())),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Liquid Glass controls (Impostazioni › Vetro). Every value is read by
+/// [appGlassSettings], [LiquidGlass], the bottom bar, dialogs and the theme.
+List<Widget> glassControls(BuildContext context) {
+  final st = AppState.I;
+  final g = st.glass;
+  final a = st.appearance;
+  void set(VoidCallback f) => st.update(f);
+  return [
+    const SectionTitle(S.materiale),
+    ChoiceRows<GlassQualityLevel>(
+      options: const [
+        (GlassQualityLevel.fast, S.vetroVeloce),
+        (GlassQualityLevel.balanced, S.vetroBilanciato),
+        (GlassQualityLevel.quality, S.qualita),
+      ],
+      value: g.quality,
+      onChanged: (v) => set(() => g.quality = v),
+    ),
+    SliderRow(icon: Icons.blur_on_rounded, label: S.blur, value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
+    SliderRow(icon: Icons.ac_unit_rounded, label: S.frost, value: g.frost, onChanged: (v) => set(() => g.frost = v)),
+    SliderRow(icon: Icons.invert_colors_rounded, label: S.saturazione, value: g.saturation, min: 0.5, max: 2.5, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.saturation = v)),
+    const SectionTitle(S.colore),
+    _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
+    SliderRow(icon: Icons.water_drop_outlined, label: S.tintaVetro, value: g.tint, max: 0.5, onChanged: (v) => set(() => g.tint = v)),
+    const SectionTitle(S.bordoProfondita),
+    SliderRow(icon: Icons.layers_outlined, label: S.spessore, value: g.thickness, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.thickness = v)),
+    SliderRow(icon: Icons.rounded_corner_rounded, label: S.curvatura, value: a.radius, min: 4, max: 32, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => a.radius = v)),
+    SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
+    SliderRow(icon: Icons.gradient_rounded, label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
+    SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, subtitle: S.profonditaSub, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
+    if (g.quality != GlassQualityLevel.quality) const Text(S.vetroNotaQualita, style: TextStyle(fontSize: 11.5, color: Palette.text3)),
+    const SectionTitle(S.luce),
+    SliderRow(icon: Icons.light_mode_outlined, label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),
+    SliderRow(icon: Icons.explore_outlined, label: S.angoloLuce, value: g.lightAngle, min: 0, max: 360, format: (v) => '${v.round()}°', onChanged: (v) => set(() => g.lightAngle = v)),
+    SliderRow(icon: Icons.highlight_rounded, label: S.rimLight, value: g.rimLight, onChanged: (v) => set(() => g.rimLight = v)),
+    SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.bordoLucido, subtitle: S.riflessoSpeculareSulBordoPiu, value: g.gloss, onChanged: (v) => set(() => g.gloss = v)),
+    if (g.gloss) SliderRow(icon: Icons.flare_rounded, label: S.lucentezza, value: g.glossIntensity, onChanged: (v) => set(() => g.glossIntensity = v)),
+    const SectionTitle(S.leggibilita),
+    SliderRow(icon: Icons.text_fields_rounded, label: S.ombraTesto, value: g.textShadow, onChanged: (v) => set(() => g.textShadow = v)),
+    SliderRow(icon: Icons.blur_linear_rounded, label: S.sfocaturaOmbra, value: g.textShadowBlur, min: 0, max: 16, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.textShadowBlur = v)),
+    SliderRow(icon: Icons.contrast_rounded, label: S.scurezzaLente, value: g.lensDarkness, max: 0.8, onChanged: (v) => set(() => g.lensDarkness = v)),
+    const SectionTitle(S.doveUsarlo),
+    SettingSwitch(icon: Icons.view_agenda_outlined, title: S.vetroBarra, value: g.useNav, onChanged: (v) => set(() => g.useNav = v)),
+    SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroPannelli, value: g.usePanels, onChanged: (v) => set(() => g.usePanels = v)),
+    SettingSwitch(icon: Icons.smart_button_outlined, title: S.vetroPulsanti, value: g.useButtons, onChanged: (v) => set(() => g.useButtons = v)),
+    SettingSwitch(icon: Icons.web_asset_rounded, title: S.vetroDialoghi, value: g.useDialogs, onChanged: (v) => set(() => g.useDialogs = v)),
+  ];
+}
+
+/// "Tinta": neutral or one of the colour dots, plus a hue strip.
+class _TintPicker extends StatelessWidget {
+  const _TintPicker({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  static const colors = [0xFF8E8E93, 0xFFFF3B30, 0xFFFF9500, 0xFFFFCC00, 0xFF34C759, 0xFF32D2E6, 0xFF3478F6, 0xFF8E44F2, 0xFFFF2D9A];
+
+  @override
+  Widget build(BuildContext context) {
+    final hue = value == 0 ? 0.0 : HSVColor.fromColor(Color(value | 0xFF000000)).hue;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        const IconChip(icon: Icons.palette_outlined),
+        const SizedBox(width: 12),
+        const Expanded(child: Text(S.tinta, style: TextStyle(fontSize: 15, color: Palette.text))),
+        TextButton(onPressed: value == 0 ? null : () => onChanged(0), child: Text(value == 0 ? S.nessuna : S.rimuovi)),
+      ]),
+      const SizedBox(height: 8),
+      // hue strip: tap/drag picks any colour
+      LayoutBuilder(builder: (context, box) {
+        void pick(double x) => onChanged(HSVColor.fromAHSV(1, (x / box.maxWidth * 360).clamp(0, 359.9), 0.85, 1).toColor().toARGB32());
+        return GestureDetector(
+          onTapDown: (d) => pick(d.localPosition.dx),
+          onHorizontalDragUpdate: (d) => pick(d.localPosition.dx),
+          child: Container(
+            height: 26,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(13),
+              gradient: LinearGradient(colors: [for (var h = 0; h <= 360; h += 60) HSVColor.fromAHSV(1, h % 360, 0.85, 1).toColor()]),
+            ),
+            alignment: Alignment((hue / 180) - 1, 0),
+            child: value == 0
+                ? null
+                : Container(width: 8, height: 26, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
+          ),
+        );
+      }),
+      const SizedBox(height: 12),
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        for (final c in colors)
+          GestureDetector(
+            onTap: () => onChanged(c),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: Color(c),
+                shape: BoxShape.circle,
+                border: Border.all(color: (value | 0xFF000000) == c ? Colors.white : Colors.transparent, width: 2.5),
               ),
             ),
-          ]),
-        ),
-      ),
-      const SizedBox(height: 18),
-      Row(children: [
-        const Expanded(child: SectionTitle(S.liquidGlassMateriale)),
-        TextButton(onPressed: () => set(g.reset), child: const Text(S.ripristina)),
+          ),
       ]),
-      SliderRow(label: S.blur, value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
-      SliderRow(label: S.spessore, value: g.thickness, min: 0, max: 60, format: (v) => v.round().toString(), onChanged: (v) => set(() => g.thickness = v)),
-      SliderRow(label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
-      SliderRow(label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
-      SliderRow(label: S.saturazione, value: g.saturation, min: 0.5, max: 2.5, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.saturation = v)),
-      SliderRow(label: S.frost, value: g.frost, onChanged: (v) => set(() => g.frost = v)),
-      SliderRow(label: S.tintaVetro, value: g.tint, max: 0.5, onChanged: (v) => set(() => g.tint = v)),
-      const SizedBox(height: 10),
-      const SectionTitle(S.luce),
-      SliderRow(label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),
-      SliderRow(label: S.angoloLuce, value: g.lightAngle, min: 0, max: 360, format: (v) => '${v.round()}°', onChanged: (v) => set(() => g.lightAngle = v)),
-      SliderRow(label: S.rimLight, value: g.rimLight, onChanged: (v) => set(() => g.rimLight = v)),
-      const SizedBox(height: 10),
-      const SectionTitle(S.lucentezza),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text(S.bordoLucido),
-        subtitle: const Text(S.riflessoSpeculareSulBordoPiu),
-        value: g.gloss,
-        onChanged: (v) => set(() => g.gloss = v),
-      ),
-      if (g.gloss) SliderRow(label: S.intensita, value: g.glossIntensity, onChanged: (v) => set(() => g.glossIntensity = v)),
-      const SizedBox(height: 10),
-      const SectionTitle(S.leggibilita),
-      SliderRow(label: S.ombraTesto, value: g.textShadow, onChanged: (v) => set(() => g.textShadow = v)),
-      SliderRow(label: S.sfocaturaOmbra, value: g.textShadowBlur, min: 0, max: 16, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.textShadowBlur = v)),
-      const Text(S.ombraDietroTestiIconeSulle, style: TextStyle(fontSize: 11, color: Palette.text3)),
-      const SizedBox(height: 10),
-      const SectionTitle(S.lenteSelezione),
-      SliderRow(label: S.scurezzaLente, value: g.lensDarkness, max: 0.8, onChanged: (v) => set(() => g.lensDarkness = v)),
-      const SizedBox(height: 10),
-      const SectionTitle(S.qualita),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text(S.qualitaPremium),
-        subtitle: const Text(S.pipelineShaderCompletaAberrazioneCromatica),
-        value: g.premium,
-        onChanged: (v) => set(() => g.premium = v),
-      ),
-    ];
+      const SizedBox(height: 4),
+    ]);
+  }
 }

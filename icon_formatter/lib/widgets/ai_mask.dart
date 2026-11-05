@@ -12,6 +12,7 @@ import '../l10n/strings.dart';
 import '../services/ai_model_service.dart';
 import '../src/rust/api/engine.dart';
 import 'common.dart';
+import 'liquid_glass.dart';
 
 /// Settings › Elaborazione: local AI model manager (download, size, RAM,
 /// delete, mask thresholds, test on an image).
@@ -24,6 +25,7 @@ class LocalAiBox extends StatefulWidget {
 
 class _LocalAiBoxState extends State<LocalAiBox> {
   double? progress;
+  String? downloading;
   String? error;
   bool cancel = false;
 
@@ -32,6 +34,7 @@ class _LocalAiBoxState extends State<LocalAiBox> {
   Future<void> _download(AiModelInfo m) async {
     setState(() {
       progress = 0;
+      downloading = m.id;
       error = null;
       cancel = false;
     });
@@ -42,7 +45,12 @@ class _LocalAiBoxState extends State<LocalAiBox> {
     } catch (e) {
       if (mounted) setState(() => error = S.aiDownloadFallito(e));
     } finally {
-      if (mounted) setState(() => progress = null);
+      if (mounted) {
+        setState(() {
+          progress = null;
+          downloading = null;
+        });
+      }
       AppState.I.update();
     }
   }
@@ -57,9 +65,9 @@ class _LocalAiBoxState extends State<LocalAiBox> {
         const SizedBox(height: 8),
         const Text(S.aiLocaleInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
         const SizedBox(height: 8),
-        for (final m in aiModels)
-          Glass(
-            padding: const EdgeInsets.all(12),
+        for (final m in aiModelsHere)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Radio<String>(
@@ -72,6 +80,11 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                     Text(m.label, style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(S.aiModelloDettagli(_mb(m.bytes), m.ramMb), style: const TextStyle(fontSize: 12, color: Palette.text2)),
                     Text(m.note, style: const TextStyle(fontSize: 11, color: Palette.text3)),
+                    const SizedBox(height: 4),
+                    Wrap(spacing: 6, children: [
+                      if (m.phone) _Tag(S.aiTagTelefono),
+                      if (m.desktop) _Tag(m.phone ? S.aiTagWindows : S.aiTagSoloWindows),
+                    ]),
                   ]),
                 ),
                 if (st.modelReady(m)) ...[
@@ -84,12 +97,12 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                       st.update();
                     },
                   ),
-                ] else if (progress == null)
-                  FilledButton.tonal(key: const ValueKey('ai-download'), onPressed: () => _download(m), child: const Text(S.aiScarica))
-                else
+                ] else if (downloading == null)
+                  FilledButton.tonal(key: ValueKey('ai-download-${m.id}'), onPressed: () => _download(m), child: const Text(S.aiScarica))
+                else if (downloading == m.id)
                   TextButton(onPressed: () => setState(() => cancel = true), child: const Text(S.annulla)),
               ]),
-              if (progress != null) LinearProgressIndicator(value: progress),
+              if (downloading == m.id && progress != null) LinearProgressIndicator(value: progress),
             ]),
           ),
         if (error != null) Text(error!, style: const TextStyle(color: Palette.danger, fontSize: 12)),
@@ -128,7 +141,7 @@ Future<void> showAiMaskDialog(BuildContext context, {String? path, Uint8List? by
     await File(p).writeAsBytes(bytes);
   }
   if (p == null || !context.mounted) return;
-  await showDialog<void>(context: context, builder: (_) => _AiMaskDialog(path: p!));
+  await showAppDialog<void>(context: context, builder: (_) => _AiMaskDialog(path: p!));
 }
 
 class _AiMaskDialog extends StatefulWidget {
@@ -237,6 +250,22 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
         ),
       ),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text(S.chiudi))],
+    );
+  }
+}
+
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: accent.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+      child: Text(text, style: TextStyle(fontSize: 11, color: accent, fontWeight: FontWeight.w600)),
     );
   }
 }

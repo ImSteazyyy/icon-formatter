@@ -93,6 +93,17 @@ pub fn reaches_edges(src: &RgbaImage, bbox: (u32, u32, u32, u32)) -> bool {
     [near(bbox.0, x0), near(bbox.1, y0), near(bbox.2, x1), near(bbox.3, y1)].iter().filter(|&&v| v).count() >= 3
 }
 
+/// The image cropped to its visible box (alpha > 16), or a copy when it has
+/// no transparent margin.
+pub fn crop_to_content(img: &RgbaImage) -> RgbaImage {
+    match crate::imageops::alpha_bbox(img, 16) {
+        Some((x0, y0, x1, y1)) if (x1 - x0, y1 - y0) != img.dimensions() && x1 > x0 + 8 && y1 > y0 + 8 => {
+            image::imageops::crop_imm(img, x0, y0, x1 - x0, y1 - y0).to_image()
+        }
+        _ => img.clone(),
+    }
+}
+
 /// True when the glyph is itself a filled tile ("icon inside the icon": a
 /// rounded square or circle that fills most of its own box). Such glyphs
 /// are stretched to the plate edge and clipped by the plate shape.
@@ -104,6 +115,140 @@ pub fn is_tile(glyph: &RgbaImage) -> bool {
     let aspect = w.max(h) as f32 / w.min(h) as f32;
     let filled = glyph.pixels().filter(|p| p[3] > 127).count() as f32 / (w * h) as f32;
     aspect < 1.25 && filled > 0.80
+}
+
+/// Coloured plate with a neutral glyph (e.g. a dark tag on a yellow disc):
+/// the glyph becomes the plate's colour and the plate itself is dropped, so
+/// on the Lucent plate the symbol keeps the app's colour; holes inside the
+/// glyph that showed the plate become transparent. Returns the recoloured
+/// glyph cropped to the plate box, the glyph box inside it and the plate box
+/// in `img` coordinates. None when the plate is neutral, not a filled
+/// disc/rounded square, or the content is itself coloured.
+pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaImage, (u32, u32, u32, u32), (u32, u32, u32, u32))> {
+    let (x0, y0, x1, y1) = crate::imageops::alpha_bbox(img, 127)?;
+    let (w, h) = (x1 - x0, y1 - y0);
+    if w < 16 || h < 16 || w.max(h) as f32 / w.min(h) as f32 > 1.2 {
+        return None;
+    }
+    let fw = img.width();
+    let raw = img.as_raw();
+    let mut inside = 0usize;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            if raw[((y * fw + x) * 4 + 3) as usize] > 127 {
+                inside += 1;
+            }
+        }
+    }
+    // filled disc (pi/4) .. rounded square (~0.95)
+    if (inside as f32) < 0.72 * (w * h) as f32 {
+        return None;
+    }
+    let lut = crate::color::linear_lut();
+    let lab = crate::color::rgba_to_oklab(raw, &lut);
+    // plate colour: mode on a ring just inside the plate edge
+    let (cx, cy) = ((x0 + x1) as f32 / 2.0, (y0 + y1) as f32 / 2.0);
+    let r = w.min(h) as f32 / 2.0;
+    let mut bins: std::collections::HashMap<(i32, i32, i32), (u32, f32, f32, f32)> = Default::default();
+    for k in 0..720 {
+        let t = k as f32 / 720.0 * std::f32::consts::TAU;
+        for rr in [0.86f32, 0.90] {
+            let (x, y) = ((cx + t.cos() * r * rr) as u32, (cy + t.sin() * r * rr) as u32);
+            let i = (y * fw + x) as usize;
+            if raw[i * 4 + 3] < 200 {
+                continue;
+            }
+            let c = lab[i];
+            let e = bins.entry(((c.l * 30.0) as i32, (c.a * 30.0) as i32, (c.b * 30.0) as i32)).or_insert((0, 0.0, 0.0, 0.0));
+            e.0 += 1;
+            e.1 += c.l;
+            e.2 += c.a;
+            e.3 += c.b;
+        }
+    }
+    let total: u32 = bins.values().map(|v| v.0).sum();
+    let (n, sl, sa, sb) = bins.values().max_by_key(|v| v.0).copied()?;
+    // the ring must be one flat colour, and a saturated one
+    if (n as f32) < 0.6 * total as f32 {
+        return None;
+    }
+    let plate = (sl / n as f32, sa / n as f32, sb / n as f32);
+    if plate.1.hypot(plate.2) < 0.07 {
+        return None;
+    }
+    // glyph = pixels clearly different from the plate colour
+    let dist = |c: &crate::color::Lab| ((c.l - plate.0).powi(2) + (c.a - plate.1).powi(2) + (c.b - plate.2).powi(2)).sqrt();
+    let mut cover = vec![0f32; (w * h) as usize];
+    let (mut cnt, mut chroma_sum, mut l_sum) = (0usize, 0f32, 0f32);
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let i = (y * fw + x) as usize;
+            if raw[i * 4 + 3] < 128 {
+                continue;
+            }
+            // edge band of the plate (anti-aliasing, outlines, leftover
+            // background): never part of the symbol
+            let e = (w.min(h) as f32 * 0.045) as u32;
+            let edge = [(x.saturating_sub(e), y), ((x + e).min(fw - 1), y), (x, y.saturating_sub(e)), (x, (y + e).min(img.height() - 1))]
+                .iter()
+                .any(|&(ex, ey)| raw[((ey * fw + ex) * 4 + 3) as usize] < 128);
+            if edge {
+                continue;
+            }
+            let d = dist(&lab[i]);
+            let t = ((d - 0.06) / 0.10).clamp(0.0, 1.0);
+            cover[((y - y0) * w + (x - x0)) as usize] = t;
+            if t > 0.5 {
+                cnt += 1;
+                chroma_sum += lab[i].a.hypot(lab[i].b);
+                l_sum += lab[i].l;
+            }
+        }
+    }
+    let frac = cnt as f32 / inside.max(1) as f32;
+    // a real symbol, and a neutral one (dark/white): coloured artwork stays as it is
+    if !(0.03..0.75).contains(&frac) {
+        return None;
+    }
+    // automatic only for a dark neutral symbol (it would vanish on the dark
+    // frosted plate); white symbols on coloured plates stay white. `force`
+    // (per-app choice) recolours whatever sits on the plate.
+    let mean_l = l_sum / cnt.max(1) as f32;
+    if !force && (chroma_sum / cnt.max(1) as f32 > 0.06 || mean_l > 0.5 || mean_l > plate.0 - 0.2) {
+        return None;
+    }
+    // plate colour in sRGB: median of the ring pixels close to the mode
+    let mut rs = Vec::new();
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let i = (y * fw + x) as usize;
+            if raw[i * 4 + 3] > 200 && dist(&lab[i]) < 0.03 {
+                rs.push([raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2]]);
+            }
+        }
+    }
+    if rs.is_empty() {
+        return None;
+    }
+    let med = |c: usize| {
+        let mut v: Vec<u8> = rs.iter().map(|p| p[c]).collect();
+        v.sort_unstable();
+        v[v.len() / 2]
+    };
+    let col = [med(0), med(1), med(2)];
+    let mut out = RgbaImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            let t = cover[(y * w + x) as usize];
+            if t > 0.0 {
+                let a = raw[(((y + y0) * fw + x + x0) * 4 + 3) as usize] as f32 / 255.0;
+                out.put_pixel(x, y, image::Rgba([col[0], col[1], col[2], (t * a * 255.0).round() as u8]));
+            }
+        }
+    }
+    let gb = crate::imageops::alpha_bbox(&out, 32)?;
+    let crop = image::imageops::crop_imm(&out, gb.0, gb.1, gb.2 - gb.0, gb.3 - gb.1).to_image();
+    Some((crop, gb, (x0, y0, x1, y1)))
 }
 
 /// "Icon inside the icon": when the glyph is a filled tile, its own
@@ -285,19 +430,27 @@ pub fn place_on_plate(canvas: &mut RgbaImage, src: &RgbaImage, res: &SegmentResu
     let mut layer = RgbaImage::new(size, canvas.height());
     let tile = is_tile(&res.glyph);
     // a full-tile source (launcher icon) is unwrapped as a whole
-    let src_tile = covered > 0.2 && is_tile(src);
+    let src_c = crop_to_content(src);
+    let src_tile = covered > 0.2 && is_tile(&src_c);
+    let recolored = if covered > 0.2 && !src_tile { recolor_on_colored_plate(src, false) } else { None };
+    let recolored_dims = recolored.as_ref().map(|r| (r.2 .2 - r.2 .0, r.2 .3 - r.2 .1));
     let unwrapped = if !(covered > 0.2) {
         None
+    } else if let Some((g, gb, _)) = recolored {
+        Some((g, gb))
     } else if src_tile {
-        unwrap_tile(src)
+        unwrap_tile(&src_c)
     } else {
         unwrap_tile(&res.glyph)
     };
-    let tile_img = if src_tile && unwrapped.is_some() { src } else { &res.glyph };
+    let tile_img = if src_tile && unwrapped.is_some() { &src_c } else { &res.glyph };
     if let Some((inner, ib)) = &unwrapped {
         // tile box -> plate box (cover); inner content keeps its position in the tile
         let (px0, py0, px1, py1) = crate::imageops::alpha_bbox(canvas, (level * 0.6) as u8).unwrap_or((0, 0, size, canvas.height()));
-        let (tw0, th0) = (tile_img.width() as f32, tile_img.height() as f32);
+        let (tw0, th0) = match recolored_dims {
+            Some((a, b)) => (a as f32, b as f32),
+            None => (tile_img.width() as f32, tile_img.height() as f32),
+        };
         // the content box (tile minus its glossy rim) covers the plate box
         let (bw, bh) = ((ib.2 - ib.0).max(1) as f32, (ib.3 - ib.1).max(1) as f32);
         let k = ((px1 - px0) as f32 / bw).max((py1 - py0) as f32 / bh) * pl.scale_mul.clamp(0.1, 4.0);
@@ -394,5 +547,49 @@ mod tests {
         assert_eq!(out.get_pixel(1, 1)[3], 0, "corner outside the plate is clipped");
         let edge = out.get_pixel(60, 7);
         assert!(edge[3] > 200 && (edge[0] > 150 || edge[2] > 150), "content reaches the plate edge: {:?}", edge);
+    }
+
+    fn disc_with_bar(bar: [u8; 3]) -> RgbaImage {
+        let mut img = RgbaImage::new(100, 100);
+        for y in 0..100u32 {
+            for x in 0..100u32 {
+                let (dx, dy) = (x as f32 - 49.5, y as f32 - 49.5);
+                if dx.hypot(dy) < 46.0 {
+                    let on_bar = dx.abs() < 24.0 && dy.abs() < 9.0 && !(dx.abs() < 5.0 && dy.abs() < 4.0);
+                    img.put_pixel(x, y, if on_bar { Rgba([bar[0], bar[1], bar[2], 255]) } else { Rgba([248, 186, 28, 255]) });
+                }
+            }
+        }
+        img
+    }
+
+    #[test]
+    fn dark_symbol_on_coloured_disc_takes_the_plate_colour() {
+        let (g, gb, pb) = recolor_on_colored_plate(&disc_with_bar([40, 40, 46]), false).expect("recoloured");
+        assert!(pb.2 - pb.0 >= 90);
+        // the bar is now yellow, the hole in it is transparent
+        let c = g.get_pixel(3, g.height() / 2);
+        assert!(c[3] > 200 && c[0] > 230 && c[1] > 160 && c[2] < 60, "{:?}", c);
+        let hole = g.get_pixel(g.width() / 2, g.height() / 2);
+        assert!(hole[3] < 40, "hole {:?}", hole);
+        assert!(gb.2 - gb.0 > 40);
+        // a white symbol is left white in automatic mode, recoloured when forced
+        assert!(recolor_on_colored_plate(&disc_with_bar([255, 255, 255]), false).is_none());
+        assert!(recolor_on_colored_plate(&disc_with_bar([255, 255, 255]), true).is_some());
+    }
+
+    #[test]
+    fn tile_with_transparent_margin_is_still_a_tile() {
+        // launcher-style full tile drawn at 70% of a transparent canvas
+        let mut img = RgbaImage::new(200, 200);
+        for y in 30..170u32 {
+            for x in 30..170u32 {
+                img.put_pixel(x, y, Rgba([90, 90, 96, 255]));
+            }
+        }
+        assert!(!is_tile(&img));
+        let c = crop_to_content(&img);
+        assert_eq!(c.dimensions(), (140, 140));
+        assert!(is_tile(&c));
     }
 }

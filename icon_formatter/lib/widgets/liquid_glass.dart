@@ -1,8 +1,10 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import '../app/models.dart';
 import '../app/state.dart';
 
 /// Space at the bottom covered by floating glass bars (Android phone
@@ -19,16 +21,24 @@ class GlassInsets extends InheritedWidget {
   bool updateShouldNotify(GlassInsets old) => old.bottom != bottom;
 }
 
-/// Glass material from Impostazioni › Liquid Glass, rendered by
+/// Glass material from Impostazioni › Vetro, rendered by
 /// `liquid_glass_widgets`. [chromatic] scales the configured aberration.
+/// Every glass surface of the app reads it, so a change in the settings is
+/// visible everywhere at once (no restart, no per-screen copies).
 LiquidGlassSettings appGlassSettings({bool dark = false, double chromatic = 0.5}) {
   final g = AppState.I.glass;
   // Frost is applied as extra diffusion + milky tint so it is visible in
   // every quality mode (the package's own frost/aberration exist only in the
   // Premium Impeller pipeline). Aberration is also drawn by GlossOverlay.
-  final tint = dark
-      ? Colors.black.withValues(alpha: g.lensDarkness)
-      : Colors.white.withValues(alpha: (g.tint + g.frost * 0.14).clamp(0.0, 0.8));
+  final Color tint;
+  if (dark) {
+    tint = Colors.black.withValues(alpha: g.lensDarkness);
+  } else if (g.tintColor != 0) {
+    // coloured glass: "Tinta" + "Colore" (amount)
+    tint = Color(g.tintColor | 0xFF000000).withValues(alpha: (g.tint * 1.4 + g.frost * 0.10).clamp(0.0, 0.85));
+  } else {
+    tint = Colors.white.withValues(alpha: (g.tint + g.frost * 0.14).clamp(0.0, 0.8));
+  }
   return LiquidGlassSettings(
     glassColor: tint,
     blur: g.blur + g.frost * 12,
@@ -41,6 +51,39 @@ LiquidGlassSettings appGlassSettings({bool dark = false, double chromatic = 0.5}
     saturation: g.saturation,
     rimLight: g.rimLight,
   );
+}
+
+/// Bottom bar material: glass, or a solid anthracite pill when
+/// "Vetro nella barra in basso" is off.
+LiquidGlassSettings navGlassSettings() {
+  if (AppState.I.glass.useNav) return appGlassSettings(chromatic: 0.6);
+  return const LiquidGlassSettings(glassColor: Color(0xF21C1C1F), blur: 0, thickness: 0, chromaticAberration: 0, lightIntensity: 0, saturation: 1);
+}
+
+/// Where a glass surface sits; each role can be switched to a solid
+/// surface in Impostazioni › Vetro › Dove usarlo.
+enum GlassRole { panel, button, nav, lens }
+
+bool glassEnabled(GlassRole r) {
+  final g = AppState.I.glass;
+  return switch (r) {
+    GlassRole.panel => g.usePanels,
+    GlassRole.button => g.useButtons,
+    GlassRole.nav => g.useNav,
+    GlassRole.lens => g.useNav,
+  };
+}
+
+/// Solid anthracite used where glass is switched off (and by plain cards).
+const solidSurface = Color(0xFF1C1C1F);
+
+/// Drop shadow of glass surfaces ("Profondità").
+List<BoxShadow> glassDepthShadows(double radius) {
+  if (!AppState.I.glass.depth) return const [];
+  return [
+    BoxShadow(color: Colors.black.withValues(alpha: 0.38), blurRadius: 18, offset: const Offset(0, 8)),
+    BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 4, offset: const Offset(0, 1)),
+  ];
 }
 
 /// Configurable shadow behind text and icons on glass (legibility).
@@ -63,7 +106,11 @@ Widget withGlassShadows(Widget child) {
   );
 }
 
-GlassQuality get appGlassQuality => AppState.I.glass.premium ? GlassQuality.premium : GlassQuality.standard;
+GlassQuality get appGlassQuality => switch (AppState.I.glass.quality) {
+      GlassQualityLevel.fast => GlassQuality.minimal,
+      GlassQualityLevel.balanced => GlassQuality.standard,
+      GlassQualityLevel.quality => GlassQuality.premium,
+    };
 
 /// App-wide glass surface (panels, floating bars, lens) backed by
 /// `GlassContainer` from liquid_glass_widgets.
@@ -75,6 +122,7 @@ class LiquidGlass extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.chromatic = 0.6,
     this.dark = false,
+    this.role = GlassRole.panel,
   });
 
   final Widget child;
@@ -87,28 +135,68 @@ class LiquidGlass extends StatelessWidget {
   /// Darker "lens" variant.
   final bool dark;
 
+  final GlassRole role;
+
   @override
   Widget build(BuildContext context) {
     // Listens to the settings itself: glass redraws live even when created
     // as a const widget inside a parent that does not rebuild.
     return ListenableBuilder(
       listenable: AppState.I,
-      builder: (context, _) => GlossOverlay(
-        radius: radius,
-        child: GlassContainer(
-          shape: LiquidRoundedSuperellipse(borderRadius: radius),
-          padding: padding,
-          settings: appGlassSettings(dark: dark, chromatic: chromatic),
-          useOwnLayer: true,
-          quality: appGlassQuality,
-          clipBehavior: Clip.antiAlias,
-          child: withGlassShadows(child),
-        ),
-      ),
+      builder: (context, _) {
+        final shadows = glassDepthShadows(radius);
+        Widget body;
+        if (!glassEnabled(role)) {
+          body = Container(
+            padding: padding,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF26252B) : solidSurface,
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            ),
+            child: child,
+          );
+        } else {
+          body = GlossOverlay(
+            radius: radius,
+            child: GlassContainer(
+              shape: LiquidRoundedSuperellipse(borderRadius: radius),
+              padding: padding,
+              settings: appGlassSettings(dark: dark, chromatic: chromatic),
+              useOwnLayer: true,
+              quality: appGlassQuality,
+              clipBehavior: Clip.antiAlias,
+              child: withGlassShadows(child),
+            ),
+          );
+        }
+        if (shadows.isEmpty) return body;
+        return DecoratedBox(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(radius), boxShadow: shadows),
+          child: body,
+        );
+      },
     );
   }
 }
 
+/// Dialogs and sheets: the screen behind is blurred with the glass blur
+/// (Impostazioni › Vetro › Dove usarlo › Finestre di dialogo).
+Future<T?> showAppDialog<T>({required BuildContext context, required WidgetBuilder builder, bool barrierDismissible = true}) {
+  return showDialog<T>(
+    context: context,
+    barrierDismissible: barrierDismissible,
+    barrierColor: Colors.black.withValues(alpha: AppState.I.glass.useDialogs ? 0.35 : 0.6),
+    builder: (ctx) {
+      final g = AppState.I.glass;
+      final child = builder(ctx);
+      if (!g.useDialogs) return child;
+      final sigma = (g.blur + g.frost * 12).clamp(0.0, 40.0) * 0.6;
+      return BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma), child: child);
+    },
+  );
+}
 
 /// Glossy specular rim over a glass shape (Impostazioni › Liquid Glass ›
 /// Lucentezza): bright where the edge faces the light, as on the reference

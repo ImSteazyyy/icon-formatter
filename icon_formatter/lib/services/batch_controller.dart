@@ -86,6 +86,14 @@ class BatchController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Hides the finished progress strip; results stay available.
+  void dismissProgress() {
+    if (running) return;
+    done = total = errors = 0;
+    fatal = null;
+    notifyListeners();
+  }
+
   void clear() {
     results.clear();
     done = total = errors = 0;

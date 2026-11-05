@@ -19,7 +19,7 @@ android {
         applicationId = "com.iconformatter.icon_formatter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(24, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -50,4 +50,9 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // Shizuku: shell-identity install and nothing_icon_pack selection (no root)
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // on-device APK signing of the generated icon pack
+    implementation("com.android.tools.build:apksig:8.7.3")
 }

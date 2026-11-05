@@ -19,7 +19,7 @@ class Glass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, child: child);
+      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, child: child);
 }
 
 /// Soft ambient background so the glass panels have something to frost.
@@ -112,14 +112,19 @@ class IconImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (bytes != null) {
-      return Image.memory(bytes!, fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true);
-    }
-    if (path != null) {
-      return Image.file(File(path!), fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true,
-          errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Palette.text3)));
-    }
-    return const SizedBox.shrink();
+    if (bytes == null && path == null) return const SizedBox.shrink();
+    // decode at the size shown (grids show 512-1024 px icons at ~80 px):
+    // far less memory and decoding work while scrolling on phones
+    return LayoutBuilder(builder: (context, box) {
+      final dpr = MediaQuery.devicePixelRatioOf(context);
+      final side = box.biggest.shortestSide;
+      final cache = side.isFinite && side > 0 ? (side * dpr).ceil().clamp(32, 2048) : null;
+      final Widget img = bytes != null
+          ? Image.memory(bytes!, fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache)
+          : Image.file(File(path!), fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache,
+              errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Palette.text3)));
+      return RepaintBoundary(child: img);
+    });
   }
 }
 
@@ -198,7 +203,11 @@ class SliderRow extends StatefulWidget {
     this.format,
     this.onChangeEnd,
     this.divisions,
+    this.icon,
   });
+
+  /// Optional accent icon chip on the left (settings pages).
+  final IconData? icon;
 
   final String label;
   final double value;
@@ -323,54 +332,63 @@ class _SliderRowState extends State<SliderRow> {
   @override
   Widget build(BuildContext context) {
     final style = TextStyle(
-      fontSize: 12,
+      fontSize: 14,
       color: _invalid ? Palette.warn : Palette.text2,
       fontFeatures: const [ui.FontFeature.tabularFigures()],
     );
-    return Row(children: [
-      SizedBox(width: 118, child: Text(widget.label, style: Theme.of(context).textTheme.bodySmall)),
-      Expanded(
-        child: Slider(
-          value: widget.value.clamp(widget.min, widget.max),
-          min: widget.min,
-          max: widget.max,
-          divisions: widget.divisions,
-          onChanged: widget.onChanged,
-          onChangeEnd: widget.onChangeEnd,
-        ),
-      ),
-      SizedBox(
-        width: 56,
-        child: _editing
-            ? CallbackShortcuts(
-                bindings: {const SingleActivator(LogicalKeyboardKey.escape): _cancel},
-                child: TextField(
-                  key: const ValueKey('slider-edit'),
-                  controller: _ctrl,
-                  focusNode: _focus,
-                  textAlign: TextAlign.right,
-                  style: style.copyWith(color: Palette.text),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-]'))],
-                  decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
-                  onSubmitted: (_) => _commit(),
-                  onTapOutside: (_) => _focus.unfocus(),
-                ),
-              )
-            : Tooltip(
-                message: S.sliderEditHint,
-                child: InkWell(
-                  key: const ValueKey('slider-value'),
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: _start,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-                    child: Text(_f(widget.value), textAlign: TextAlign.right, style: style.copyWith(decoration: TextDecoration.underline, decorationStyle: TextDecorationStyle.dotted)),
-                  ),
+    final value = SizedBox(
+      width: 72,
+      child: _editing
+          ? CallbackShortcuts(
+              bindings: {const SingleActivator(LogicalKeyboardKey.escape): _cancel},
+              child: TextField(
+                key: const ValueKey('slider-edit'),
+                controller: _ctrl,
+                focusNode: _focus,
+                textAlign: TextAlign.right,
+                style: style.copyWith(color: Palette.text),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-]'))],
+                decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6)),
+                onSubmitted: (_) => _commit(),
+                onTapOutside: (_) => _focus.unfocus(),
+              ),
+            )
+          : Tooltip(
+              message: S.sliderEditHint,
+              child: InkWell(
+                key: const ValueKey('slider-value'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: _start,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                  child: Text(_f(widget.value), textAlign: TextAlign.right, style: style),
                 ),
               ),
-      ),
-    ]);
+            ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          if (widget.icon != null) ...[IconChip(icon: widget.icon!), const SizedBox(width: 12)],
+          Expanded(child: Text(widget.label, style: const TextStyle(fontSize: 15, color: Palette.text))),
+          value,
+        ]),
+        SizedBox(
+          height: 34,
+          child: Slider(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            value: widget.value.clamp(widget.min, widget.max),
+            min: widget.min,
+            max: widget.max,
+            divisions: widget.divisions,
+            onChanged: widget.onChanged,
+            onChangeEnd: widget.onChangeEnd,
+          ),
+        ),
+      ]),
+    );
   }
 }
 
@@ -411,7 +429,11 @@ class ProgressStrip extends StatelessWidget {
     required this.running,
     this.onCancel,
     this.label,
+    this.onDismiss,
   });
+
+  /// When finished, swiping the strip down (or tapping ×) calls this.
+  final VoidCallback? onDismiss;
 
   final int done;
   final int total;
@@ -423,7 +445,8 @@ class ProgressStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = total == 0 ? 0.0 : done / total;
-    return Glass(
+    final closable = !running && onDismiss != null;
+    final strip = Glass(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(children: [
         Expanded(
@@ -443,6 +466,27 @@ class ProgressStrip extends StatelessWidget {
           const SizedBox(width: 12),
           OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: const Text(S.annulla)),
         ],
+        if (closable) ...[
+          const SizedBox(width: 8),
+          IconButton(
+            key: const ValueKey('progress-close'),
+            tooltip: S.scorriGiuPerChiudere,
+            icon: const Icon(Icons.close_rounded, size: 18, color: Palette.text2),
+            onPressed: onDismiss,
+          ),
+        ],
+      ]),
+    );
+    if (!closable) return strip;
+    // finished: swipe down to close (a grab handle hints the gesture)
+    return Dismissible(
+      key: const ValueKey('progress-strip'),
+      direction: DismissDirection.down,
+      onDismissed: (_) => onDismiss!(),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        strip,
+        const SizedBox(height: 4),
+        Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(2))),
       ]),
     );
   }
@@ -458,7 +502,7 @@ void showMsg(BuildContext context, String msg, {bool error = false}) {
 
 Future<String?> askText(BuildContext context, String title, {String initial = '', String hint = ''}) async {
   final c = TextEditingController(text: initial);
-  return showDialog<String>(
+  return showAppDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
@@ -472,7 +516,7 @@ Future<String?> askText(BuildContext context, String title, {String initial = ''
 }
 
 Future<bool> confirm(BuildContext context, String title, String body, {String ok = S.conferma}) async {
-  final r = await showDialog<bool>(
+  final r = await showAppDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
@@ -488,7 +532,7 @@ Future<bool> confirm(BuildContext context, String title, String body, {String ok
 
 /// Full-screen zoomable viewer for one icon.
 Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, String? title}) {
-  return showDialog(
+  return showAppDialog(
     context: context,
     builder: (ctx) => Dialog(
       insetPadding: const EdgeInsets.all(24),
@@ -538,6 +582,7 @@ class ToolButton extends StatelessWidget {
       child: LiquidGlass(
         radius: 22,
         chromatic: 0.3,
+        role: GlassRole.button,
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -575,6 +620,7 @@ class GlassIconButton extends StatelessWidget {
       child: LiquidGlass(
         radius: size / 2,
         chromatic: 0.5,
+        role: GlassRole.button,
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -586,5 +632,270 @@ class GlassIconButton extends StatelessWidget {
       ),
     );
     return tooltip == null ? b : Tooltip(message: tooltip!, child: b);
+  }
+}
+
+
+// ---------------------------------------------------------------- design kit
+// Shared building blocks of the dark minimal UI: every screen, menu and
+// settings page uses these instead of ad-hoc containers.
+
+/// Accent icon in a soft rounded tile (settings rows, cards, headers).
+class IconChip extends StatelessWidget {
+  const IconChip({super.key, required this.icon, this.size = 36});
+
+  final IconData icon;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: accent.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(size * 0.3)),
+      child: Icon(icon, size: size * 0.56, color: accent),
+    );
+  }
+}
+
+/// Large page title with an optional round glass back button.
+class LargeHeader extends StatelessWidget {
+  const LargeHeader(this.title, {super.key, this.onBack, this.trailing, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onBack;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          if (onBack != null) ...[
+            GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: 50, tooltip: S.indietro),
+            const SizedBox(width: 16),
+          ],
+          Expanded(
+            child: Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text)),
+          ),
+          ?trailing,
+        ]),
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(subtitle!, style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.35)),
+        ],
+      ]),
+    );
+  }
+}
+
+/// Dark card holding a group of settings rows, separated by thin dividers.
+class SettingsCard extends StatelessWidget {
+  const SettingsCard({super.key, required this.children, this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 6)});
+
+  final List<Widget> children;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) rows.add(Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)));
+      rows.add(Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: children[i]));
+    }
+    return Glass(
+      padding: padding,
+      radius: AppState.I.appearance.radius + 6,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: rows),
+    );
+  }
+}
+
+/// Splits a flat list of settings widgets into cards: every [SectionTitle]
+/// starts a new card, plain vertical spacers are dropped.
+List<Widget> sectioned(List<Widget> items) {
+  final out = <Widget>[];
+  var group = <Widget>[];
+  void flush() {
+    if (group.isNotEmpty) {
+      out.add(SettingsCard(children: group));
+      out.add(const SizedBox(height: 22));
+    }
+    group = <Widget>[];
+  }
+
+  for (final w in items) {
+    if (w is SectionTitle) {
+      flush();
+      out.add(Padding(padding: const EdgeInsets.only(left: 6), child: w));
+    } else if (w is SizedBox && w.child == null && w.width == null) {
+      continue;
+    } else if (w is SettingsCard || w is LargeHeader) {
+      flush();
+      out.add(w);
+      out.add(const SizedBox(height: 22));
+    } else {
+      group.add(w);
+    }
+  }
+  flush();
+  return out;
+}
+
+/// Scrollable settings page body: cards from [sectioned], padding for the
+/// floating glass bar.
+class SettingsList extends StatelessWidget {
+  const SettingsList({super.key, required this.children, this.header});
+
+  final List<Widget> children;
+
+  /// Pinned widget kept visible while scrolling (e.g. Liquid Glass preview).
+  final Widget? header;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = 24 + GlassInsets.of(context);
+    final body = ListView(
+      padding: EdgeInsets.fromLTRB(16, header == null ? 4 : 14, 16, bottom),
+      children: sectioned(children),
+    );
+    if (header == null) return body;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), child: header!),
+      Expanded(
+        // content fades under the sticky preview instead of being covered
+        child: ShaderMask(
+          shaderCallback: (r) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.transparent, Colors.black],
+            stops: [0, 0.035],
+          ).createShader(r),
+          blendMode: BlendMode.dstIn,
+          child: body,
+        ),
+      ),
+    ]);
+  }
+}
+
+/// Toggle row: icon chip, title, optional subtitle, switch.
+class SettingSwitch extends StatelessWidget {
+  const SettingSwitch({super.key, required this.title, required this.value, required this.onChanged, this.icon, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+  final IconData? icon;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onChanged == null ? null : () => onChanged!(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          if (icon != null) ...[IconChip(icon: icon!), const SizedBox(width: 12)],
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 15, color: Palette.text)),
+              if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Switch(value: value, onChanged: onChanged),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Single-choice list (rows with a check mark on the selected one).
+class ChoiceRows<T> extends StatelessWidget {
+  const ChoiceRows({super.key, required this.options, required this.value, required this.onChanged});
+
+  final List<(T, String)> options;
+  final T value;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Column(children: [
+      for (var i = 0; i < options.length; i++) ...[
+        if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+        InkWell(
+          onTap: () => onChanged(options[i].$1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            child: Row(children: [
+              Expanded(
+                child: Text(options[i].$2,
+                    style: TextStyle(fontSize: 16, color: options[i].$1 == value ? Palette.text : Palette.text2)),
+              ),
+              if (options[i].$1 == value) Icon(Icons.check_rounded, color: accent),
+            ]),
+          ),
+        ),
+      ],
+    ]);
+  }
+}
+
+
+/// Numbered step of a guided flow (Pack: sorgenti -> icone nuove -> applica).
+class StepCard extends StatelessWidget {
+  const StepCard({super.key, required this.step, required this.title, this.subtitle, this.children = const [], this.done = false});
+
+  final int step;
+  final String title;
+  final String? subtitle;
+  final List<Widget> children;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Glass(
+        radius: AppState.I.appearance.radius + 6,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: done ? accent : accent.withValues(alpha: 0.16), shape: BoxShape.circle),
+              child: done
+                  ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                  : step == 0
+                      ? Icon(Icons.memory_rounded, size: 18, color: accent)
+                      : Text('$step', style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
+                if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+              ]),
+            ),
+          ]),
+          if (children.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(children: children),
+          ],
+        ]),
+      ),
+    );
   }
 }

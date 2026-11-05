@@ -59,6 +59,15 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             accent = 0xFFBA4CD4;
         }
+        // packs built on the phone share one base APK: name and accent come from assets/pack.json
+        String packTitle = getString(R.string.app_name);
+        try (InputStream in = getAssets().open("pack.json")) {
+            JSONObject meta = new JSONObject(readAll(in));
+            if (meta.has("accent")) accent = Color.parseColor(meta.getString("accent"));
+            if (meta.has("name")) packTitle = meta.getString("name");
+        } catch (Exception ignored) {
+            // Windows build: values are compiled into the resources
+        }
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -81,7 +90,7 @@ public class MainActivity extends Activity {
         logo.setImageResource(R.mipmap.ic_launcher);
         head.addView(logo, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView title = new TextView(this);
-        title.setText(getString(R.string.app_name));
+        title.setText(packTitle);
         title.setTextColor(0xFFE9E7E2);
         title.setTextSize(22);
         title.setPadding(dp(10), 0, 0, 0);
@@ -179,13 +188,17 @@ public class MainActivity extends Activity {
         if (adapter != null) adapter.notifyDataSetChanged();
     }
 
+    private static String readAll(InputStream in) throws java.io.IOException {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+        return bo.toString("UTF-8");
+    }
+
     private void load() {
         try (InputStream in = getAssets().open("mapping.json")) {
-            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-            JSONArray arr = new JSONArray(bo.toString("UTF-8"));
+            JSONArray arr = new JSONArray(readAll(in));
             PackageManager pm = getPackageManager();
             for (int k = 0; k < arr.length(); k++) {
                 JSONObject o = arr.getJSONObject(k);

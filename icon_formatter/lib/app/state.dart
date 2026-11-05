@@ -47,6 +47,9 @@ class AppState extends ChangeNotifier {
   /// Background removal provider (local Rust is the default).
   BgProvider bgProvider = BgProvider.local;
 
+  /// Studio: after "Elabora tutte" the results go to the Pack builder.
+  bool autoSendToPack = false;
+
   // Pack cleanup
   late SegmentSettings packSegment;
   StudioMode packMode = StudioMode.translucent;
@@ -115,6 +118,7 @@ class AppState extends ChangeNotifier {
     translucentSize = (j['translucentSize'] as num?)?.toInt() ?? translucentSize;
     threads = (j['threads'] as num?)?.toInt() ?? threads;
     bgProvider = BgProvider.values.firstWhere((b) => b.name == j['bgProvider'], orElse: () => BgProvider.local);
+    autoSendToPack = j['autoSendToPack'] as bool? ?? false;
     packMode = StudioMode.values.firstWhere((m) => m.name == j['packMode'], orElse: () => packMode);
     packPresetId = j['packPresetId'] as String? ?? packPresetId;
     processedPackages = ((j['processedPackages'] as List?) ?? []).cast<String>().toSet();
@@ -142,6 +146,7 @@ class AppState extends ChangeNotifier {
         'translucentSize': translucentSize,
         'threads': threads,
         'bgProvider': bgProvider.name,
+        'autoSendToPack': autoSendToPack,
         'packMode': packMode.name,
         'packPresetId': packPresetId,
         'processedPackages': processedPackages.toList(),
@@ -188,6 +193,7 @@ class AppState extends ChangeNotifier {
     translucentSize = 512;
     threads = 0;
     bgProvider = BgProvider.local;
+    autoSendToPack = false;
     packMode = StudioMode.translucent;
     packPresetId = 'nothing';
     processedPackages = {};

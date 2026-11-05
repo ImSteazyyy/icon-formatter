@@ -1496,8 +1496,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LucentSettings dco_decode_lucent_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return LucentSettings(
       ink: dco_decode_u_32(arr[0]),
       backdrop: dco_decode_u_32(arr[1]),
@@ -1508,6 +1508,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       rim: dco_decode_f_32(arr[6]),
       launcherShadow: dco_decode_bool(arr[7]),
       nothingEncode: dco_decode_bool(arr[8]),
+      strategy: dco_decode_lucent_strategy(arr[9]),
     );
   }
 
@@ -1515,6 +1516,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LucentShape dco_decode_lucent_shape(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return LucentShape.values[raw as int];
+  }
+
+  @protected
+  LucentStrategy dco_decode_lucent_strategy(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return LucentStrategy.values[raw as int];
   }
 
   @protected
@@ -2227,6 +2234,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_rim = sse_decode_f_32(deserializer);
     var var_launcherShadow = sse_decode_bool(deserializer);
     var var_nothingEncode = sse_decode_bool(deserializer);
+    var var_strategy = sse_decode_lucent_strategy(deserializer);
     return LucentSettings(
       ink: var_ink,
       backdrop: var_backdrop,
@@ -2237,6 +2245,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       rim: var_rim,
       launcherShadow: var_launcherShadow,
       nothingEncode: var_nothingEncode,
+      strategy: var_strategy,
     );
   }
 
@@ -2245,6 +2254,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return LucentShape.values[inner];
+  }
+
+  @protected
+  LucentStrategy sse_decode_lucent_strategy(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return LucentStrategy.values[inner];
   }
 
   @protected
@@ -2978,10 +2994,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_32(self.rim, serializer);
     sse_encode_bool(self.launcherShadow, serializer);
     sse_encode_bool(self.nothingEncode, serializer);
+    sse_encode_lucent_strategy(self.strategy, serializer);
   }
 
   @protected
   void sse_encode_lucent_shape(LucentShape self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_lucent_strategy(
+    LucentStrategy self,
+    SseSerializer serializer,
+  ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
   }

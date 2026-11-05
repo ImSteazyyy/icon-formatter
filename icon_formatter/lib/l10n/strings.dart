@@ -401,7 +401,13 @@ class S {
 
   // AI locale
   static const aiLocaleOffline = 'AI locale (offline, modello scaricabile)';
-  static const aiModelU2netpNote = 'Leggero, CPU ~0,8 s/icona. Licenza Apache-2.0.';
+  static const aiModelU2netpNote = 'Leggero: ~0,9 s/icona su PC, pochi secondi sul telefono senza bloccare l\'interfaccia. Licenza Apache-2.0.';
+  static const aiModelIsnetNote = 'Qualità alta su bordi fini: ~7,5 s/icona su PC (input 1024 px). Troppo pesante per il telefono. Licenza Apache-2.0.';
+  static const aiTagTelefono = 'Telefono';
+  static const aiTagWindows = 'Windows';
+  static const aiTagSoloWindows = 'Solo Windows';
+  static const aiModelliLocali = 'Modelli locali (scontorno)';
+  static const aiModelliLocaliInfo = 'Scontornano le icone sul dispositivo, senza internet e senza chiavi API.';
   static String aiDownloadFallito(Object? e) => 'Download non riuscito: $e';
   static const aiLocaleInfo = "Segmentazione con rete neurale sul dispositivo (ONNX, motore tract in Rust, CPU). Nessun dato lascia il dispositivo. Il modello si carica una volta e resta in memoria; se l'icona ha già lo sfondo trasparente la rimozione viene saltata. I risultati incerti vengono segnalati, non corretti a caso.";
   static String aiModelloDettagli(Object? size, Object? ram) => "Download $size · RAM durante l'uso ~$ram MB";
@@ -469,7 +475,7 @@ class S {
   static String asAltre(Object? n) => '…e altre $n';
   static const asApplicaLauncher = 'Applica nel launcher';
   static const asApriImpostazioniLauncher = 'Apri impostazioni Home';
-  static const asLimiteLauncher = "Android non permette a un'app di sostituire le icone di altre app né di ricaricare il pack del launcher senza root. Nothing IconGen ci riesce scrivendo l'impostazione di sistema nothing_icon_pack, cosa possibile solo con targetSdk 22 e permessi concessi via ADB (WRITE_SETTINGS / WRITE_SECURE_SETTINGS), e ricostruendo e installando sul telefono un APK del pack. Icon Formatter usa un targetSdk moderno, quindi qui il refresh silenzioso non è disponibile: esporta il pack (cartella o ZIP con appfilter.xml), compilalo in un APK di icon pack e selezionalo dalle impostazioni del launcher.";
+  static const asLimiteLauncher = "Senza Shizuku Android non permette a un'app di installare in silenzio il pack né di cambiare il pack selezionato nel launcher (la chiave nothing_icon_pack è riservata). Puoi installare il pack con la conferma di sistema e sceglierlo a mano dalle impostazioni del launcher; con Shizuku attivo Icon Formatter fa tutto da sola.";
 
   // APK del pack
   static const apkCrea = 'Crea APK';
@@ -481,4 +487,97 @@ class S {
   static const apkSdkMancante = 'Android SDK non trovato (ANDROID_HOME).';
   static String apkFallita(Object? e) => 'Compilazione non riuscita: $e';
   static const asSegnaViste = 'Segna come viste';
+
+  // Applica nel launcher (Shizuku)
+  static const dpTitolo = 'Applica nel launcher';
+  static const dpInfo = "Il pack è un'app separata (com.iconformatter.pack.device): il pack di sistema non viene toccato. Con Shizuku Icon Formatter lo installa e lo seleziona in Nothing Launcher senza PC e senza root, come Nothing IconGen.";
+  static const dpApplica = 'Installa e applica';
+  static const dpSoloInstalla = 'Installa (conferma di sistema)';
+  static const dpConcedi = 'Concedi permesso Shizuku';
+  static const dpApriShizuku = 'Apri Shizuku';
+  static const dpRipristina = 'Ripristina pack precedente';
+  static const dpScegliManuale = 'Scegli il pack nel launcher';
+  static const dpShizukuMancante = 'Shizuku non è installato. Installalo per applicare il pack in automatico; senza Shizuku puoi installare il pack con la conferma di sistema e sceglierlo a mano.';
+  static const dpShizukuFermo = "Shizuku è installato ma non è attivo: aprilo e premi Avvia (Debug wireless, nessun PC). Dopo ogni riavvio del telefono va avviato di nuovo.";
+  static const dpShizukuNegato = 'Permesso Shizuku non ancora concesso a Icon Formatter.';
+  static const dpShizukuVecchio = 'Versione di Shizuku troppo vecchia: aggiornala.';
+  static const dpShizukuOk = 'Shizuku attivo e autorizzato';
+  static const dpNoNothing = 'Nothing Launcher non trovato: il pack viene installato, sceglilo dalle impostazioni del tuo launcher.';
+  static String dpLauncher(Object v) => 'Nothing Launcher $v';
+  static String dpSelettore(Object? v) => 'nothing_icon_pack: ${v ?? '—'}';
+  static const dpCompilazione = 'Creo il pack sul telefono…';
+  static const dpInstallazione = 'Installo il pack…';
+  static const dpApplicazione = 'Seleziono il pack nel launcher…';
+  static String dpFatto(int n, String v) => 'Pack $v applicato: $n icone. Nothing Launcher ha ricevuto il cambio di pack.';
+  static const dpNonVerificato = "Pack installato, ma il launcher non riporta il pack selezionato: sceglilo a mano.";
+  static String dpInstallato(int n, String v) => 'Pack $v installato ($n icone). Sceglilo nelle impostazioni del launcher.';
+  static const dpConfermaSistema = "Conferma l'installazione nella finestra di sistema, poi scegli il pack nel launcher.";
+  static String dpRipristinato(Object? v) => 'Selezione ripristinata: ${v ?? 'predefinita'}';
+  static const dpApplicaDopo = 'Applica automaticamente dopo Rielabora';
+  static const scorriGiuPerChiudere = 'Chiudi (o scorri giù)';
+  static const indietro = 'Indietro';
+
+  // Impostazioni (home a griglia) e Vetro
+  static const vetro = 'Vetro';
+  static const interfaccia = 'Interfaccia';
+  static const apri = 'Apri';
+  static String versioneBreve(Object v) => 'Versione $v';
+  static const catAspettoDesc = 'Colore accento, animazioni e densità';
+  static const catVetroDesc = 'Liquid Glass di barra, pannelli, pulsanti e finestre';
+  static const catElaborazioneDesc = 'Dimensioni, scontorno e batch';
+  static const catBaseDesc = 'Sfondi e calibrazione delle icone';
+  static const catAiDesc = 'Servizio AI e modelli locali';
+  static const catPackDesc = 'Regole di pulizia dei pack';
+  static const catExportDesc = 'Formato, nomi e destinazione';
+  static const catSistemaDesc = 'Cache, ripristino e versione';
+  static const materiale = 'Materiale';
+  static const vetroVeloce = 'Più veloce';
+  static const vetroBilanciato = 'Bilanciato';
+  static const colore = 'Colore';
+  static const tinta = 'Tinta';
+  static const nessuna = 'Nessuna';
+  static const bordoProfondita = 'Bordo e profondità';
+  static const profonditaSub = 'Ombra morbida sotto le superfici in vetro';
+  static const vetroNotaQualita = 'Rifrazione e aberrazione cromatica del vetro sono complete con Qualità; nelle altre modalità restano sfocatura, saturazione, tinta, luce e bordo.';
+  static const doveUsarlo = 'Dove usarlo';
+  static const vetroBarra = 'Vetro nella barra in basso';
+  static const vetroPannelli = 'Vetro in pannelli e schede';
+  static const vetroPulsanti = 'Vetro nei pulsanti';
+  static const vetroDialoghi = 'Vetro nelle finestre di dialogo';
+  // Pack Builder a passi
+  static const pbSottotitoloBreve = 'Crea il tuo icon pack in pochi passi.';
+  static const pbPasso1 = 'Icone originali';
+  static const pbPasso1Sub = 'Le app a cui assegnare le icone';
+  static String pbOriginaliN(int n) => '$n icone originali caricate';
+  static const pbDaFile = 'Da file, ZIP o APK';
+  static const pbPasso2 = 'Icone nuove';
+  static const pbPasso2Sub = "Generale con lo Studio o importale, poi abbina";
+  static const pbEsporta = 'Esporta';
+  static const pbEsportaSub = 'Cartella, ZIP con appfilter.xml o APK';
+  static String dpVersioneInstallata(Object v) => 'Pack installato: versione $v (si aggiorna, non ne crea altri)';
+  // Rigenera › Modalità del simbolo (per singola app)
+  static const rigeneraConModalita = 'Rigenera con modalità…';
+  static String modalitaSimbolo(Object n) => 'Modalità simbolo · $n';
+  static const modalitaSimboloInfo = "Se il riconoscimento automatico sbaglia, scegli tu come prendere il simbolo da questa icona (solo stile Lucent).";
+  static const modoAuto = 'Automatica';
+  static const modoAutoDesc = "Decide l'app: icone a piastrella piena aperte, simboli scuri su piatto colorato ricolorati";
+  static const modoColorePiatto = 'Colore del piatto';
+  static const modoColorePiattoDesc = 'Il simbolo prende il colore dello sfondo originale (es. cartellino giallo)';
+  static const modoBordoPieno = 'Bordo pieno';
+  static const modoBordoPienoDesc = "L'icona originale arriva a tutto il bordo (Maps, Gboard…)";
+  static const modoNormale = 'Normale';
+  static const modoNormaleDesc = 'Il simbolo scontornato così com\'è, senza aperture o ricolorazioni';
+  static const importaIcona = 'Importa icona';
+  static const aiUsaLocale = 'Usa il modello AI locale per lo scontorno';
+  static const aiUsaLocaleSub = "Facoltativo: di base resta l'algoritmo classico, più veloce.";
+  // Studio -> Pack
+  static const mandaAlPack = 'Manda al Pack';
+  static String mandateAlPack(int n) => '$n icone mandate al Pack (passo 2)';
+  static const autoMandaAlPack = 'Dopo "Elabora tutte" manda le icone al Pack';
+  static const autoMandaAlPackSub = 'Le icone dello Studio arrivano da sole nel passo 2 e vengono abbinate';
+  static const studioPasso1 = 'Importa le icone';
+  static const studioPasso2 = 'Elabora';
+  static const studioPasso2Sub = "Stile scelto in alto a destra; tocca un'icona per correggerla";
+  static const studioPasso3 = 'Manda al Pack o esporta';
+  static const studioPasso3Sub = 'Crea il tuo icon pack o salva cartella/ZIP';
 }

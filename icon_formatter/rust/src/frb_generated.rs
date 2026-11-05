@@ -1577,6 +1577,7 @@ impl SseDecode for crate::api::engine::LucentSettings {
         let mut var_rim = <f32>::sse_decode(deserializer);
         let mut var_launcherShadow = <bool>::sse_decode(deserializer);
         let mut var_nothingEncode = <bool>::sse_decode(deserializer);
+        let mut var_strategy = <crate::api::engine::LucentStrategy>::sse_decode(deserializer);
         return crate::api::engine::LucentSettings {
             ink: var_ink,
             backdrop: var_backdrop,
@@ -1587,6 +1588,7 @@ impl SseDecode for crate::api::engine::LucentSettings {
             rim: var_rim,
             launcher_shadow: var_launcherShadow,
             nothing_encode: var_nothingEncode,
+            strategy: var_strategy,
         };
     }
 }
@@ -1600,6 +1602,20 @@ impl SseDecode for crate::api::engine::LucentShape {
             1 => crate::api::engine::LucentShape::Circle,
             2 => crate::api::engine::LucentShape::Squircle,
             _ => unreachable!("Invalid variant for LucentShape: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::LucentStrategy {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::engine::LucentStrategy::Auto,
+            1 => crate::api::engine::LucentStrategy::PlateColor,
+            2 => crate::api::engine::LucentStrategy::FullBleed,
+            3 => crate::api::engine::LucentStrategy::AsIs,
+            _ => unreachable!("Invalid variant for LucentStrategy: {}", inner),
         };
     }
 }
@@ -2298,6 +2314,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentSettings {
             self.rim.into_into_dart().into_dart(),
             self.launcher_shadow.into_into_dart().into_dart(),
             self.nothing_encode.into_into_dart().into_dart(),
+            self.strategy.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2332,6 +2349,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::LucentShape>
     for crate::api::engine::LucentShape
 {
     fn into_into_dart(self) -> crate::api::engine::LucentShape {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentStrategy {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Auto => 0.into_dart(),
+            Self::PlateColor => 1.into_dart(),
+            Self::FullBleed => 2.into_dart(),
+            Self::AsIs => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::LucentStrategy
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::LucentStrategy>
+    for crate::api::engine::LucentStrategy
+{
+    fn into_into_dart(self) -> crate::api::engine::LucentStrategy {
         self
     }
 }
@@ -2950,6 +2990,7 @@ impl SseEncode for crate::api::engine::LucentSettings {
         <f32>::sse_encode(self.rim, serializer);
         <bool>::sse_encode(self.launcher_shadow, serializer);
         <bool>::sse_encode(self.nothing_encode, serializer);
+        <crate::api::engine::LucentStrategy>::sse_encode(self.strategy, serializer);
     }
 }
 
@@ -2961,6 +3002,24 @@ impl SseEncode for crate::api::engine::LucentShape {
                 crate::api::engine::LucentShape::Original => 0,
                 crate::api::engine::LucentShape::Circle => 1,
                 crate::api::engine::LucentShape::Squircle => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::engine::LucentStrategy {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::engine::LucentStrategy::Auto => 0,
+                crate::api::engine::LucentStrategy::PlateColor => 1,
+                crate::api::engine::LucentStrategy::FullBleed => 2,
+                crate::api::engine::LucentStrategy::AsIs => 3,
                 _ => {
                     unimplemented!("");
                 }

@@ -279,13 +279,14 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       child: Stack(children: [
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(children: [
             Expanded(child: Text(S.appInstallate, style: Theme.of(context).textTheme.titleLarge)),
-            IconButton(tooltip: S.ricarica, onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
+            GlassIconButton(tooltip: S.ricarica, size: 46, onPressed: loading ? null : _load, icon: Icons.refresh_rounded),
+            const SizedBox(width: 8),
             PopupMenuButton<String>(
               tooltip: S.esportaIconPack,
-              icon: const Icon(Icons.ios_share),
+              child: const GlassIconButton(size: 46, onPressed: null, icon: Icons.ios_share_rounded),
               onSelected: (k) => _exportPack(kind: k),
               itemBuilder: (_) => const [
                 PopupMenuItem(value: 'zip', child: Text(S.iconPackZipAppfilterXml)),
@@ -305,7 +306,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         ),
         SizedBox(
           height: 48,
-          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
+          child: ListView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
             FilterChip(label: const Text(S.escludiAppSistema), selected: hideSystem, onSelected: (v) => setState(() => hideSystem = v)),
             const SizedBox(width: 8),
             FilterChip(label: const Text(S.soloNonElaborate), selected: onlyUnprocessed, onSelected: (v) => setState(() => onlyUnprocessed = v)),
@@ -402,7 +403,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
             builder: (context, _) {
               final b = c.batch;
               if (aiRunning || aiTotal > 0) {
-                return ProgressStrip(done: aiDone, total: aiTotal, errors: aiErrors, running: aiRunning, label: 'AI', onCancel: () => setState(() => aiCancel = true));
+                return ProgressStrip(done: aiDone, total: aiTotal, errors: aiErrors, running: aiRunning, label: 'AI', onCancel: () => setState(() => aiCancel = true), onDismiss: () => setState(() => aiTotal = aiDone = aiErrors = 0));
               }
               if (b.total == 0) return const SizedBox.shrink();
               return ProgressStrip(
@@ -412,6 +413,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                 running: b.running,
                 onCancel: b.cancel,
                 label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
+                onDismiss: b.dismissProgress,
               );
             },
           ),

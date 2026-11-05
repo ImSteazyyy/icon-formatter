@@ -69,7 +69,11 @@ class ApkPackService {
     if (await mapping.exists()) await mapping.copy(p.join(main, 'assets', 'mapping.json'));
     await File(p.join(root, 'local.properties')).writeAsString('sdk.dir=${sdk.replaceAll('\\', '/')}\n');
 
-    final id = 'com.iconformatter.pack.${sanitizeDrawableName(name: name).replaceAll(RegExp(r'^[^a-z]+'), '')}';
+    // one pack app: every build updates it (1.0, 1.1, ...), never a new one
+    const id = 'com.iconformatter.pack';
+    final vFile = File(p.join(AppPaths.I.root.path, 'pack_version.txt'));
+    final code = (int.tryParse(await vFile.exists() ? (await vFile.readAsString()).trim() : '') ?? 0) + 1;
+    final versionName = '${1 + (code - 1) ~/ 10}.${(code - 1) % 10}';
     final accent = AppState.I.appearance.accent & 0xFFFFFF;
     log?.call(S.apkCompilazione);
     final r = await Process.run(
@@ -78,10 +82,11 @@ class ApkPackService {
         'assembleRelease',
         '--no-daemon',
         '-q',
-        '-PpackId=${id.isEmpty ? 'com.iconformatter.pack.generated' : id}',
+        '-PpackId=$id',
         '-PpackName=$name',
         '-PpackAccent=#${accent.toRadixString(16).padLeft(6, '0')}',
-        '-PpackVersionCode=${DateTime.now().millisecondsSinceEpoch ~/ 60000 % 2000000000}',
+        '-PpackVersionCode=$code',
+        '-PpackVersionName=$versionName',
       ],
       workingDirectory: root,
       runInShell: true,
@@ -91,6 +96,7 @@ class ApkPackService {
       final err = '${r.stdout}\n${r.stderr}'.trim();
       throw Exception(S.apkFallita(err.length > 600 ? err.substring(err.length - 600) : err));
     }
+    await vFile.writeAsString('$code');
     return apk;
   }
 }

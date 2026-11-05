@@ -10,7 +10,7 @@ import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'engine.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `ai_kind`, `ai_of`, `background_image`, `candidates`, `check_size`, `handle`, `isolate_with`, `item_result`, `lucent_of`, `pack_info`, `placement_dto`, `preview_image`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
 SegmentSettings defaultSegmentSettings() =>
     RustLib.instance.api.crateApiEngineDefaultSegmentSettings();
@@ -594,6 +594,9 @@ class LucentSettings {
   final bool launcherShadow;
   final bool nothingEncode;
 
+  /// How the symbol is taken from the original (per-app override).
+  final LucentStrategy strategy;
+
   const LucentSettings({
     required this.ink,
     required this.backdrop,
@@ -604,6 +607,7 @@ class LucentSettings {
     required this.rim,
     required this.launcherShadow,
     required this.nothingEncode,
+    required this.strategy,
   });
 
   @override
@@ -616,7 +620,8 @@ class LucentSettings {
       glyphScale.hashCode ^
       rim.hashCode ^
       launcherShadow.hashCode ^
-      nothingEncode.hashCode;
+      nothingEncode.hashCode ^
+      strategy.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -631,7 +636,8 @@ class LucentSettings {
           glyphScale == other.glyphScale &&
           rim == other.rim &&
           launcherShadow == other.launcherShadow &&
-          nothingEncode == other.nothingEncode;
+          nothingEncode == other.nothingEncode &&
+          strategy == other.strategy;
 }
 
 enum LucentShape {
@@ -644,6 +650,9 @@ enum LucentShape {
   /// Reference squircle (0.93, n 4.25).
   squircle,
 }
+
+/// Per-app choice in "Rigenera" (Automatica / Colore del piatto / Bordo pieno / Normale).
+enum LucentStrategy { auto, plateColor, fullBleed, asIs }
 
 class MatchInput {
   final String id;

@@ -47,7 +47,7 @@ Future<void> main() async {
   runApp(LiquidGlassWidgets.wrap(
     child: const IconFormatterApp(),
     brightnessResolver: Theme.maybeBrightnessOf,
-    adaptiveQuality: true,
+    adaptiveQuality: false,
   ));
 }
 
@@ -61,7 +61,7 @@ class IconFormatterApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         title: S.iconFormatter,
         debugShowCheckedModeBanner: false,
-        theme: buildTheme(AppState.I.appearance),
+        theme: buildTheme(AppState.I.appearance, AppState.I.glass),
         home: const Shell(),
       ),
     );

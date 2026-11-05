@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../src/rust/api/engine.dart';
@@ -306,7 +307,10 @@ class AiConfig {
 }
 
 
+enum GlassQualityLevel { fast, balanced, quality }
+
 /// Liquid glass material (liquid_glass_widgets) used by bars, panels and lens.
+/// One instance (AppState.I.glass) drives every glass surface of the app.
 class GlassConfig {
   double blur = 8;
   double thickness = 28;
@@ -319,7 +323,24 @@ class GlassConfig {
   double tint = 0.08;
   double rimLight = 0.3;
   double lensDarkness = 0.32;
-  bool premium = false;
+
+  /// Render tier: fast (blur only, no shader), balanced (light shader),
+  /// quality (full shader with refraction and chromatic aberration).
+  GlassQualityLevel quality = GlassQualityLevel.balanced;
+
+  /// Glass tint colour (ARGB without alpha meaning); 0 = neutral (white/black).
+  int tintColor = 0;
+
+  /// Soft drop shadow under glass surfaces.
+  bool depth = true;
+
+  /// Where the glass material is used (off = solid anthracite surface).
+  bool useNav = true;
+  bool usePanels = true;
+  bool useButtons = true;
+  bool useDialogs = true;
+
+  bool get premium => quality == GlassQualityLevel.quality;
 
   /// Text/icon shadow on glass for legibility (0 = off).
   double textShadow = 0.6;
@@ -341,7 +362,13 @@ class GlassConfig {
         'tint': tint,
         'rimLight': rimLight,
         'lensDarkness': lensDarkness,
-        'premium': premium,
+        'quality': quality.name,
+        'tintColor': tintColor,
+        'depth': depth,
+        'useNav': useNav,
+        'usePanels': usePanels,
+        'useButtons': useButtons,
+        'useDialogs': useDialogs,
         'textShadow': textShadow,
         'gloss': gloss,
         'glossIntensity': glossIntensity,
@@ -360,7 +387,15 @@ class GlassConfig {
     tint = _d(j['tint'], tint);
     rimLight = _d(j['rimLight'], rimLight);
     lensDarkness = _d(j['lensDarkness'], lensDarkness);
-    premium = j['premium'] as bool? ?? premium;
+    // v1.1: premium flag -> quality level
+    if (j['premium'] == true) quality = GlassQualityLevel.quality;
+    quality = GlassQualityLevel.values.firstWhere((q) => q.name == j['quality'], orElse: () => quality);
+    tintColor = (j['tintColor'] as num?)?.toInt() ?? tintColor;
+    depth = j['depth'] as bool? ?? depth;
+    useNav = j['useNav'] as bool? ?? useNav;
+    usePanels = j['usePanels'] as bool? ?? usePanels;
+    useButtons = j['useButtons'] as bool? ?? useButtons;
+    useDialogs = j['useDialogs'] as bool? ?? useDialogs;
     textShadow = _d(j['textShadow'], textShadow);
     gloss = j['gloss'] as bool? ?? gloss;
     glossIntensity = _d(j['glossIntensity'], glossIntensity);
@@ -399,6 +434,7 @@ class LucentConfig {
       rim: rim,
       launcherShadow: launcherShadow && !nothingEncode,
       nothingEncode: nothingEncode,
+      strategy: LucentStrategy.auto,
     );
   }
 
@@ -431,7 +467,11 @@ class LucentConfig {
 
 /// Local AI background removal model catalogue (optional downloads).
 class AiModelInfo {
-  const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note);
+  const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note, {this.phone = true, this.desktop = true});
+
+  /// Runs smoothly on a phone (Nothing Phone (2a) Plus class) / on Windows.
+  final bool phone;
+  final bool desktop;
   final String id;
   final AiModelKind kind;
   final String label;
@@ -447,7 +487,12 @@ class AiModelInfo {
 /// so it is not listed.
 const aiModels = [
   AiModelInfo('u2netp', AiModelKind.u2Netp, 'U²-Net-p', 4574861, 350, S.aiModelU2netpNote),
+  // 1024 px input: ~7,5 s/icona su un PC (misurato), decine di secondi su telefono
+  AiModelInfo('isnet-general-use', AiModelKind.isnetGeneral, 'ISNet General', 178648008, 1400, S.aiModelIsnetNote, phone: false),
 ];
+
+/// Models offered on this device (phone-friendly ones only on Android).
+List<AiModelInfo> get aiModelsHere => [for (final m in aiModels) if (Platform.isAndroid ? m.phone : m.desktop) m];
 
 class LocalAiConfig {
   String modelId = 'u2netp';

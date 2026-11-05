@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.2.0 — 2026-11-05
+
+### Added
+- **Apply the pack on the phone with Shizuku (no PC, no root).** Icon Formatter builds the icon pack APK on the phone, signs it, installs it and selects it in Nothing Launcher.
+  - **Build:** the base APK (`assets/iconpack_base.apk`, 2000 empty drawable slots, built by `tool/make_base_apk.py`) is filled with the pack's PNGs, plus binary `appfilter.xml` / `drawable.xml`, `mapping.json` and `pack.json`. It is then signed with apksig, using a key kept in the Android Keystore.
+  - **Install and select:** `pm install`, then IconGen's sequence: the Nothing Launcher icon pack picker opens behind the app, and `nothing_icon_pack` is written to `THEMED_ICONS_NOTHING` and back to the pack 0.5 s later.
+  - **A separate app:** the pack is its own package (`com.iconformatter.pack.device`), so system packs are untouched. Each build updates it in place with a progressive version (1.0, 1.1, 1.2, …), and "Ripristina pack precedente" restores the previous selection.
+  - **Permissions:** the Shizuku permission is requested on launch, only when it is missing.
+  - **Without Shizuku:** installation goes through the system installer with user confirmation, and the pack is chosen by hand in the launcher.
+- **Studio → Pack:** a "Manda al Pack" button, and an optional automatic hand-off after "Elabora tutte", both feeding step 2 of the Pack and matching right away.
+- **Rigenera con modalità… (per icon):**
+  - Automatica.
+  - Colore del piatto: the symbol takes the colour of the original plate.
+  - Bordo pieno: edge to edge, like Maps or Gboard.
+  - Normale.
+- **Automatic recolouring:** a dark, neutral symbol on a coloured disc or tile (for example a dark tag on a yellow disc) takes the plate colour, and holes inside the symbol become transparent. White symbols stay white.
+- **AI tab › Local models:**
+  - U²-Net-p, for phone and Windows (~0.9 s per icon on a PC).
+  - ISNet General, Windows only (~7.5 s per icon, 1024 px input).
+  - Download, delete and choose the model, with an optional "Usa il modello AI locale" switch. The classic algorithm stays the default.
+- **New icons:** the app icon and the pack icon have transparent backgrounds, clean edges and the same proportions as other app icons.
+
+### Changed
+- **New UI**, following the reference screenshots:
+  - Impostazioni: a home with a large title, a profile card and a two-column grid of categories. Pages have a round back button and a large title, sections are dark cards with thin separators, sliders have an icon, name and value on top with the control below, and switches and choice lists are modern.
+  - Pack: numbered steps.
+  - Studio: when empty, it shows a 3-step guide.
+  - Everywhere: large titles, glass header buttons, and redesigned dialogs, sheets and menus.
+- **Global Liquid Glass (Impostazioni › Vetro):**
+  - The parameters drive every glass surface: bottom bar, panels and cards, buttons, and dialogs (the screen behind is blurred).
+  - The effect applies in real time without a restart.
+  - The settings are: quality (Più veloce / Bilanciato / Qualità), blur, frost, saturation, tint colour and amount, thickness, curvature, refraction, chromatic aberration, depth (shadow), light, gloss rim, legibility, lens, and where to use it.
+  - The sticky preview at the top reproduces the Studio base screen.
+  - The package's automatic quality downgrade is off, so the chosen quality is respected.
+- **Edge-to-edge icons:** a full tile with a transparent margin (as launchers return them) is now recognised, so Maps- and Gboard-like icons are no longer rendered small inside the plate.
+- **Performance on Android:** grid icons are decoded at display size (`cacheWidth`) inside a `RepaintBoundary`.
+
+### Fixed
+- **Scrolling action bars:** in Studio, AI and App, the actions no longer get cut by a straight line and now follow the rounded edge.
+- **Progress strip:** the finished strip closes with a swipe down (or ×).
+
 ## 1.1.1 — 2026-11-05
 
 ### Fixed

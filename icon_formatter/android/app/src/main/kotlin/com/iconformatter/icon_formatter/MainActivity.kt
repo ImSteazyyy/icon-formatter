@@ -32,6 +32,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         AutoSync.registerUnlock(applicationContext)
+        // ask Shizuku permission once when Shizuku is running and it is missing
+        rikka.shizuku.Shizuku.addBinderReceivedListenerSticky(shizukuBinder)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
             when (call.method) {
                 "listApps" -> background(result) { listApps(call.argument<Boolean>("includeSystem") ?: true) }
@@ -65,9 +67,46 @@ class MainActivity : FlutterActivity() {
                     val i = Intent(android.provider.Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     result.success(try { startActivity(i); true } catch (e: Exception) { false })
                 }
+                "shizukuState" -> result.success(DevicePack.shizukuState(applicationContext))
+                "shizukuRequest" -> result.success(DevicePack.requestShizukuIfNeeded(force = true))
+                "openShizuku" -> result.success(DevicePack.openShizuku(this))
+                "devicePackInfo" -> background(result) {
+                    mapOf(
+                        "shizuku" to DevicePack.shizukuState(applicationContext),
+                        "launcher" to DevicePack.launcherInstalled(applicationContext),
+                        "installed" to (DevicePack.installedVersion(applicationContext) != null),
+                        "version" to DevicePack.installedVersionName(applicationContext),
+                        "package" to DevicePack.PACKAGE,
+                        "selector" to try { DevicePack.currentSelector() } catch (_: Exception) { null },
+                    )
+                }
+                "devicePackBuild" -> background(result) {
+                    val built = DevicePack.build(
+                        applicationContext,
+                        call.argument<String>("packDir")!!,
+                        call.argument<String>("name") ?: "Icon Formatter Pack",
+                        call.argument<String>("accent") ?: "#BA4CD4",
+                    )
+                    mapOf("apk" to built.apk.absolutePath, "count" to built.count, "version" to built.versionName)
+                }
+                "devicePackInstall" -> background(result) {
+                    val apk = File(call.argument<String>("apk")!!)
+                    if (call.argument<Boolean>("shizuku") == true) {
+                        DevicePack.installShizuku(applicationContext, apk)
+                    } else {
+                        DevicePack.installSession(this, apk); "pending"
+                    }
+                }
+                "devicePackApply" -> background(result) { DevicePack.apply(this) }
+                "devicePackRestore" -> background(result) { DevicePack.restore(applicationContext) }
+                "openNothingPicker" -> result.success(DevicePack.openPicker(this))
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private val shizukuBinder = rikka.shizuku.Shizuku.OnBinderReceivedListener {
+        main.post { DevicePack.requestShizukuIfNeeded() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -327,6 +366,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        rikka.shizuku.Shizuku.removeBinderReceivedListener(shizukuBinder)
         executor.shutdown()
         super.onDestroy()
     }

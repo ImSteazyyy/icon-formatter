@@ -9,6 +9,7 @@ import '../widgets/liquid_glass.dart';
 import 'adjust_panel.dart';
 import 'workspace_controller.dart';
 import '../l10n/strings.dart';
+import '../src/rust/api/engine.dart';
 
 /// Grid tile with source or processed icon and status.
 class WorkTile extends StatelessWidget {
@@ -93,6 +94,7 @@ class WorkTile extends StatelessWidget {
       const PopupMenuItem(value: 'zoom', child: Text(S.ingrandisci)),
       PopupMenuItem(value: 'exclude', child: Text(it.excluded ? S.includi : S.escludi)),
       const PopupMenuItem(value: 'redo', child: Text(S.rielaboraQuestaIcona)),
+      const PopupMenuItem(value: 'mode', child: Text(S.rigeneraConModalita)),
       if (it.hasOverride) const PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
       const PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
     ];
@@ -118,6 +120,37 @@ class WorkTile extends StatelessWidget {
         c.toggleExcluded(it);
       case 'redo':
         c.process(only: [it]);
+      case 'mode':
+        if (!context.mounted) return;
+        final cur = it.strategyOverride ?? LucentStrategy.auto;
+        final st = await showModalBottomSheet<LucentStrategy>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(S.modalitaSimbolo(it.label ?? it.name), style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                const Text(S.modalitaSimboloInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
+                const SizedBox(height: 8),
+                for (final (v, t, d) in const [
+                  (LucentStrategy.auto, S.modoAuto, S.modoAutoDesc),
+                  (LucentStrategy.plateColor, S.modoColorePiatto, S.modoColorePiattoDesc),
+                  (LucentStrategy.fullBleed, S.modoBordoPieno, S.modoBordoPienoDesc),
+                  (LucentStrategy.asIs, S.modoNormale, S.modoNormaleDesc),
+                ])
+                  ListTile(
+                    key: ValueKey('mode-${v.name}'),
+                    title: Text(t),
+                    subtitle: Text(d),
+                    trailing: v == cur ? Icon(Icons.check_rounded, color: Theme.of(ctx).colorScheme.primary) : null,
+                    onTap: () => Navigator.pop(ctx, v),
+                  ),
+              ]),
+            ),
+          ),
+        );
+        if (st != null) c.setStrategy(it, st);
       case 'reset':
         c.clearOverrides(it);
       case 'remove':
@@ -256,6 +289,7 @@ class WorkspaceView extends StatelessWidget {
                 running: b.running,
                 onCancel: b.cancel,
                 label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
+                onDismiss: b.dismissProgress,
               ),
               if (b.fatal != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(b.fatal!, style: const TextStyle(color: Palette.danger))),
             ]),
@@ -326,11 +360,14 @@ class WorkspaceView extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           progress,
           const SizedBox(height: 6),
+          // the glass shape clips the scrolling actions, so they disappear
+          // along its rounded edge instead of a straight inner line
           LiquidGlass(
             radius: 30,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Row(children: [for (final a in bottomActions) Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: a)]),
             ),
           ),
@@ -355,9 +392,11 @@ class WorkspaceView extends StatelessWidget {
               ),
             ),
           ]),
-          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: toolbar)),
+          // chips scroll out to the screen edge (no straight cut at the page padding)
+          SingleChildScrollView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, child: Row(children: toolbar)),
           ?header,
-          SizedBox(height: (box.maxHeight * 0.36).clamp(200, 360), child: PreviewPane(c: c, compact: true)),
+          // the preview appears once there is something to show
+          if (c.items.isNotEmpty) SizedBox(height: (box.maxHeight * 0.36).clamp(200, 360), child: PreviewPane(c: c, compact: true)),
           const SizedBox(height: 8),
           Expanded(child: _grid(context, 92, bottomPad: under + 150)),
           ]),
@@ -372,9 +411,15 @@ class WorkspaceView extends StatelessWidget {
       listenable: c,
       builder: (context, _) {
         if (c.items.isEmpty) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: bottomPad),
-            child: Center(child: emptyHint ?? const Text(S.nessunaIcona, style: TextStyle(color: Palette.text3))),
+          // scrollable: the guide never overflows on short screens
+          return LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: bottomPad, top: 8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: (box.maxHeight - bottomPad - 8).clamp(0, double.infinity)),
+                child: Center(child: emptyHint ?? const Text(S.nessunaIcona, style: TextStyle(color: Palette.text3))),
+              ),
+            ),
           );
         }
         return GridView.builder(

@@ -85,4 +85,19 @@ class PlatformService {
   static Future<String?> takeLaunchAction() => _ch.invokeMethod<String>('takeLaunchAction');
 
   static Future<bool> openHomeSettings() async => (await _ch.invokeMethod<bool>('openHomeSettings')) ?? false;
+
+  // --- icon pack on the phone + Shizuku (DevicePack.kt) ---
+  static Future<String> shizukuState() async => (await _ch.invokeMethod<String>('shizukuState')) ?? 'missing';
+  static Future<bool> shizukuRequest() async => (await _ch.invokeMethod<bool>('shizukuRequest')) ?? false;
+  static Future<bool> openShizuku() async => (await _ch.invokeMethod<bool>('openShizuku')) ?? false;
+  static Future<Map<String, dynamic>> devicePackInfo() async =>
+      Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackInfo') ?? {});
+  static Future<Map<String, dynamic>> devicePackBuild(String packDir, String name, String accent) async =>
+      Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackBuild', {'packDir': packDir, 'name': name, 'accent': accent}) ?? {});
+  static Future<Object?> devicePackInstall(String apk, {required bool shizuku}) =>
+      _ch.invokeMethod('devicePackInstall', {'apk': apk, 'shizuku': shizuku});
+  static Future<Map<String, dynamic>> devicePackApply() async =>
+      Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackApply') ?? {});
+  static Future<String?> devicePackRestore() => _ch.invokeMethod<String>('devicePackRestore');
+  static Future<bool> openNothingPicker() async => (await _ch.invokeMethod<bool>('openNothingPicker')) ?? false;
 }

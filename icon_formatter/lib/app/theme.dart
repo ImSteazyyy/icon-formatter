@@ -15,7 +15,18 @@ class Palette {
   static const warn = Color(0xFFD6B25E);
 }
 
-ThemeData buildTheme(Appearance a) {
+ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
+  final g = glass ?? GlassConfig();
+  // dialogs, sheets and menus: translucent anthracite when glass is on for
+  // them (the screen behind is blurred by showAppDialog), solid otherwise
+  final tintCol = g.tintColor != 0 ? Color(g.tintColor | 0xFF000000) : const Color(0xFF2A2930);
+  final overlay = g.useDialogs
+      ? Color.alphaBlend(tintCol.withValues(alpha: (g.tint * 0.9).clamp(0.0, 0.3)), const Color(0xFF1C1C1F)).withValues(alpha: (0.94 - g.frost * 0.12).clamp(0.72, 0.96))
+      : const Color(0xFF1C1C1F);
+  final overlayShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(a.radius + 10),
+    side: BorderSide(color: Colors.white.withValues(alpha: g.useDialogs ? 0.10 : 0.05)),
+  );
   final accent = a.accentColor;
   final scheme = ColorScheme.fromSeed(
     seedColor: accent,
@@ -38,8 +49,9 @@ ThemeData buildTheme(Appearance a) {
     canvasColor: Palette.bg,
     fontFamily: 'Segoe UI',
     textTheme: const TextTheme(
-      headlineSmall: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.4, color: Palette.text),
-      titleLarge: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.3, color: Palette.text),
+      // page titles (Studio, AI, Pack, App, ...): large, like Impostazioni
+      headlineSmall: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text),
+      titleLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.7, color: Palette.text),
       titleMedium: TextStyle(fontWeight: FontWeight.w600, color: Palette.text),
       titleSmall: TextStyle(fontWeight: FontWeight.w600, color: Palette.text2, letterSpacing: 0.2),
       bodyMedium: TextStyle(color: Palette.text, height: 1.35),
@@ -48,12 +60,14 @@ ThemeData buildTheme(Appearance a) {
     ),
     dividerColor: Colors.white.withValues(alpha: 0.07),
     sliderTheme: SliderThemeData(
-      trackHeight: 3,
+      trackHeight: 6,
       activeTrackColor: accent,
-      inactiveTrackColor: Colors.white.withValues(alpha: 0.10),
-      thumbColor: accent,
-      overlayColor: accent.withValues(alpha: 0.12),
-      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+      inactiveTrackColor: Colors.white.withValues(alpha: 0.12),
+      thumbColor: Colors.white,
+      overlayColor: accent.withValues(alpha: 0.14),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10, elevation: 2),
+      trackShape: const RoundedRectSliderTrackShape(),
+      showValueIndicator: ShowValueIndicator.never,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
@@ -68,7 +82,6 @@ ThemeData buildTheme(Appearance a) {
     ),
     textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: accent, shape: const StadiumBorder())),
     iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(shape: const CircleBorder())),
-    chipTheme: const ChipThemeData(shape: StadiumBorder()),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.04),
@@ -85,7 +98,8 @@ ThemeData buildTheme(Appearance a) {
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? Colors.white : Palette.text2),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? accent : Colors.white.withValues(alpha: 0.08)),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? accent : Colors.white.withValues(alpha: 0.10)),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -94,10 +108,56 @@ ThemeData buildTheme(Appearance a) {
       shape: RoundedRectangleBorder(borderRadius: r),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: const Color(0xFF1C1C1F),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(a.radius)),
+      backgroundColor: overlay,
+      surfaceTintColor: Colors.transparent,
+      shape: overlayShape,
+      titleTextStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: Palette.text),
+      contentTextStyle: const TextStyle(fontSize: 14.5, height: 1.45, color: Palette.text2),
     ),
-    bottomSheetTheme: const BottomSheetThemeData(backgroundColor: Color(0xFF1A1A1D), showDragHandle: true),
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: overlay,
+      surfaceTintColor: Colors.transparent,
+      showDragHandle: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(a.radius + 10))),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: overlay,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(a.radius * 0.8)),
+      textStyle: const TextStyle(color: Palette.text, fontSize: 14),
+    ),
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(overlay),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(a.radius * 0.8))),
+      ),
+    ),
+    dropdownMenuTheme: DropdownMenuThemeData(
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(overlay),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(a.radius * 0.8))),
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      contentPadding: EdgeInsets.zero,
+      titleTextStyle: TextStyle(fontSize: 15, color: Palette.text),
+      subtitleTextStyle: TextStyle(fontSize: 12, color: Palette.text2),
+      iconColor: Palette.text2,
+    ),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: Palette.text),
+    ),
+    chipTheme: ChipThemeData(
+      shape: const StadiumBorder(),
+      side: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+      backgroundColor: Colors.white.withValues(alpha: 0.04),
+      selectedColor: accent.withValues(alpha: 0.22),
+      labelStyle: const TextStyle(color: Palette.text, fontSize: 13),
+    ),
     pageTransitionsTheme: PageTransitionsTheme(
       builders: {
         for (final p in TargetPlatform.values)

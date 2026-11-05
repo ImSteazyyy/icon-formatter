@@ -69,7 +69,7 @@ class _ShellState extends State<Shell> {
     pages = [
       for (final d in dests)
         switch (d.id) {
-          'studio' => StudioScreen(onOpenBases: _openBases),
+          'studio' => StudioScreen(onOpenBases: _openBases, onOpenPack: () => _go('builder')),
           'ai' => AiScreen(onOpenSettings: () => _openSettings(SettingsCat.ai)),
           'pack' => PackScreen(onOpenBases: _openBases),
           'builder' => const PackBuilderScreen(),
@@ -122,6 +122,17 @@ class _ShellState extends State<Shell> {
               bottom: inset,
               // nav redraws on every settings change (glass, accent, shadows)
               child: ListenableBuilder(listenable: AppState.I, builder: (context, _) => Stack(children: [
+                // "Profondità": soft shadow under the floating pill
+                if (AppState.I.glass.depth)
+                  Positioned(
+                    left: 12,
+                    right: 12,
+                    top: 12,
+                    height: navH,
+                    child: IgnorePointer(
+                      child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(navH / 2), boxShadow: glassDepthShadows(navH / 2))),
+                    ),
+                  ),
                 GlassTabBar.bottom(
                 key: _navKey,
                 barHeight: navH,
@@ -129,7 +140,7 @@ class _ShellState extends State<Shell> {
                 verticalPadding: 12,
                 selectedIndex: index,
                 onTabSelected: (i) => setState(() => index = i),
-                settings: appGlassSettings(chromatic: 0.6),
+                settings: navGlassSettings(),
                 quality: appGlassQuality,
                 // dark grey lens tinted with a desaturated pink-lilac accent
                 indicatorColor: Color.lerp(const Color(0xFF26252B), HSLColor.fromColor(accent).withSaturation(0.28).toColor(), 0.42)!.withValues(alpha: 0.62),

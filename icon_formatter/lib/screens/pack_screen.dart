@@ -10,6 +10,7 @@ import '../services/export_service.dart';
 import '../services/import_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/common.dart';
+import '../widgets/liquid_glass.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
 import '../l10n/strings.dart';
@@ -192,7 +193,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
       ]);
 
   void _details(PackInfo pi) {
-    showDialog(
+    showAppDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text(S.dettagliMapping),

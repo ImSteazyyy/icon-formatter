@@ -66,6 +66,9 @@ class PbRow {
 
 /// Icon Pack Builder: originals ↔ generated association, corrections, export.
 class PackBuilderController extends ChangeNotifier {
+  /// One builder for the app: the Studio sends its results here.
+  static final I = PackBuilderController();
+
   final List<PbIcon> originals = [];
   final List<PbIcon> generated = [];
   final List<PbRow> rows = [];
@@ -161,6 +164,19 @@ class PackBuilderController extends ChangeNotifier {
     } catch (e) {
       _set(S.errore(e), running: false);
     }
+  }
+
+  /// Studio › "Manda al Pack": generated icons (with app label/package when
+  /// known) become step 2; they are matched right away when originals exist.
+  Future<int> addFromStudio(List<PbIcon> icons) async {
+    if (icons.isEmpty) return 0;
+    final ids = icons.map((g) => g.id).toSet();
+    generated.removeWhere((g) => ids.contains(g.id));
+    generated.addAll(icons);
+    _set(S.pbGenerateCaricate(generated.length), running: false);
+    if (originals.isNotEmpty) await match();
+    notifyListeners();
+    return icons.length;
   }
 
   Future<String?> Function() _pickKindImpl = () async => null;
@@ -321,6 +337,47 @@ class PackBuilderController extends ChangeNotifier {
     }
   }
 
+  /// Android: builds the pack APK on the phone, installs it and (with
+  /// Shizuku) selects it in Nothing Launcher. Returns the user message.
+  Future<String?> applyOnDevice({String name = 'Icon Formatter Pack'}) async {
+    _set(S.dpCompilazione, running: true);
+    try {
+      final dir = await _buildPackDir(name);
+      if (dir == null) {
+        _set(S.pbNienteDaEsportare, running: false);
+        return null;
+      }
+      final accent = '#${(AppState.I.appearance.accent & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+      final built = await PlatformService.devicePackBuild(dir, name, accent);
+      final apk = built['apk'] as String;
+      final n = (built['count'] as num).toInt();
+      final v = built['version'] as String? ?? '';
+      final shizuku = await PlatformService.shizukuState() == 'granted';
+      _set(S.dpInstallazione, running: true);
+      await PlatformService.devicePackInstall(apk, shizuku: shizuku);
+      if (!shizuku) {
+        _set(S.dpConfermaSistema, running: false);
+        return S.dpConfermaSistema;
+      }
+      final info = await PlatformService.devicePackInfo();
+      if (info['launcher'] == null) {
+        _set(S.dpInstallato(n, v), running: false);
+        return S.dpNoNothing;
+      }
+      _set(S.dpApplicazione, running: true);
+      final r = await PlatformService.devicePackApply();
+      final msg = r['verified'] == true ? S.dpFatto(n, v) : S.dpNonVerificato;
+      _set(msg, running: false);
+      return msg;
+    } catch (e) {
+      _set(S.errore(e), running: false);
+      rethrow;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<ExportResult?> export({required bool zip}) async {
     final ok = rows.where((r) => !r.excluded && r.generatedId != null).toList();
     if (ok.isEmpty) return null;
@@ -356,7 +413,7 @@ class PackBuilderScreen extends StatefulWidget {
 }
 
 class _PackBuilderScreenState extends State<PackBuilderScreen> {
-  final c = PackBuilderController();
+  final c = PackBuilderController.I;
   PbState? filter;
   String query = '';
 
@@ -419,25 +476,48 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
         return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + GlassInsets.of(context)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(S.pbTitolo, style: Theme.of(context).textTheme.titleLarge)),
-                TextButton.icon(
-                  icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                  label: const Text(S.packCleanup),
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text(S.packCleanup)), body: PackScreen(onOpenBases: () {})))),
-                ),
-            ]),
-            const SizedBox(height: 4),
-            Text(S.pbSottotitolo, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-            if (Platform.isAndroid) AutoSyncCard(builder: c),
-            const SizedBox(height: 10),
-            Wrap(children: [
-              if (Platform.isAndroid) ToolButton(icon: Icons.apps_rounded, label: S.pbAppInstallate, onTap: c.busy ? null : () => _run(c.addInstalledApps)),
-              ToolButton(icon: Icons.inventory_2_outlined, label: S.pbOriginali, onTap: c.busy ? null : () => _run(() => c.addSource(original: true))),
-              ToolButton(icon: Icons.auto_fix_high_outlined, label: S.pbGeneraDaStudio, onTap: c.busy || c.originals.isEmpty ? null : () => _run(() => c.generateFromOriginals())),
-              ToolButton(icon: Icons.collections_outlined, label: S.pbImportaGenerate, onTap: c.busy ? null : () => _run(() => c.addSource(original: false))),
-              ToolButton(icon: Icons.join_inner_rounded, label: S.pbAbbina, onTap: c.busy || c.originals.isEmpty ? null : () => _run(c.match)),
-            ]),
+            LargeHeader(
+              S.pbTitolo,
+              subtitle: S.pbSottotitoloBreve,
+              trailing: GlassIconButton(
+                icon: Icons.cleaning_services_outlined,
+                tooltip: S.packCleanup,
+                size: 46,
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (ctx) => Scaffold(
+                    body: Backdrop(
+                      child: SafeArea(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 0), child: LargeHeader(S.packCleanup, onBack: () => Navigator.of(ctx).pop())),
+                          Expanded(child: PackScreen(onOpenBases: () {})),
+                        ]),
+                      ),
+                    ),
+                  ),
+                )),
+              ),
+            ),
+            StepCard(
+              step: 1,
+              title: S.pbPasso1,
+              subtitle: c.originals.isEmpty ? S.pbPasso1Sub : S.pbOriginaliN(c.originals.length),
+              done: c.originals.isNotEmpty,
+              children: [
+                if (Platform.isAndroid) ToolButton(icon: Icons.apps_rounded, label: S.pbAppInstallate, onTap: c.busy ? null : () => _run(c.addInstalledApps)),
+                ToolButton(icon: Icons.inventory_2_outlined, label: Platform.isAndroid ? S.pbDaFile : S.pbOriginali, onTap: c.busy ? null : () => _run(() => c.addSource(original: true))),
+              ],
+            ),
+            StepCard(
+              step: 2,
+              title: S.pbPasso2,
+              subtitle: S.pbPasso2Sub,
+              done: c.rows.isNotEmpty,
+              children: [
+                ToolButton(icon: Icons.auto_fix_high_outlined, label: S.pbGeneraDaStudio, onTap: c.busy || c.originals.isEmpty ? null : () => _run(() => c.generateFromOriginals())),
+                ToolButton(icon: Icons.collections_outlined, label: S.pbImportaGenerate, onTap: c.busy ? null : () => _run(() => c.addSource(original: false))),
+                ToolButton(icon: Icons.join_inner_rounded, label: S.pbAbbina, onTap: c.busy || c.originals.isEmpty ? null : () => _run(c.match)),
+              ],
+            ),
             if (c.status != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -480,8 +560,10 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       itemBuilder: (context, i) => _card(rows[i]),
                     ),
             ),
+            const SizedBox(height: 12),
+            if (Platform.isAndroid) LauncherApplyCard(builder: c),
             if (c.rows.isNotEmpty)
-              Wrap(alignment: WrapAlignment.end, children: [
+              StepCard(step: Platform.isAndroid ? 4 : 3, title: S.pbEsporta, subtitle: S.pbEsportaSub, children: [
                 ToolButton(icon: Icons.drive_folder_upload_outlined, label: S.esportaCartella, onTap: c.busy ? null : () => _export(false)),
                 ToolButton(icon: Icons.folder_zip_outlined, label: S.pbEsportaZip, onTap: c.busy ? null : () => _export(true)),
                 if (ApkPackService.available)
@@ -502,6 +584,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                           },
                   ),
               ]),
+            if (Platform.isAndroid) const SizedBox(height: 12),
+            if (Platform.isAndroid) AutoSyncCard(builder: c),
           ]),
         );
       },
@@ -546,7 +630,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
   }
 
   Future<void> _details(PbRow r) async {
-    await showDialog<void>(
+    await showAppDialog<void>(
       context: context,
       builder: (ctx) => ListenableBuilder(
         listenable: c,
@@ -593,7 +677,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
   }
 
   Future<void> _pick(PbRow r) async {
-    final picked = await showDialog<PbIcon>(
+    final picked = await showAppDialog<PbIcon>(
       context: context,
       builder: (ctx) {
         var q = '';
@@ -724,31 +808,14 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
                       await widget.builder.generateFromOriginals();
                       await PlatformService.autoSyncClear(pending.map((m) => m['component'] as String).toList());
                       await _load(PlatformService.autoSyncStatus);
+                      // with Shizuku the refreshed pack is re-applied right away
+                      final info = await PlatformService.devicePackInfo();
+                      if (info['shizuku'] == 'granted' && info['installed'] == true) {
+                        final msg = await widget.builder.applyOnDevice();
+                        if (context.mounted && msg != null) showMsg(context, msg);
+                      }
                     },
             ),
-          TextButton.icon(
-            icon: const Icon(Icons.home_outlined, size: 18),
-            label: const Text(S.asApplicaLauncher),
-            onPressed: () async {
-              await showDialog<void>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text(S.asApplicaLauncher),
-                  content: const Text(S.asLimiteLauncher),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.chiudi)),
-                    FilledButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        PlatformService.openHomeSettings();
-                      },
-                      child: const Text(S.asApriImpostazioniLauncher),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
         ]),
         if (pending.isNotEmpty) ...[
           const SizedBox(height: 6),
@@ -756,6 +823,146 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
           if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: const TextStyle(fontSize: 11, color: Palette.text3)),
         ],
       ]),
+    );
+  }
+}
+
+
+/// Android: install the pack and select it in Nothing Launcher through
+/// Shizuku (DevicePack.kt). Without Shizuku: system installer + manual pick.
+class LauncherApplyCard extends StatefulWidget {
+  const LauncherApplyCard({super.key, required this.builder});
+  final PackBuilderController builder;
+
+  @override
+  State<LauncherApplyCard> createState() => _LauncherApplyCardState();
+}
+
+class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindingObserver {
+  Map<String, dynamic> info = {};
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // changes made in the Shizuku app (start, permission) show up on return
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final r = await PlatformService.devicePackInfo();
+      if (mounted) setState(() => info = r);
+    } catch (_) {}
+  }
+
+  Future<void> _do(Future<String?> Function() f) async {
+    setState(() => busy = true);
+    try {
+      final msg = await f();
+      if (mounted && msg != null) showMsg(context, msg);
+    } catch (e) {
+      if (mounted) showMsg(context, S.errore(e), error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+      await _refresh();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sh = info['shizuku'] as String? ?? 'missing';
+    final launcher = info['launcher'];
+    final (stateText, stateColor) = switch (sh) {
+      'granted' => (S.dpShizukuOk, Palette.ok),
+      'denied' => (S.dpShizukuNegato, Palette.warn),
+      'stopped' => (S.dpShizukuFermo, Palette.warn),
+      'old' => (S.dpShizukuVecchio, Palette.danger),
+      _ => (S.dpShizukuMancante, Palette.text2),
+    };
+    final hasRows = widget.builder.rows.any((r) => !r.excluded && r.generatedId != null);
+    final working = busy || widget.builder.busy;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Glass(
+        key: const ValueKey('launcher-apply-card'),
+        radius: AppState.I.appearance.radius + 6,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16), shape: BoxShape.circle),
+              child: Text('3', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text(S.dpTitolo, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text))),
+          ]),
+          const SizedBox(height: 10),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 4), child: Icon(Icons.circle, size: 9, color: stateColor)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(stateText, key: const ValueKey('shizuku-state'), style: const TextStyle(fontSize: 12.5, color: Palette.text))),
+          ]),
+          const SizedBox(height: 4),
+          Text(
+            [
+              if (info['version'] != null) S.dpVersioneInstallata(info['version']),
+              launcher == null ? S.dpNoNothing : S.dpLauncher(launcher),
+              if (sh == 'granted') S.dpSelettore(info['selector']),
+            ].join(' · '),
+            style: const TextStyle(fontSize: 11, color: Palette.text3),
+          ),
+          const SizedBox(height: 4),
+          const Text(S.dpInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            if (sh == 'granted')
+              FilledButton.icon(
+                key: const ValueKey('dp-apply'),
+                icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                label: const Text(S.dpApplica),
+                onPressed: working || !hasRows ? null : () => _do(widget.builder.applyOnDevice),
+              )
+            else
+              FilledButton.tonalIcon(
+                key: const ValueKey('dp-install'),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text(S.dpSoloInstalla),
+                onPressed: working || !hasRows ? null : () => _do(widget.builder.applyOnDevice),
+              ),
+            if (sh == 'denied')
+              OutlinedButton(onPressed: PlatformService.shizukuRequest, child: const Text(S.dpConcedi)),
+            if (sh == 'stopped' || sh == 'old')
+              OutlinedButton(onPressed: PlatformService.openShizuku, child: const Text(S.dpApriShizuku)),
+            if (sh == 'granted' && info['installed'] == true)
+              OutlinedButton(
+                onPressed: working ? null : () => _do(() async => S.dpRipristinato(await PlatformService.devicePackRestore())),
+                child: const Text(S.dpRipristina),
+              ),
+            TextButton(
+              onPressed: () async {
+                if (!await PlatformService.openNothingPicker()) await PlatformService.openHomeSettings();
+              },
+              child: const Text(S.dpScegliManuale),
+            ),
+          ]),
+        ]),
+      ),
     );
   }
 }

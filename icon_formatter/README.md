@@ -29,7 +29,14 @@ Images cross the FFI as file paths whenever possible (batches read and write dir
 
 ## UI
 
-- **Liquid glass**: [`liquid_glass_widgets`](https://github.com/sdegenaar/liquid_glass_widgets) 1.16 (refraction, chromatic aberration, specular light). On Android the navigation is a floating `GlassTabBar.bottom` with a dark lens; the action bars float above it and content scrolls underneath. Every parameter (blur, thickness, refraction, aberration, light, gloss rim, text shadow, lens, Standard/Premium quality) lives in Settings › Liquid Glass.
+- **Liquid glass**: [`liquid_glass_widgets`](https://github.com/sdegenaar/liquid_glass_widgets) 1.16 (refraction, chromatic aberration, specular light).
+  - On Android the navigation is a floating `GlassTabBar.bottom` with a dark lens; the action bars float above it and content scrolls underneath.
+  - One `GlassConfig` (Impostazioni › Vetro) drives every glass surface (`LiquidGlass` with a `GlassRole`: panel, button, nav, lens), the bottom bar, dialogs (`showAppDialog` blurs the screen behind) and the theme (dialogs, sheets, menus), live.
+  - Each surface can switch to a solid anthracite one.
+  - Quality levels: Più veloce = `minimal`, Bilanciato = `standard`, Qualità = `premium`. Refraction and aberration are complete only in Qualità.
+- **Layout**:
+  - Impostazioni is a grid home with nested pages (`SettingsList` + `SettingsCard`).
+  - Shared kit in `widgets/common.dart`: `IconChip`, `LargeHeader`, `SettingSwitch`, `ChoiceRows`, `StepCard`.
 - **Windows**: custom title bar (`window_manager` 0.5, native caption hidden).
 - **Accent**: default pink #BA4CD4 (sampled from the Windows Start icon), with presets, hex entry and HSL sliders.
 
@@ -42,7 +49,8 @@ Engines (Settings › Elaborazione):
   - The model is loaded once and reused.
   - Removal is skipped when the background is already transparent.
   - Mask preview with thresholds; uncertain results are flagged.
-  - Silueta and IS-Net took about 93 s per icon with `tract`, so they are not offered. No GPU path with `tract`.
+  - ISNet General (170 MB, 1024 px input) is offered on Windows only: ~7.5 s per icon on the same PC, too slow for a phone.
+  - Silueta took about 89 s per icon with `tract`, so it is not offered. No GPU path with `tract`.
 
 Option: Option: **remove.bg** (Settings › Processing), with the API key in secure storage, a test that shows the remaining credits, and one call per image cached for the session. In a batch, the calls run first (3 in parallel, cancellable), then Rust composites the cutout without re-segmenting it.
 
@@ -76,6 +84,25 @@ Manual corrections are stored in `state.json` (`packCorrections`).
 
 Export: folder or ZIP (`res/drawable-nodpi`, `appfilter.xml`, `mapping.json`). On Windows, **Crea APK** fills `assets/iconpack_template.zip` (source in `iconpack_template/`, rebuild with `python tool/make_template_zip.py`) and runs Gradle with the local Android SDK and JDK. The result is an installable icon pack with its own icon browser, signed with the local debug key.
 
+### On the phone, with Shizuku (`DevicePack.kt`)
+
+**Install and apply.** The pack is the separate app `com.iconformatter.pack.device`. It is built on the phone from `assets/iconpack_base.apk`, which `tool/make_base_apk.py` creates with 2000 empty drawable slots:
+- the slots get the PNGs;
+- binary `appfilter.xml` and `drawable.xml` are written (an AXML writer validated with `aapt2 dump xmltree`), together with `mapping.json` and `pack.json`;
+- `versionCode` / `versionName` are patched in the manifest (1.0, 1.1, …);
+- the APK is signed with apksig (Android Keystore key).
+
+Shizuku (shell identity) then runs `pm install -r` and IconGen's selection sequence: open `com.nothing.launcher.icon_pack_picker` behind the task, write `nothing_icon_pack` = `THEMED_ICONS_NOTHING`, then the pack package after 500 ms. The previous value is saved for "Ripristina".
+
+Shizuku starts on the phone itself (Wireless debugging, Android 11+). Without it, the APK goes through the system installer and the pack is chosen by hand.
+
+**Verified on the emulator (API 35):**
+- Shizuku 13.6 is started as shell and the permission is granted in the app dialog.
+- A stub `com.nothing.launcher` (5.0) has the picker activity.
+- Results: install, update 1.1 → 1.2 → 1.3, the temporary value seen by polling, the final selector equal to the pack, `aapt2` and `apksigner` checks.
+
+**Not verified:** how a real Nothing Launcher on Nothing OS 5.0 redraws the icons. That needs the phone.
+
 ## Android automation
 
 - A persisted JobScheduler job (every 6 h, battery not low; survives reboots, subject to Doze) plus an immediate check on unlock (`USER_PRESENT`) while the process is alive.
@@ -85,9 +112,14 @@ Export: folder or ZIP (`res/drawable-nodpi`, `appfilter.xml`, `mapping.json`). O
 
 ## Known limits
 
-- **Launcher refresh**: Nothing IconGen reapplies its pack by writing the system setting `nothing_icon_pack` (temporary value, then back). That requires `WRITE_SETTINGS` granted via ADB and `targetSdk 22`: Android rejects non-public `Settings.System` keys for apps targeting 23+. IconGen also builds and installs the pack APK on the phone (aapt2 + apksig). Icon Formatter targets SDK 36, so it cannot do this silently. The pack has to be installed or updated, then selected in the launcher. This could not be verified on a real Nothing Launcher (the tests ran on an emulator with the stock launcher).
+- **Launcher refresh**:
+  - With Shizuku, Icon Formatter installs and selects its pack the way IconGen does. The shell identity may write the non-public `nothing_icon_pack` key, which apps with `targetSdk` ≥ 23 cannot.
+  - Shizuku must be running when the pack is applied, and after a reboot it must be started again from the Shizuku app.
+  - The icon redraw by the real Nothing Launcher could not be verified without the phone.
 
-- **Android icon pack**: the app generates the standard layout (`res/drawable-nodpi`, `res/xml/appfilter.xml`, `assets/appfilter.xml`, `drawable.xml`) and plain PNGs. An APK that launchers can install requires building that layout inside a template (Blueprint, CandyBar, …). Without root, Android does not let an app replace other apps' icons, and support depends on the launcher.
+- **Android icon pack**:
+  - The phone build holds up to 2000 icons, and its label is fixed ("Icon Formatter Pack"); name and accent shown inside come from `pack.json`.
+  - Without root, Android does not let an app replace other apps' icons, and support depends on the launcher.
 - **Installed Apps**: only apps with a launcher activity are visible (Android 11+ package visibility policy). Apps without a readable icon are reported and skipped. "Not themed" means not yet processed by this app; the presence of a system monochrome icon (Android 13+) is detected.
 - **AI**: costs and limits shown are indicative and depend on the provider; check the official price list.
 - **Live transparency**: the "Simulated transparency" parameter lowers the alpha of the rendered PNG; it does not reproduce the launcher's live blur.

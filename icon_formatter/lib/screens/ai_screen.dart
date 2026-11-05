@@ -8,8 +8,10 @@ import 'package:path/path.dart' as p;
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../services/ai_service.dart';
+import '../services/bg_removal_service.dart';
 import '../services/export_service.dart';
 import '../src/rust/api/engine.dart';
+import '../widgets/ai_mask.dart';
 import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
 import '../l10n/strings.dart';
@@ -197,7 +199,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
               if (it.versions.length > 1)
                 SizedBox(
                   height: 56,
-                  child: ListView(scrollDirection: Axis.horizontal, children: [
+                  child: ListView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, children: [
                     for (var v = 0; v < it.versions.length; v++)
                       GestureDetector(
                         onTap: () => setState(() => it.current = v),
@@ -303,7 +305,14 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
               const SizedBox(width: 16),
               Expanded(child: preview),
               const SizedBox(width: 16),
-              SizedBox(width: 340, child: controls),
+              SizedBox(
+                width: 340,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Expanded(child: controls),
+                  const SizedBox(height: 12),
+                  const SizedBox(height: 300, child: SingleChildScrollView(child: _LocalModelsCard())),
+                ]),
+              ),
             ]),
           ),
         ]),
@@ -314,14 +323,14 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
       child: ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + GlassInsets.of(context)), children: [
         Row(children: [
           Expanded(child: Text(S.aiIconTheme, style: Theme.of(context).textTheme.titleLarge)),
-          IconButton(onPressed: _import, icon: const Icon(Icons.add_photo_alternate_outlined)),
+          GlassIconButton(onPressed: _import, size: 46, tooltip: S.importaIcona, icon: Icons.add_photo_alternate_outlined),
         ]),
         banner,
         const SizedBox(height: 8),
         if (items.isNotEmpty)
           SizedBox(
             height: 64,
-            child: ListView(scrollDirection: Axis.horizontal, children: [
+            child: ListView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, children: [
               for (var i = 0; i < items.length; i++)
                 GestureDetector(
                   onTap: () => setState(() => sel = i),
@@ -337,7 +346,50 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
         SizedBox(height: 420, child: preview),
         const SizedBox(height: 12),
         SizedBox(height: 560, child: controls),
+        const SizedBox(height: 18),
+        const _LocalModelsCard(),
       ]),
+    );
+  }
+}
+
+
+/// Local background-removal models (download / delete / choose) in the AI tab.
+class _LocalModelsCard extends StatelessWidget {
+  const _LocalModelsCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState.I,
+      builder: (context, _) {
+        final st = AppState.I;
+        final ready = st.modelReady(st.localAi.model);
+        return StepCard(
+          key: const ValueKey('ai-local-models'),
+          step: 0,
+          title: S.aiModelliLocali,
+          subtitle: S.aiModelliLocaliInfo,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                // optional: the classic algorithm stays the default
+                SettingSwitch(
+                  key: const ValueKey('ai-local-use'),
+                  title: S.aiUsaLocale,
+                  subtitle: ready ? S.aiUsaLocaleSub : S.aiModelloMancante,
+                  value: st.bgProvider == BgProvider.localAi,
+                  onChanged: ready || st.bgProvider == BgProvider.localAi
+                      ? (v) => st.update(() => st.bgProvider = v ? BgProvider.localAi : BgProvider.local)
+                      : null,
+                ),
+                const LocalAiBox(),
+              ]),
+            ),
+          ],
+        );
+      },
     );
   }
 }

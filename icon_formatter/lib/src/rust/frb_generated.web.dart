@@ -165,6 +165,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LucentShape dco_decode_lucent_shape(dynamic raw);
 
   @protected
+  LucentStrategy dco_decode_lucent_strategy(dynamic raw);
+
+  @protected
   MatchInput dco_decode_match_input(dynamic raw);
 
   @protected
@@ -378,6 +381,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   LucentShape sse_decode_lucent_shape(SseDeserializer deserializer);
+
+  @protected
+  LucentStrategy sse_decode_lucent_strategy(SseDeserializer deserializer);
 
   @protected
   MatchInput sse_decode_match_input(SseDeserializer deserializer);
@@ -656,6 +662,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_lucent_shape(LucentShape self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_lucent_strategy(
+    LucentStrategy self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_match_input(MatchInput self, SseSerializer serializer);
