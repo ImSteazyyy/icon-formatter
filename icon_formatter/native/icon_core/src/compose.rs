@@ -201,6 +201,13 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
         v * 255.0
     };
     let sigma = (w.min(h) as f32 * 0.004).max(1.0);
+    // reference lightness of neutral objects (roads, keys): 90th percentile
+    let mut nl: Vec<f32> = (0..n).filter(|&i| key[i] > 0.5 && lab[i].a.hypot(lab[i].b) < 0.03).map(|i| lab[i].l).collect();
+    nl.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let obj_l = nl.get(nl.len() * 9 / 10).copied().unwrap_or(1.0).max(bg.0 + 0.05);
+    let zone = crate::lucent::gaussian_blur(&key, w as usize, h as usize, (w.min(h) as f32 * 0.012).max(2.0));
+    let core = key.clone();
+    let fg_keep = |i: usize| core[i] > 0.5;
     let key = crate::lucent::gaussian_blur(&key, w as usize, h as usize, sigma);
     let mut out = RgbaImage::new(w, h);
     let mut kept = 0u32;
@@ -216,6 +223,29 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
             let a = (base_a * k * 255.0).round() as u8;
             if a > 127 {
                 kept += 1;
+            }
+            // soft (blurry) edge of a neutral object: alpha follows its own
+            // lightness ramp over the dark tile, colour un-mixed from it
+            let c = lab[i];
+            if !bgm[i] && fg_keep(i) {
+                // object core: untouched
+                // anti-aliased rim from the blurred mask (no stair-steps)
+                let t = ((key[i] - 0.25) / 0.5).clamp(0.0, 1.0);
+                let ka = t * t * (3.0 - 2.0 * t);
+                out.put_pixel(x, y, Rgba([p[0], p[1], p[2], (base_a * ka * 255.0).round() as u8]));
+                continue;
+            }
+            if bgm[i] && zone[i] > 0.02 && c.a.hypot(c.b) < 0.03 {
+                let la = ((c.l - bg.0) / (obj_l - bg.0)).clamp(0.0, 1.0);
+                let la = la * la * (3.0 - 2.0 * la);
+                if la > 0.02 {
+                    let un = |v: u8| ((v as f32 - bg_rgb * (1.0 - la)) / la).clamp(0.0, 255.0) as u8;
+                    let aa = (base_a * la * 255.0).round() as u8;
+                    out.put_pixel(x, y, Rgba([un(p[0]), un(p[1]), un(p[2]), aa]));
+                } else {
+                    out.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+                }
+                continue;
             }
             if k > 0.02 && k < 0.98 {
                 // edge pixel mixed with the old dark tile: un-mix it from the
