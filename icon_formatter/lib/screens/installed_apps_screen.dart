@@ -16,6 +16,7 @@ import '../widgets/liquid_glass.dart';
 import '../workspace/adjust_panel.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
+import '../l10n/strings.dart';
 
 enum AppPipeline { original, translucent, preset, ai }
 
@@ -122,7 +123,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         final r = await PlatformService.getIcons([a], size: 432);
         b = r.first;
         if (b == null) {
-          if (mounted) showMsg(context, 'Icona non disponibile per ${a.label}', error: true);
+          if (mounted) showMsg(context, S.iconaNonDisponibile(a.label), error: true);
           return;
         }
         glyph[a.key] = b;
@@ -173,7 +174,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   Future<void> _process() async {
     final list = apps.where((a) => selected.contains(a.key)).toList();
     if (list.isEmpty) {
-      showMsg(context, 'Seleziona almeno un\'app');
+      showMsg(context, S.selezionaAlmenoApp);
       return;
     }
     if (pipeline == AppPipeline.ai) return _processAi(list);
@@ -187,21 +188,20 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
     await c.process(only: items);
     final ok = items.where((i) => i.result?.ok == true).map((i) => i.id);
     AppState.I.update(() => AppState.I.processedPackages.addAll(ok));
-    if (mounted && skipped > 0) showMsg(context, '$skipped app senza icona leggibile sono state saltate');
+    if (mounted && skipped > 0) showMsg(context, S.appSenzaIconaLeggibileSono(skipped));
   }
 
   Future<void> _processAi(List<InstalledApp> list) async {
     if (!await AiService.isConfigured()) {
-      if (mounted) showMsg(context, 'AI non configurata: imposta provider e API key in Impostazioni.', error: true);
+      if (mounted) showMsg(context, S.aiNonConfigurataImpostaProvider2, error: true);
       return;
     }
     if (!mounted) return;
     final ok = await confirm(
       context,
-      'Generare ${list.length} icone con AI?',
-      'Ogni icona è una richiesta a pagamento al provider (${aiProviders[AppState.I.ai.provider]!.name}). '
-          '${aiProviders[AppState.I.ai.provider]!.costNote}',
-      ok: 'Genera',
+      S.generareIconeAi(list.length),
+      S.ogniIconaERichiestaPagamento(aiProviders[AppState.I.ai.provider]!.name, aiProviders[AppState.I.ai.provider]!.costNote),
+      ok: S.genera,
     );
     if (!ok) return;
     final items = await _prepare(list);
@@ -223,7 +223,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         // normalise through the Rust compositor: isolate + calibrated size
         final composed = await previewBytes(bytes: png, settings: c.settingsForItem(it));
         await File(out).writeAsBytes(composed.png);
-        it.result = ItemResult(id: it.id, name: it.name, ok: true, output: out, ambiguous: composed.ambiguous, confidence: composed.confidence, method: 'ai+${composed.method}', notes: composed.notes);
+        it.result = ItemResult(id: it.id, name: it.name, ok: true, output: out, ambiguous: composed.ambiguous, confidence: composed.confidence, method: S.ai(composed.method), notes: composed.notes);
         AppState.I.update(() => AppState.I.processedPackages.add(it.id));
       } catch (e) {
         aiErrors++;
@@ -239,12 +239,12 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   Future<void> _exportPack({required String kind}) async {
     final done = c.items.where((i) => i.outputPath != null && File(i.outputPath!).existsSync()).toList();
     if (done.isEmpty) {
-      showMsg(context, 'Nessuna icona elaborata: avvia prima l\'elaborazione', error: true);
+      showMsg(context, S.nessunaIconaElaborataAvviaPrima, error: true);
       return;
     }
     try {
       final dir = await AppPaths.I.workDir('iconpack');
-      final name = 'IconFormatter_pack_${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+      final name = S.iconformatterPack(DateTime.now().millisecondsSinceEpoch ~/ 1000);
       final r = await buildIconPack(
         apps: [for (final i in done) IconPackApp(label: i.label ?? i.name, package: i.package!, activity: i.activity ?? '', png: i.outputPath!)],
         outDir: dir,
@@ -261,9 +261,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         case 'share':
           await ExportService.shareDirAsZip(dir, name);
       }
-      if (res != null && mounted) showMsg(context, '${res.message} · ${r.icons} icone, appfilter.xml generato');
+      if (res != null && mounted) showMsg(context, S.iconeAppfilterXmlGenerato(res.message, r.icons));
     } catch (e) {
-      if (mounted) showMsg(context, 'Export non riuscito: $e', error: true);
+      if (mounted) showMsg(context, S.exportNonRiuscito(e), error: true);
     }
   }
 
@@ -281,17 +281,17 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
           child: Row(children: [
-            Expanded(child: Text('App installate', style: Theme.of(context).textTheme.titleLarge)),
-            IconButton(tooltip: 'Ricarica', onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
+            Expanded(child: Text(S.appInstallate, style: Theme.of(context).textTheme.titleLarge)),
+            IconButton(tooltip: S.ricarica, onPressed: loading ? null : _load, icon: const Icon(Icons.refresh)),
             PopupMenuButton<String>(
-              tooltip: 'Esporta icon pack',
+              tooltip: S.esportaIconPack,
               icon: const Icon(Icons.ios_share),
               onSelected: (k) => _exportPack(kind: k),
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'zip', child: Text('Icon pack ZIP (appfilter.xml)')),
-                PopupMenuItem(value: 'folder', child: Text('Icon pack in cartella')),
-                PopupMenuItem(value: 'png', child: Text('Solo PNG individuali')),
-                PopupMenuItem(value: 'share', child: Text('Condividi ZIP')),
+                PopupMenuItem(value: 'zip', child: Text(S.iconPackZipAppfilterXml)),
+                PopupMenuItem(value: 'folder', child: Text(S.iconPackCartella)),
+                PopupMenuItem(value: 'png', child: Text(S.soloPngIndividuali)),
+                PopupMenuItem(value: 'share', child: Text(S.condividiZip)),
               ],
             ),
           ]),
@@ -299,38 +299,38 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Cerca per nome o package'),
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: S.cercaNomeOPackage),
             onChanged: (v) => setState(() => query = v),
           ),
         ),
         SizedBox(
           height: 48,
           child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
-            FilterChip(label: const Text('Escludi app di sistema'), selected: hideSystem, onSelected: (v) => setState(() => hideSystem = v)),
+            FilterChip(label: const Text(S.escludiAppSistema), selected: hideSystem, onSelected: (v) => setState(() => hideSystem = v)),
             const SizedBox(width: 8),
-            FilterChip(label: const Text('Solo non elaborate'), selected: onlyUnprocessed, onSelected: (v) => setState(() => onlyUnprocessed = v)),
+            FilterChip(label: const Text(S.soloNonElaborate), selected: onlyUnprocessed, onSelected: (v) => setState(() => onlyUnprocessed = v)),
             const SizedBox(width: 8),
-            ActionChip(label: const Text('Seleziona tutte'), onPressed: () => setState(() => selected.addAll(list.map((a) => a.key)))),
+            ActionChip(label: const Text(S.selezionaTutte), onPressed: () => setState(() => selected.addAll(list.map((a) => a.key)))),
             const SizedBox(width: 8),
-            ActionChip(label: const Text('Deseleziona'), onPressed: () => setState(() => selected.removeAll(list.map((a) => a.key)))),
+            ActionChip(label: const Text(S.deseleziona), onPressed: () => setState(() => selected.removeAll(list.map((a) => a.key)))),
           ]),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
             Tooltip(
-              message: 'Tocca per selezionare · tieni premuto per anteprima e correzioni',
-              child: Text('${list.length} app · ${selected.length} selezionate', style: const TextStyle(fontSize: 12, color: Palette.text2)),
+              message: S.toccaSelezionareTieniPremutoAnteprima,
+              child: Text(S.appSelezionate(list.length, selected.length), style: const TextStyle(fontSize: 12, color: Palette.text2)),
             ),
             const Spacer(),
             DropdownButton<AppPipeline>(
               value: pipeline,
               underline: const SizedBox.shrink(),
               items: const [
-                DropdownMenuItem(value: AppPipeline.original, child: Text('Original Composition')),
-                DropdownMenuItem(value: AppPipeline.translucent, child: Text('Nothing Translucent')),
-                DropdownMenuItem(value: AppPipeline.preset, child: Text('Custom Preset')),
-                DropdownMenuItem(value: AppPipeline.ai, child: Text('AI Icon Theme')),
+                DropdownMenuItem(value: AppPipeline.original, child: Text(S.originalComposition)),
+                DropdownMenuItem(value: AppPipeline.translucent, child: Text(S.nothingTranslucent)),
+                DropdownMenuItem(value: AppPipeline.preset, child: Text(S.customPreset)),
+                DropdownMenuItem(value: AppPipeline.ai, child: Text(S.aiIconTheme)),
               ],
               onChanged: (v) => setState(() => pipeline = v!),
             ),
@@ -340,7 +340,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
           child: loading
               ? const Center(child: CircularProgressIndicator())
               : error != null
-                  ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Impossibile leggere le app: $error', style: const TextStyle(color: Palette.danger))))
+                  ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(S.impossibileLeggereApp(error), style: const TextStyle(color: Palette.danger))))
                   : ListenableBuilder(
                       listenable: c,
                       builder: (context, _) => GridView.builder(
@@ -411,7 +411,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                 errors: b.errors,
                 running: b.running,
                 onCancel: b.cancel,
-                label: b.cancelled ? 'Annullato' : (b.running && b.phase != null ? b.phase : null),
+                label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
               );
             },
           ),
@@ -421,7 +421,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             child: Row(children: [
               GlassIconButton(
-                tooltip: 'Regolazioni',
+                tooltip: S.regolazioni,
                 onPressed: () => showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
@@ -437,7 +437,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                     style: FilledButton.styleFrom(shape: const StadiumBorder()),
                     onPressed: c.batch.running || aiRunning || selected.isEmpty ? null : _process,
                     icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text('Elabora ${selected.length} app'),
+                    label: Text(S.elaboraApp(selected.length)),
                   ),
                 ),
               ),

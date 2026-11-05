@@ -11,6 +11,7 @@ import '../app/theme.dart';
 import '../services/import_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/common.dart';
+import '../l10n/strings.dart';
 
 /// Base icon management: import, select, rename, delete, calibrate.
 class BasesScreen extends StatelessWidget {
@@ -19,18 +20,18 @@ class BasesScreen extends StatelessWidget {
   final bool embedded;
 
   Future<void> _import(BuildContext context) async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['png', 'webp', 'jpg', 'jpeg'], dialogTitle: 'Importa base icon');
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['png', 'webp', 'jpg', 'jpeg'], dialogTitle: S.importaBaseIcon);
     final path = r?.files.single.path;
     if (path == null || !context.mounted) return;
-    final name = await askText(context, 'Nome del base icon', initial: p.basenameWithoutExtension(path));
+    final name = await askText(context, S.nomeDelBaseIcon, initial: p.basenameWithoutExtension(path));
     if (name == null || name.isEmpty) return;
     try {
       final b = await AppState.I.importBase(path, name);
       if (context.mounted) {
-        showMsg(context, 'Base importato (${b.width}×${b.height}). Calibralo con circa 20 icone di esempio.');
+        showMsg(context, S.baseImportatoCalibraloCirca20(b.width, b.height));
       }
     } catch (e) {
-      if (context.mounted) showMsg(context, 'Import non riuscito: $e', error: true);
+      if (context.mounted) showMsg(context, S.importNonRiuscito(e), error: true);
     }
   }
 
@@ -41,7 +42,7 @@ class BasesScreen extends StatelessWidget {
     try {
       final png = await renderBackgroundPng(background: BackgroundSettings.translucent(params: pr.params), size: size);
       await st.addBaseFromPng(png, '${pr.name} $size', size);
-      if (context.mounted) showMsg(context, 'Base creato dal preset ${pr.name}');
+      if (context.mounted) showMsg(context, S.baseCreatoDalPreset(pr.name));
     } catch (e) {
       if (context.mounted) showMsg(context, '$e', error: true);
     }
@@ -54,20 +55,20 @@ class BasesScreen extends StatelessWidget {
       builder: (context, _) {
         final st = AppState.I;
         final content = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          if (!embedded) Text('Base Icons', style: Theme.of(context).textTheme.headlineSmall),
+          if (!embedded) Text(S.baseIcons, style: Theme.of(context).textTheme.headlineSmall),
           if (!embedded) const SizedBox(height: 4),
           const Text(
-            'Ogni base ha una calibrazione indipendente. La risoluzione predefinita dell\'output è quella del base.',
+            S.ogniBaseHaCalibrazioneIndipendente,
             style: TextStyle(color: Palette.text2, fontSize: 12),
           ),
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            FilledButton.icon(onPressed: () => _import(context), icon: const Icon(Icons.add), label: const Text('Importa base')),
-            OutlinedButton.icon(onPressed: () => _fromPreset(context), icon: const Icon(Icons.blur_on), label: Text('Crea da preset "${st.activePreset.name}"')),
+            FilledButton.icon(onPressed: () => _import(context), icon: const Icon(Icons.add), label: const Text(S.importaBase)),
+            OutlinedButton.icon(onPressed: () => _fromPreset(context), icon: const Icon(Icons.blur_on), label: Text(S.creaPreset(st.activePreset.name))),
           ]),
           const SizedBox(height: 14),
           for (final b in st.bases) _BaseTile(b: b, selected: st.selectedBase?.id == b.id),
-          if (st.bases.isEmpty) const Text('Nessun base icon.', style: TextStyle(color: Palette.text3)),
+          if (st.bases.isEmpty) const Text(S.nessunBaseIcon, style: TextStyle(color: Palette.text3)),
         ]);
         if (embedded) return content;
         return SingleChildScrollView(padding: const EdgeInsets.all(20), child: content);
@@ -103,35 +104,35 @@ class _BaseTile extends StatelessWidget {
                   Icon(Icons.check_circle, size: 16, color: Theme.of(context).colorScheme.primary),
                 ],
               ]),
-              Text('${b.width}×${b.height}px', style: const TextStyle(fontSize: 12, color: Palette.text2)),
+              Text(S.px(b.width, b.height), style: const TextStyle(fontSize: 12, color: Palette.text2)),
               Text(
                 cal == null
-                    ? 'Non calibrato'
-                    : 'Calibrato su ${info?['samples'] ?? '?'} esempi (${info?['inliers'] ?? '?'} validi) · glyph ${(cal.glyphRatio * 100).toStringAsFixed(1)}%',
+                    ? S.nonCalibrato
+                    : S.calibratoEsempiValidiGlyph(info?['samples'] ?? '?', info?['inliers'] ?? '?', (cal.glyphRatio * 100).toStringAsFixed(1)),
                 style: TextStyle(fontSize: 12, color: cal == null ? Palette.warn : Palette.text2),
               ),
             ]),
           ),
           Wrap(children: [
-            if (!selected) TextButton(onPressed: () => st.update(() => st.selectedBaseId = b.id), child: const Text('Usa')),
+            if (!selected) TextButton(onPressed: () => st.update(() => st.selectedBaseId = b.id), child: const Text(S.usa)),
             TextButton(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CalibrationPage(base: b))),
-              child: Text(cal == null ? 'Calibra' : 'Ricalibra'),
+              child: Text(cal == null ? S.calibra : S.ricalibra),
             ),
             PopupMenuButton<String>(
               onSelected: (v) async {
                 if (v == 'rename') {
-                  final n = await askText(context, 'Rinomina', initial: b.name);
+                  final n = await askText(context, S.rinomina, initial: b.name);
                   if (n != null && n.isNotEmpty) st.renameBase(b, n);
                 } else if (v == 'delete') {
-                  if (await confirm(context, 'Eliminare "${b.name}"?', 'Viene rimossa la copia interna e la sua calibrazione. I file originali non vengono toccati.', ok: 'Elimina')) {
+                  if (await confirm(context, S.eliminare(b.name), S.vieneRimossaCopiaInternaSua, ok: S.elimina)) {
                     await st.deleteBase(b);
                   }
                 }
               },
               itemBuilder: (_) => const [
-                PopupMenuItem(value: 'rename', child: Text('Rinomina')),
-                PopupMenuItem(value: 'delete', child: Text('Elimina')),
+                PopupMenuItem(value: 'rename', child: Text(S.rinomina)),
+                PopupMenuItem(value: 'delete', child: Text(S.elimina)),
               ],
             ),
           ]),
@@ -223,7 +224,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       'date': DateTime.now().toIso8601String(),
       'manual': edit!.glyphRatio != o.placement.glyphRatio || edit!.centerX != o.placement.centerX || edit!.centerY != o.placement.centerY,
     });
-    showMsg(context, 'Calibrazione salvata per ${widget.base.name}');
+    showMsg(context, S.calibrazioneSalvata(widget.base.name));
     Navigator.pop(context);
   }
 
@@ -233,55 +234,55 @@ class _CalibrationPageState extends State<CalibrationPage> {
     final e = edit;
     final wide = MediaQuery.of(context).size.width > 900;
     final left = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle('Esempi correttamente composti'),
+      const SectionTitle(S.esempiCorrettamenteComposti),
       Text(
-        '${samples.length} esempi selezionati · consigliati circa 20. Gli esempi possono avere qualsiasi stile di sfondo: si analizza solo il glyph.',
+        S.esempiSelezionatiConsigliatiCirca20(samples.length),
         style: TextStyle(fontSize: 12, color: samples.length < 10 ? Palette.warn : Palette.text2),
       ),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFiles), icon: const Icon(Icons.image_outlined), label: const Text('File')),
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFolderImages), icon: const Icon(Icons.folder_open_outlined), label: const Text('Cartella')),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFiles), icon: const Icon(Icons.image_outlined), label: const Text(S.file)),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFolderImages), icon: const Icon(Icons.folder_open_outlined), label: const Text(S.cartella)),
         OutlinedButton.icon(onPressed: () => _add(ImportService.pickZip), icon: const Icon(Icons.folder_zip_outlined), label: const Text('ZIP')),
-        if (samples.isNotEmpty) TextButton(onPressed: () => setState(() => samples = []), child: const Text('Svuota')),
+        if (samples.isNotEmpty) TextButton(onPressed: () => setState(() => samples = []), child: const Text(S.svuota)),
       ]),
       const SizedBox(height: 12),
       FilledButton.icon(
         onPressed: samples.isEmpty || running ? null : _run,
         icon: running ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.analytics_outlined),
-        label: const Text('Analizza e calibra'),
+        label: const Text(S.analizzaCalibra),
       ),
       if (error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: const TextStyle(color: Palette.danger))),
       if (o != null) ...[
         const SizedBox(height: 18),
-        const SectionTitle('Risultati (mediana, outlier esclusi)'),
-        _kv('Esempi validi', '${o.inliers} / ${o.samples.length}'),
-        _kv('Lato glyph', '${(o.placement.glyphRatio * 100).toStringAsFixed(2)}% (MAD ${(o.maxSideMad * 100).toStringAsFixed(2)})'),
-        _kv('Area ottica', '${(o.placement.areaRatio * 100).toStringAsFixed(2)}%'),
-        _kv('Centro', '(${o.placement.centerX.toStringAsFixed(3)}, ${o.placement.centerY.toStringAsFixed(3)})'),
-        _kv('Margini L/T/R/B', o.margins.map((m) => '${(m * 100).toStringAsFixed(1)}%').join(' / ')),
-        _kv('Proporzione media', o.medianAspect.toStringAsFixed(2)),
+        const SectionTitle(S.risultatiMedianaOutlierEsclusi),
+        _kv(S.esempiValidi, '${o.inliers} / ${o.samples.length}'),
+        _kv(S.latoGlyph, S.mad((o.placement.glyphRatio * 100).toStringAsFixed(2), (o.maxSideMad * 100).toStringAsFixed(2))),
+        _kv(S.areaOttica, '${(o.placement.areaRatio * 100).toStringAsFixed(2)}%'),
+        _kv(S.centro, '(${o.placement.centerX.toStringAsFixed(3)}, ${o.placement.centerY.toStringAsFixed(3)})'),
+        _kv(S.marginiLTRB, o.margins.map((m) => '${(m * 100).toStringAsFixed(1)}%').join(' / ')),
+        _kv(S.proporzioneMedia, o.medianAspect.toStringAsFixed(2)),
         const SizedBox(height: 14),
-        const SectionTitle('Correzione manuale'),
-        SliderRow(label: 'Lato glyph', value: e!.glyphRatio, min: 0.3, max: 0.95, format: (v) => '${(v * 100).toStringAsFixed(1)}%', onChanged: (v) => _setEdit(copyPlacement(e, glyphRatio: v))),
-        SliderRow(label: 'Centro X', value: e.centerX, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerX: v))),
-        SliderRow(label: 'Centro Y', value: e.centerY, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerY: v))),
+        const SectionTitle(S.correzioneManuale),
+        SliderRow(label: S.latoGlyph, value: e!.glyphRatio, min: 0.3, max: 0.95, format: (v) => '${(v * 100).toStringAsFixed(1)}%', onChanged: (v) => _setEdit(copyPlacement(e, glyphRatio: v))),
+        SliderRow(label: S.centroX, value: e.centerX, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerX: v))),
+        SliderRow(label: S.centroY, value: e.centerY, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerY: v))),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Dimensione ottica (area)'),
+          title: const Text(S.dimensioneOtticaArea),
           value: e.areaFit,
           onChanged: (v) => _setEdit(copyPlacement(e, areaFit: v)),
         ),
         Row(children: [
-          TextButton(onPressed: () => _setEdit(o.placement), child: const Text('Ripristina misurati')),
+          TextButton(onPressed: () => _setEdit(o.placement), child: const Text(S.ripristinaMisurati)),
           const Spacer(),
-          FilledButton(onPressed: _save, child: const Text('Salva calibrazione')),
+          FilledButton(onPressed: _save, child: const Text(S.salvaCalibrazione)),
         ]),
       ],
     ]);
     final right = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle('Area utile sul base'),
+      const SectionTitle(S.areaUtileSulBase),
       AspectRatio(
         aspectRatio: 1,
         child: ClipRRect(
@@ -297,7 +298,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       if (o != null) ...[
         const SizedBox(height: 12),
         Row(children: [
-          const Expanded(child: SectionTitle('Verifica su un esempio')),
+          const Expanded(child: SectionTitle(S.verificaEsempio)),
           IconButton(
             onPressed: () {
               testIndex++;
@@ -309,7 +310,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
         if (testPng != null)
           AspectRatio(aspectRatio: 1, child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Checkerboard(child: IconImage(bytes: testPng)))),
         const SizedBox(height: 12),
-        const SectionTitle('Esempi'),
+        const SectionTitle(S.esempi),
         for (final s in o.samples)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -326,7 +327,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       ],
     ]);
     return Scaffold(
-      appBar: AppBar(title: Text('Calibrazione · ${widget.base.name}'), backgroundColor: Colors.transparent),
+      appBar: AppBar(title: Text(S.calibrazione(widget.base.name)), backgroundColor: Colors.transparent),
       body: SafeArea(
         child: wide
             ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -6,7 +6,7 @@
 use crate::frb_generated::StreamSink;
 use anyhow::{anyhow, Result};
 use icon_core::{
-    batch, calibrate, compose, iconpack, imageops, pack, segment, squircle, translucent,
+    ai, matching, batch, calibrate, compose, iconpack, imageops, lucent, pack, segment, squircle, translucent,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -57,11 +57,87 @@ pub struct TranslucentSettings {
     pub seed: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LucentShape {
+    /// Silhouette of the source icon.
+    Original,
+    /// Nothing Launcher / IconGen circle.
+    Circle,
+    /// Reference squircle (0.93, n 4.25).
+    Squircle,
+}
+
+/// Lucent (Nothing OS 5.0) plate, ported from Nothing IconGen.
+#[derive(Clone, Debug)]
+pub struct LucentSettings {
+    /// Ink colour (ARGB) for the optional monochrome glyph.
+    pub ink: u32,
+    /// Frosted backdrop (ARGB, alpha 0x66 on Nothing OS).
+    pub backdrop: u32,
+    pub shape: LucentShape,
+    pub monochrome: bool,
+    pub keep_composition: bool,
+    pub glyph_scale: f32,
+    pub rim: f32,
+    pub launcher_shadow: bool,
+    pub nothing_encode: bool,
+}
+
 #[derive(Clone, Debug)]
 pub enum BackgroundSettings {
     Transparent,
     BaseImage { path: String },
     Translucent { params: TranslucentSettings },
+    Lucent { params: LucentSettings },
+}
+
+impl From<&LucentSettings> for lucent::LucentParams {
+    fn from(l: &LucentSettings) -> Self {
+        let c = |v: u32| [((v >> 16) & 255) as u8, ((v >> 8) & 255) as u8, (v & 255) as u8];
+        let b = c(l.backdrop);
+        lucent::LucentParams {
+            ink: c(l.ink),
+            backdrop: [b[0], b[1], b[2], (l.backdrop >> 24) as u8],
+            shape: match l.shape {
+                LucentShape::Original => lucent::PlateShape::Original,
+                LucentShape::Circle => lucent::PlateShape::Circle,
+                LucentShape::Squircle => lucent::PlateShape::Squircle(squircle::Shape::default()),
+            },
+            monochrome: l.monochrome,
+            keep_composition: l.keep_composition,
+            glyph_scale: l.glyph_scale,
+            offset_x: 0.0,
+            offset_y: 0.0,
+            rim: l.rim,
+            lift_greys: true,
+            launcher_shadow: l.launcher_shadow,
+            nothing_encode: l.nothing_encode,
+        }
+    }
+}
+
+fn lucent_of(b: &BackgroundSettings) -> Option<lucent::LucentParams> {
+    match b {
+        BackgroundSettings::Lucent { params } => Some(params.into()),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AiModelKind {
+    U2netp,
+    Silueta,
+    IsnetGeneral,
+}
+
+/// Local AI background removal (ONNX model on disk).
+#[derive(Clone, Debug)]
+pub struct AiSettings {
+    pub model_path: String,
+    pub model: AiModelKind,
+    /// Mask remap thresholds (0..1).
+    pub low: f32,
+    pub high: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -70,6 +146,33 @@ pub struct ProcessSettings {
     pub background: BackgroundSettings,
     pub placement: PlacementSettings,
     pub segment: SegmentSettings,
+    /// When set, the glyph is isolated by the local AI model.
+    pub ai: Option<AiSettings>,
+}
+
+fn ai_kind(k: AiModelKind) -> ai::ModelKind {
+    match k {
+        AiModelKind::U2netp => ai::ModelKind::U2netp,
+        AiModelKind::Silueta => ai::ModelKind::Silueta,
+        AiModelKind::IsnetGeneral => ai::ModelKind::IsnetGeneral,
+    }
+}
+
+fn ai_of(s: &Option<AiSettings>) -> Result<Option<(Arc<ai::Model>, ai::AiOptions)>> {
+    Ok(match s {
+        None => None,
+        Some(a) => Some((
+            ai::model(&a.model_path, ai_kind(a.model)).map_err(|e| anyhow!(e))?,
+            ai::AiOptions { low: a.low, high: a.high },
+        )),
+    })
+}
+
+fn isolate_with(img: &image::RgbaImage, s: &ProcessSettings) -> Result<segment::SegmentResult> {
+    Ok(match ai_of(&s.ai)? {
+        Some((m, o)) => ai::isolate_ai(img, &m, o).map_err(|e| anyhow!(e))?.seg,
+        None => segment::isolate(img, &(&s.segment).into()),
+    })
 }
 
 impl From<&SegmentSettings> for segment::SegmentOptions {
@@ -144,6 +247,16 @@ fn background_image(b: &BackgroundSettings, size: u32) -> Result<image::RgbaImag
         BackgroundSettings::Translucent { params } => {
             compose::render_background(&compose::Background::Translucent(params.into()), size)
         }
+        BackgroundSettings::Lucent { params } => {
+            // plate alone, on the reference squircle silhouette
+            let sq = squircle::mask(size, &squircle::Shape::default());
+            let mut src = image::RgbaImage::new(size, size);
+            for (p, &m) in src.pixels_mut().zip(sq.iter()) {
+                *p = image::Rgba([128, 128, 128, m]);
+            }
+            let p: lucent::LucentParams = params.into();
+            lucent::render(&src, &image::RgbaImage::new(1, 1), (0, 0, 1, 1), size, &p).image
+        }
     })
 }
 
@@ -185,6 +298,23 @@ pub fn default_translucent_settings() -> TranslucentSettings {
 }
 
 #[flutter_rust_bridge::frb(sync)]
+pub fn default_lucent_settings(dark: bool) -> LucentSettings {
+    let d = if dark { lucent::LucentParams::dark() } else { lucent::LucentParams::light() };
+    let argb = |a: u8, c: [u8; 3]| ((a as u32) << 24) | ((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32;
+    LucentSettings {
+        ink: argb(255, d.ink),
+        backdrop: argb(d.backdrop[3], [d.backdrop[0], d.backdrop[1], d.backdrop[2]]),
+        shape: LucentShape::Squircle,
+        monochrome: d.monochrome,
+        keep_composition: d.keep_composition,
+        glyph_scale: d.glyph_scale,
+        rim: d.rim,
+        launcher_shadow: d.launcher_shadow,
+        nothing_encode: d.nothing_encode,
+    }
+}
+
+#[flutter_rust_bridge::frb(sync)]
 pub fn core_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -206,8 +336,22 @@ pub struct PreviewResult {
 
 fn preview_image(img: &image::RgbaImage, s: &ProcessSettings) -> Result<PreviewResult> {
     let size = check_size(s.size)?;
-    let bg = background_image(&s.background, size)?;
-    let (out, res) = compose::compose_icon(img, &bg, &(&s.placement).into(), &(&s.segment).into());
+    let placement: compose::Placement = (&s.placement).into();
+    let (out, res) = if let Some(lp) = lucent_of(&s.background) {
+        // same function the batch uses: preview == export
+        let res = isolate_with(img, s)?;
+        let mut o = lucent::render(img, &res.glyph, res.bbox, size, &lucent::with_placement(&lp, &placement));
+        imageops::clean_transparent(&mut o.image);
+        let mut res = res;
+        res.notes.extend(o.notes);
+        (o.image, res)
+    } else {
+        let mut bg = background_image(&s.background, size)?;
+        let res = isolate_with(img, s)?;
+        compose::place_on_plate(&mut bg, img, &res, &placement);
+        imageops::clean_transparent(&mut bg);
+        (bg, res)
+    };
     Ok(PreviewResult {
         png: imageops::encode_png(&out)?,
         glyph_png: imageops::encode_png(&res.glyph)?,
@@ -243,6 +387,13 @@ pub fn render_background_png(background: BackgroundSettings, size: u32) -> Resul
 pub fn compose_glyph_png(glyph_png: Vec<u8>, settings: ProcessSettings) -> Result<Vec<u8>> {
     let size = check_size(settings.size)?;
     let glyph = imageops::decode(&glyph_png)?;
+    if let Some(lp) = lucent_of(&settings.background) {
+        let bbox = (0, 0, glyph.width(), glyph.height());
+        let pl: compose::Placement = (&settings.placement).into();
+        let mut o = lucent::render(&glyph, &glyph, bbox, size, &lucent::with_placement(&lp, &pl)).image;
+        imageops::clean_transparent(&mut o);
+        return Ok(imageops::encode_png(&o)?);
+    }
     let mut bg = background_image(&settings.background, size)?;
     compose::place_glyph(&mut bg, &glyph, &(&settings.placement).into());
     imageops::clean_transparent(&mut bg);
@@ -397,6 +548,8 @@ pub fn run_batch(
         placement: (&settings.placement).into(),
         segment: (&settings.segment).into(),
         threads: threads as usize,
+        lucent: lucent_of(&settings.background),
+        ai: ai_of(&settings.ai)?,
     };
     let flag = cancel.handle();
     let sink = std::sync::Mutex::new(sink);
@@ -623,4 +776,108 @@ pub fn sanitize_drawable_name(name: String) -> String {
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
+}
+
+// ---------------------------------------------------------------- local AI
+
+pub struct AiPreview {
+    /// Alpha mask (white = kept) at source resolution.
+    pub mask_png: Vec<u8>,
+    pub glyph_png: Vec<u8>,
+    /// False when the source already has a transparent background.
+    pub needed: bool,
+    pub uncertain: bool,
+    pub confidence: f32,
+    pub notes: Vec<String>,
+    pub millis: u32,
+}
+
+/// Runs the local model on one image (model loaded once and cached).
+pub fn ai_preview(path: String, settings: AiSettings) -> Result<AiPreview> {
+    let img = imageops::decode_file(Path::new(&path))?;
+    let t = std::time::Instant::now();
+    let m = ai::model(&settings.model_path, ai_kind(settings.model)).map_err(|e| anyhow!(e))?;
+    let r = ai::isolate_ai(&img, &m, ai::AiOptions { low: settings.low, high: settings.high }).map_err(|e| anyhow!(e))?;
+    Ok(AiPreview {
+        mask_png: imageops::encode_png(&r.mask)?,
+        glyph_png: imageops::encode_png(&r.seg.glyph)?,
+        needed: r.needed,
+        uncertain: r.uncertain,
+        confidence: r.seg.confidence,
+        notes: r.seg.notes,
+        millis: t.elapsed().as_millis() as u32,
+    })
+}
+
+/// Frees the cached model.
+pub fn ai_unload_model() {
+    ai::unload();
+}
+
+// ---------------------------------------------------------------- pack builder matching
+
+pub struct MatchInput {
+    pub id: String,
+    pub label: String,
+    pub package: String,
+    pub file: String,
+    pub path: Option<String>,
+    pub png: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MatchState {
+    Confident,
+    Doubtful,
+    Missing,
+}
+
+pub struct MatchOutput {
+    pub original: String,
+    pub generated: Option<String>,
+    pub score: f32,
+    pub text: f32,
+    pub visual: f32,
+    pub state: MatchState,
+    pub reason: String,
+}
+
+fn candidates(v: Vec<MatchInput>) -> Vec<matching::Candidate> {
+    v.into_iter()
+        .map(|m| matching::Candidate {
+            id: m.id,
+            label: m.label,
+            package: m.package,
+            file: m.file,
+            path: m.path,
+            image: m.png.and_then(|b| imageops::decode(&b).ok()),
+        })
+        .collect()
+}
+
+/// Associates originals with generated icons (name, package, file, visual).
+pub fn match_icons(originals: Vec<MatchInput>, generated: Vec<MatchInput>) -> Result<Vec<MatchOutput>> {
+    let r = matching::match_icons(&candidates(originals), &candidates(generated));
+    Ok(r.into_iter()
+        .map(|m| MatchOutput {
+            original: m.original,
+            generated: m.generated,
+            score: m.score,
+            text: m.text,
+            visual: m.visual,
+            state: match m.status {
+                matching::MatchStatus::Confident => MatchState::Confident,
+                matching::MatchStatus::Doubtful => MatchState::Doubtful,
+                matching::MatchStatus::Missing => MatchState::Missing,
+            },
+            reason: m.reason,
+        })
+        .collect())
+}
+
+/// Visual similarity 0..1 between two images (manual verification).
+pub fn visual_similarity(a: String, b: String) -> Result<f32> {
+    let ia = imageops::decode_file(Path::new(&a))?;
+    let ib = imageops::decode_file(Path::new(&b))?;
+    Ok(matching::similarity(&matching::signature(&ia), &matching::signature(&ib)))
 }

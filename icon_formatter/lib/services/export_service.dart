@@ -9,6 +9,7 @@ import '../app/state.dart';
 import '../app/storage.dart';
 import '../src/rust/api/engine.dart';
 import 'platform_service.dart';
+import '../l10n/strings.dart';
 
 class ExportResult {
   ExportResult(this.message, {this.location});
@@ -38,18 +39,18 @@ class ExportService {
         final z = p.join(await AppPaths.I.workDir('zip'), '$name.zip');
         await zipDirectory(dir: dir, zipPath: z);
         final bytes = await File(z).readAsBytes();
-        final saved = await FilePicker.platform.saveFile(dialogTitle: 'Salva ZIP', fileName: '$name.zip', bytes: bytes);
+        final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaZip, fileName: '$name.zip', bytes: bytes);
         if (saved == null) return null;
-        return ExportResult('ZIP salvato', location: saved);
+        return ExportResult(S.zipSalvato, location: saved);
       }
       final tree = await PlatformService.pickTree();
       if (tree == null) return null;
       final n = await PlatformService.writeDirToTree(tree, dir, subfolder: name);
-      return ExportResult('$n file salvati nella cartella scelta');
+      return ExportResult(S.fileSalvatiNellaCartellaScelta(n));
     }
     // Windows / desktop: native folder dialog
     final target = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'Scegli la cartella di destinazione',
+      dialogTitle: S.scegliCartellaDestinazione,
       initialDirectory: AppState.I.export.destination,
     );
     if (target == null) return null;
@@ -57,11 +58,11 @@ class ExportService {
     if (zip) {
       final z = uniquePath(p.join(target, '$name.zip'));
       final n = await zipDirectory(dir: dir, zipPath: z);
-      return ExportResult('ZIP creato ($n file)', location: z);
+      return ExportResult(S.zipCreatoFile(n), location: z);
     }
     final out = uniquePath(p.join(target, name));
     final n = await _copyDir(Directory(dir), Directory(out));
-    return ExportResult('$n file esportati', location: out);
+    return ExportResult(S.fileEsportati(n), location: out);
   }
 
   static Future<int> _copyDir(Directory src, Directory dst) async {
@@ -82,11 +83,11 @@ class ExportService {
   /// Saves a single PNG.
   static Future<ExportResult?> saveSingle(Uint8List png, String fileName) async {
     if (Platform.isAndroid) {
-      final saved = await FilePicker.platform.saveFile(dialogTitle: 'Salva PNG', fileName: fileName, bytes: png);
-      return saved == null ? null : ExportResult('PNG salvato', location: saved);
+      final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaPng, fileName: fileName, bytes: png);
+      return saved == null ? null : ExportResult(S.pngSalvato, location: saved);
     }
     final path = await FilePicker.platform.saveFile(
-      dialogTitle: 'Salva PNG',
+      dialogTitle: S.salvaPng,
       fileName: fileName,
       type: FileType.custom,
       allowedExtensions: ['png'],
@@ -98,7 +99,7 @@ class ExportService {
     // refuse to touch the original sources by writing a new file only.
     await File(target).writeAsBytes(png);
     AppState.I.update(() => AppState.I.export.destination = p.dirname(target));
-    return ExportResult('PNG salvato', location: target);
+    return ExportResult(S.pngSalvato, location: target);
   }
 
   /// Android Share Sheet (also works on Windows where supported).

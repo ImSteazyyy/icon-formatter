@@ -27,7 +27,7 @@ void main() {
 
   test('built-in presets exist and are editable copies', () {
     final ps = builtInPresets(t0);
-    expect(ps.map((e) => e.name), containsAll(['Liquid Glass', 'Nothing Translucent', 'Minimal', 'Dark Flat', 'Custom']));
+    expect(ps.map((e) => e.name), containsAll(['Liquid Glass', 'Nothing Translucent', 'Minimale', 'Scuro piatto', 'Personalizzato']));
     final pr = StylePreset.fromJson(ps[1].toJson(), t0);
     expect(pr.params.reflection, ps[1].params.reflection);
   });

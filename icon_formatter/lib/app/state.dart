@@ -9,6 +9,7 @@ import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
 import 'models.dart';
 import 'storage.dart';
+import '../l10n/strings.dart';
 
 enum StudioMode { original, translucent, preset }
 
@@ -26,6 +27,8 @@ class AppState extends ChangeNotifier {
   final ExportSettings export = ExportSettings();
   final AiConfig ai = AiConfig();
   final GlassConfig glass = GlassConfig();
+  final LucentConfig lucent = LucentConfig();
+  final LocalAiConfig localAi = LocalAiConfig();
 
   List<StylePreset> presets = [];
   String activePresetId = 'nothing';
@@ -84,6 +87,8 @@ class AppState extends ChangeNotifier {
     export.load((j['export'] as Map?)?.cast() ?? {});
     ai.load((j['ai'] as Map?)?.cast() ?? {});
     glass.load((j['glass'] as Map?)?.cast() ?? {});
+    lucent.load((j['lucent'] as Map?)?.cast() ?? {});
+    localAi.load((j['localAi'] as Map?)?.cast() ?? {});
     final ps = (j['presets'] as List?)?.map((e) => StylePreset.fromJson((e as Map).cast(), defaultTranslucent)).toList();
     if (ps != null && ps.isNotEmpty) {
       // keep built-ins present even if a stored list misses them
@@ -116,6 +121,8 @@ class AppState extends ChangeNotifier {
         'export': export.toJson(),
         'ai': ai.toJson(),
         'glass': glass.toJson(),
+        'lucent': lucent.toJson(),
+        'localAi': localAi.toJson(),
         'presets': presets.map((e) => e.toJson()).toList(),
         'activePresetId': activePresetId,
         'bases': bases.map((e) => e.toJson()).toList(),
@@ -161,6 +168,8 @@ class AppState extends ChangeNotifier {
     export.load(ExportSettings().toJson());
     ai.load(AiConfig().toJson());
     glass.reset();
+    lucent.reset();
+    localAi.load(LocalAiConfig().toJson());
     presets = builtInPresets(defaultTranslucent);
     activePresetId = 'nothing';
     segment = defaultSegment;
@@ -272,7 +281,7 @@ class AppState extends ChangeNotifier {
       0,
       BaseIcon(
         id: 'reference',
-        name: 'Reference Translucent',
+        name: S.referenceTranslucent,
         path: dest,
         width: 192,
         height: 192,
@@ -307,7 +316,7 @@ class AppState extends ChangeNotifier {
         final b = selectedBase;
         return b == null ? const BackgroundSettings.transparent() : BackgroundSettings.baseImage(path: b.path);
       case StudioMode.translucent:
-        return BackgroundSettings.translucent(params: presetById('nothing').params);
+        return BackgroundSettings.lucent(params: lucent.toSettings());
       case StudioMode.preset:
         return BackgroundSettings.translucent(params: presetById(presetId ?? activePresetId).params);
     }
@@ -318,5 +327,19 @@ class AppState extends ChangeNotifier {
         background: backgroundFor(mode, presetId: presetId),
         placement: placementFor(mode),
         segment: seg ?? segment,
+        ai: aiSettings,
       );
+
+  /// Path of a downloaded local model.
+  String modelPath(AiModelInfo m) => '${AppPaths.I.models}${Platform.pathSeparator}${m.id}.onnx';
+
+  bool modelReady(AiModelInfo m) => File(modelPath(m)).existsSync();
+
+  /// Local AI settings when that engine is selected and its model is on disk.
+  AiSettings? get aiSettings {
+    if (bgProvider != BgProvider.localAi) return null;
+    final m = localAi.model;
+    if (!modelReady(m)) return null;
+    return AiSettings(modelPath: modelPath(m), model: m.kind, low: localAi.low, high: localAi.high);
+  }
 }

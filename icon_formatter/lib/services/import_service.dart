@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../app/storage.dart';
 import '../src/rust/api/engine.dart';
 import 'platform_service.dart';
+import '../l10n/strings.dart';
 
 /// Picks images, folders or ZIPs and expands them into a flat image list.
 /// Sources are only read; ZIPs/SAF folders are copied into the cache.
@@ -16,7 +17,7 @@ class ImportService {
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: [...exts, 'zip'],
-      dialogTitle: 'Importa icone (PNG, JPG, WEBP o ZIP)',
+      dialogTitle: S.importaIconePngJpgWebp,
     );
     if (r == null) return [];
     final paths = r.files.map((f) => f.path).whereType<String>().toList();
@@ -24,7 +25,7 @@ class ImportService {
   }
 
   static Future<List<PackImage>> pickZip() async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: 'Importa ZIP');
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: S.importaZip);
     final path = r?.files.single.path;
     if (path == null) return [];
     return expand([path]);
@@ -39,7 +40,7 @@ class ImportService {
       await PlatformService.copyTreeToDir(tree, dir);
       return dir;
     }
-    return FilePicker.platform.getDirectoryPath(dialogTitle: 'Importa cartella di icone');
+    return FilePicker.platform.getDirectoryPath(dialogTitle: S.importaCartellaIcone);
   }
 
   static Future<List<PackImage>> pickFolderImages() async {

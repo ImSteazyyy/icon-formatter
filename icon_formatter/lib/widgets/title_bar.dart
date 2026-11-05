@@ -3,6 +3,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../app/state.dart';
 import '../app/theme.dart';
+import '../l10n/strings.dart';
 
 /// Custom Windows title bar (the native caption is hidden): drag area,
 /// double-click to maximise, and minimise / maximise / close buttons.
@@ -46,7 +47,6 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    final accent = AppState.I.appearance.accentColor;
     return SizedBox(
       height: AppTitleBar.height,
       child: Row(children: [
@@ -56,32 +56,24 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
               color: Colors.transparent,
               padding: const EdgeInsets.only(left: 14),
               child: Row(children: [
-                Container(
-                  width: 18,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
-                    gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.55)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  ),
-                  child: const Icon(Icons.blur_on, size: 13, color: Colors.white),
-                ),
+                Image.asset('assets/branding/app_icon.png', width: 18, height: 18, filterQuality: FilterQuality.medium),
                 const SizedBox(width: 10),
                 Text(
-                  'Icon Formatter',
+                  S.iconFormatter,
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: focused ? Palette.text : Palette.text3, letterSpacing: 0.2),
                 ),
               ]),
             ),
           ),
         ),
-        _CaptionButton(icon: Icons.remove_rounded, tooltip: 'Riduci a icona', onTap: windowManager.minimize),
+        _CaptionButton(icon: Icons.remove_rounded, tooltip: S.riduciIcona, onTap: windowManager.minimize),
         _CaptionButton(
           icon: maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
           iconSize: maximized ? 13 : 15,
-          tooltip: maximized ? 'Ripristina' : 'Ingrandisci',
+          tooltip: maximized ? S.ripristina : S.ingrandisci,
           onTap: () async => maximized ? windowManager.unmaximize() : windowManager.maximize(),
         ),
-        _CaptionButton(icon: Icons.close_rounded, tooltip: 'Chiudi', danger: true, onTap: windowManager.close),
+        _CaptionButton(icon: Icons.close_rounded, tooltip: S.chiudi, danger: true, onTap: windowManager.close),
       ]),
     );
   }

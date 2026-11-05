@@ -44,6 +44,8 @@ fn main() {
             placement: Placement::default(),
             segment: SegmentOptions::default(),
             threads,
+            lucent: None,
+            ai: None,
         };
         let t = Instant::now();
         let r = run(&jobs, &cfg, &AtomicBool::new(false), &|_, _, _| {});

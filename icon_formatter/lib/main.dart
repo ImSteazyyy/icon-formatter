@@ -10,6 +10,7 @@ import 'app/state.dart';
 import 'app/storage.dart';
 import 'app/theme.dart';
 import 'src/rust/frb_generated.dart';
+import 'l10n/strings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,7 @@ Future<void> main() async {
   if (Platform.isWindows) {
     await windowManager.ensureInitialized();
     const options = WindowOptions(
-      title: 'Icon Formatter',
+      title: S.iconFormatter,
       size: Size(1440, 900),
       minimumSize: Size(980, 640),
       center: true,
@@ -58,7 +59,7 @@ class IconFormatterApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: AppState.I,
       builder: (context, _) => MaterialApp(
-        title: 'Icon Formatter',
+        title: S.iconFormatter,
         debugShowCheckedModeBanner: false,
         theme: buildTheme(AppState.I.appearance),
         home: const Shell(),

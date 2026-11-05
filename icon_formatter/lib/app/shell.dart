@@ -14,6 +14,7 @@ import '../widgets/liquid_glass.dart';
 import '../widgets/title_bar.dart';
 import 'state.dart';
 import 'theme.dart';
+import '../l10n/strings.dart';
 
 class _Dest {
   const _Dest(this.id, this.label, this.icon, [this.shortLabel]);
@@ -29,12 +30,12 @@ class _Dest {
 
 /// Destinations. "apps" exists only on Android.
 List<_Dest> get _dests => [
-      const _Dest('studio', 'Studio', Icons.auto_awesome_mosaic_outlined),
-      const _Dest('ai', 'AI Theme', Icons.auto_awesome_outlined, 'AI'),
-      const _Dest('pack', 'Pack Cleanup', Icons.cleaning_services_outlined, 'Pack'),
-      if (Platform.isAndroid) const _Dest('apps', 'App', Icons.apps_rounded),
-      if (!Platform.isAndroid) const _Dest('bases', 'Base Icons', Icons.crop_square_rounded),
-      const _Dest('settings', 'Impostazioni', Icons.settings_outlined, 'Opzioni'),
+      const _Dest('studio', S.studio, Icons.auto_awesome_mosaic_outlined),
+      const _Dest('ai', S.aiTheme, Icons.auto_awesome_outlined, 'AI'),
+      const _Dest('pack', S.packCleanup, Icons.cleaning_services_outlined, S.pack),
+      if (Platform.isAndroid) const _Dest('apps', S.app, Icons.apps_rounded),
+      if (!Platform.isAndroid) const _Dest('bases', S.baseIcons, Icons.crop_square_rounded),
+      const _Dest('settings', S.impostazioni, Icons.settings_outlined, S.opzioni),
     ];
 
 class Shell extends StatefulWidget {
@@ -202,7 +203,7 @@ class _ShellState extends State<Shell> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Base attivo', style: TextStyle(fontSize: 10, color: Palette.text3)),
+                          const Text(S.baseAttivo, style: TextStyle(fontSize: 10, color: Palette.text3)),
                           Text(b?.name ?? 'nessuno', overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
                         ]),
                       ),

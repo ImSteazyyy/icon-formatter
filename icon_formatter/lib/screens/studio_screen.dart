@@ -10,6 +10,7 @@ import '../services/import_service.dart';
 import '../widgets/common.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
+import '../l10n/strings.dart';
 
 /// Original Composition / Nothing Translucent / Custom Presets.
 class StudioScreen extends StatefulWidget {
@@ -39,9 +40,9 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       final imgs = await f();
       if (imgs.isEmpty) return;
       c.addPaths(imgs.cast());
-      if (mounted) showMsg(context, '${imgs.length} icone importate');
+      if (mounted) showMsg(context, S.iconeImportate(imgs.length));
     } catch (e) {
-      if (mounted) showMsg(context, 'Importazione non riuscita: $e', error: true);
+      if (mounted) showMsg(context, S.importazioneNonRiuscita(e), error: true);
     }
   }
 
@@ -53,12 +54,12 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     }
     final done = c.processed;
     if (done.isEmpty) {
-      if (mounted) showMsg(context, 'Nessuna icona elaborata da esportare', error: true);
+      if (mounted) showMsg(context, S.nessunaIconaElaborataEsportare, error: true);
       return;
     }
     try {
       final stage = await ExportService.stage({for (final i in done) i.name: i.outputPath!}, c.settings.size);
-      final name = 'IconFormatter_${c.mode.name}_${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+      final name = S.iconformatter(c.mode.name, DateTime.now().millisecondsSinceEpoch ~/ 1000);
       if (share) {
         await ExportService.shareDirAsZip(stage, name);
         return;
@@ -66,7 +67,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       final r = await ExportService.exportDir(stage, name: name, zip: zip);
       if (r != null && mounted) await showExportDone(context, r);
     } catch (e) {
-      if (mounted) showMsg(context, 'Esportazione non riuscita: $e', error: true);
+      if (mounted) showMsg(context, S.esportazioneNonRiuscita(e), error: true);
     }
   }
 
@@ -74,14 +75,14 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
   Widget build(BuildContext context) {
     super.build(context);
     final toolbar = [
-      ToolButton(icon: Icons.add_photo_alternate_outlined, label: 'File', onTap: () => _import(ImportService.pickFiles)),
-      ToolButton(icon: Icons.folder_open_outlined, label: 'Cartella', onTap: () => _import(ImportService.pickFolderImages)),
+      ToolButton(icon: Icons.add_photo_alternate_outlined, label: S.file, onTap: () => _import(ImportService.pickFiles)),
+      ToolButton(icon: Icons.folder_open_outlined, label: S.cartella, onTap: () => _import(ImportService.pickFolderImages)),
       ToolButton(icon: Icons.folder_zip_outlined, label: 'ZIP', onTap: () => _import(ImportService.pickZip)),
       ToolButton(
         icon: Icons.clear_all,
-        label: 'Svuota',
+        label: S.svuota,
         onTap: () async {
-          if (c.items.isNotEmpty && await confirm(context, 'Svuotare la lista?', 'I file originali non vengono toccati.', ok: 'Svuota')) c.clear();
+          if (c.items.isNotEmpty && await confirm(context, S.svuotareLista, S.fileOriginaliNonVengonoToccati, ok: S.svuota)) c.clear();
         },
       ),
     ];
@@ -91,19 +92,19 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         builder: (context, _) => FilledButton.icon(
           onPressed: c.items.isEmpty || c.batch.running ? null : () => c.process(),
           icon: const Icon(Icons.play_arrow_rounded),
-          label: Text(c.batch.running ? 'Elaborazione…' : 'Elabora tutte'),
+          label: Text(c.batch.running ? S.elaborazione : S.elaboraTutte),
         ),
       ),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text('Esporta cartella')),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text('Esporta ZIP')),
+      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text(S.esportaCartella)),
+      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text(S.esportaZip)),
       if (Platform.isAndroid)
-        OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text('Condividi')),
+        OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text(S.condividi)),
     ];
     final empty = Column(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.auto_awesome_mosaic_outlined, size: 40, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
       const SizedBox(height: 10),
       Text(
-        Platform.isWindows ? 'Trascina qui icone, cartelle o ZIP\noppure usa i pulsanti in alto' : 'Importa icone, cartelle o ZIP',
+        Platform.isWindows ? S.trascinaQuiIconeCartelleO : S.importaIconeCartelleOZip,
         textAlign: TextAlign.center,
         style: const TextStyle(color: Palette.text2),
       ),
@@ -112,7 +113,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       listenable: c,
       builder: (context, _) => WorkspaceView(
         c: c,
-        title: 'Studio',
+        title: S.studio,
         toolbar: toolbar,
         bottomActions: buildActions(),
         emptyHint: empty,
@@ -140,7 +141,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                     color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                     border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
                   ),
-                  child: const Center(child: Text('Rilascia per importare', style: TextStyle(fontSize: 18))),
+                  child: const Center(child: Text(S.rilasciaImportare, style: TextStyle(fontSize: 18))),
                 ),
               ),
             ),

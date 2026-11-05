@@ -12,6 +12,7 @@ import '../services/export_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
+import '../l10n/strings.dart';
 
 class _AiItem {
   _AiItem(this.name, this.original);
@@ -84,7 +85,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
     final it = cur;
     if (it == null || busy) return;
     if (configured != true) {
-      showMsg(context, 'AI non configurata: imposta provider e API key.', error: true);
+      showMsg(context, S.aiNonConfigurataImpostaProvider, error: true);
       return;
     }
     setState(() {
@@ -137,8 +138,8 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
             child: Row(children: [
               const Icon(Icons.key_off_outlined, color: Palette.warn),
               const SizedBox(width: 10),
-              const Expanded(child: Text('AI non configurata. Nessuna generazione viene simulata: configura provider e API key.')),
-              TextButton(onPressed: widget.onOpenSettings, child: const Text('Configura')),
+              const Expanded(child: Text(S.aiNonConfigurataNessunaGenerazione)),
+              TextButton(onPressed: widget.onOpenSettings, child: const Text(S.configura)),
             ]),
           )
         : const SizedBox.shrink();
@@ -147,12 +148,12 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
       padding: const EdgeInsets.all(8),
       child: Column(children: [
         Row(children: [
-          const Expanded(child: SectionTitle('Icone')),
-          IconButton(tooltip: 'Importa', onPressed: _import, icon: const Icon(Icons.add)),
+          const Expanded(child: SectionTitle(S.icone)),
+          IconButton(tooltip: S.importa, onPressed: _import, icon: const Icon(Icons.add)),
         ]),
         Expanded(
           child: items.isEmpty
-              ? const Center(child: Text('Importa una o più icone', style: TextStyle(color: Palette.text3)))
+              ? const Center(child: Text(S.importaOPiuIcone, style: TextStyle(color: Palette.text3)))
               : ListView.builder(
                   itemCount: items.length,
                   itemBuilder: (_, i) => ListTile(
@@ -160,7 +161,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
                     leading: SizedBox(width: 36, height: 36, child: IconImage(bytes: items[i].result ?? items[i].original)),
                     title: Text(items[i].name, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
-                      items[i].accepted == true ? 'accettata' : (items[i].versions.isEmpty ? 'da generare' : '${items[i].versions.length} versioni'),
+                      items[i].accepted == true ? 'accettata' : (items[i].versions.isEmpty ? S.generare : '${items[i].versions.length} versioni'),
                       style: const TextStyle(fontSize: 11),
                     ),
                     onTap: () => setState(() => sel = i),
@@ -172,7 +173,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
 
     final preview = Glass(
       child: it == null
-          ? const Center(child: Text('Nessuna icona selezionata', style: TextStyle(color: Palette.text3)))
+          ? const Center(child: Text(S.nessunaIconaSelezionata, style: TextStyle(color: Palette.text3)))
           : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(
                 child: Center(
@@ -186,7 +187,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
                             ? const Center(child: CircularProgressIndicator())
                             : it.result != null
                                 ? IconImage(bytes: it.result)
-                                : Center(child: Text(it.error ?? 'Nessuna generazione', textAlign: TextAlign.center, style: TextStyle(color: it.error != null ? Palette.danger : Palette.text3))),
+                                : Center(child: Text(it.error ?? S.nessunaGenerazione, textAlign: TextAlign.center, style: TextStyle(color: it.error != null ? Palette.danger : Palette.text3))),
                       ),
                     ),
                   ),
@@ -217,7 +218,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
                 OutlinedButton.icon(
                   onPressed: it.result == null ? null : () => setState(() => it.accepted = true),
                   icon: const Icon(Icons.check),
-                  label: Text(it.accepted == true ? 'Accettata' : 'Accetta'),
+                  label: Text(it.accepted == true ? S.accettata : S.accetta),
                 ),
                 OutlinedButton.icon(
                   onPressed: it.result == null
@@ -228,11 +229,11 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
                             it.accepted = false;
                           }),
                   icon: const Icon(Icons.close),
-                  label: const Text('Rifiuta'),
+                  label: const Text(S.rifiuta),
                 ),
-                OutlinedButton.icon(onPressed: it.result == null ? null : _save, icon: const Icon(Icons.download_outlined), label: const Text('Salva')),
+                OutlinedButton.icon(onPressed: it.result == null ? null : _save, icon: const Icon(Icons.download_outlined), label: const Text(S.salva)),
                 IconButton(
-                  tooltip: 'Ingrandisci',
+                  tooltip: S.ingrandisci,
                   onPressed: it.result == null ? null : () => showZoom(context, bytes: it.result, title: it.name),
                   icon: const Icon(Icons.zoom_in),
                 ),
@@ -243,7 +244,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
     final controls = Glass(
       padding: EdgeInsets.zero,
       child: ListView(padding: const EdgeInsets.all(16), children: [
-        const SectionTitle('Tema'),
+        const SectionTitle(S.tema),
         DropdownButtonFormField<String>(
           initialValue: theme,
           isExpanded: true,
@@ -255,13 +256,13 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
           controller: custom,
           minLines: 2,
           maxLines: 4,
-          decoration: InputDecoration(hintText: theme == 'Personalizzato' ? 'Descrivi lo stile desiderato' : 'Istruzioni aggiuntive (opzionale)'),
+          decoration: InputDecoration(hintText: theme == S.personalizzato ? S.descriviStileDesiderato : S.istruzioniAggiuntiveOpzionale),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text('Normalizza sul base Nothing Translucent', style: TextStyle(fontSize: 13)),
-          subtitle: const Text('Isola il glyph generato e lo compone con la calibrazione', style: TextStyle(fontSize: 11)),
+          title: const Text(S.normalizzaSulBaseNothingTranslucent, style: TextStyle(fontSize: 13)),
+          subtitle: const Text(S.isolaGlyphGeneratoComponeCalibrazione, style: TextStyle(fontSize: 11)),
           value: compose,
           onChanged: (v) => setState(() => compose = v),
         ),
@@ -269,20 +270,20 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
         FilledButton.icon(
           onPressed: it == null || busy || configured != true ? null : () => _generate(regenerate: false),
           icon: const Icon(Icons.auto_awesome),
-          label: const Text('Genera'),
+          label: const Text(S.genera),
         ),
         const SizedBox(height: 18),
-        const SectionTitle('Rigenera'),
-        TextField(controller: comment, minLines: 2, maxLines: 4, decoration: const InputDecoration(hintText: 'Commento: cosa cambiare rispetto al risultato precedente')),
+        const SectionTitle(S.rigenera),
+        TextField(controller: comment, minLines: 2, maxLines: 4, decoration: const InputDecoration(hintText: S.commentoCosaCambiareRispettoAl)),
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: it?.result == null || busy || configured != true ? null : () => _generate(regenerate: true),
           icon: const Icon(Icons.refresh),
-          label: const Text('Rigenera dalla versione corrente'),
+          label: const Text(S.rigeneraDallaVersioneCorrente),
         ),
         const SizedBox(height: 18),
-        const SectionTitle('Provider'),
-        Text('${info.name} · modello ${AppState.I.ai.model}', style: const TextStyle(fontSize: 12)),
+        const SectionTitle(S.provider),
+        Text(S.modello(info.name, AppState.I.ai.model), style: const TextStyle(fontSize: 12)),
         const SizedBox(height: 4),
         Text(info.costNote, style: const TextStyle(fontSize: 11, color: Palette.text3)),
       ]),
@@ -292,7 +293,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
       return Padding(
         padding: const EdgeInsets.all(20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('AI Icon Theme', style: Theme.of(context).textTheme.headlineSmall),
+          Text(S.aiIconTheme, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
           banner,
           if (configured == false) const SizedBox(height: 12),
@@ -312,7 +313,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
       bottom: false,
       child: ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + GlassInsets.of(context)), children: [
         Row(children: [
-          Expanded(child: Text('AI Icon Theme', style: Theme.of(context).textTheme.titleLarge)),
+          Expanded(child: Text(S.aiIconTheme, style: Theme.of(context).textTheme.titleLarge)),
           IconButton(onPressed: _import, icon: const Icon(Icons.add_photo_alternate_outlined)),
         ]),
         banner,

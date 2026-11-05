@@ -1,6 +1,6 @@
 //! Parallel batch engine with progress reporting and cooperative cancellation.
 
-use crate::compose::{place_glyph, Placement};
+use crate::compose::Placement;
 use crate::error::{CoreError, Result};
 use crate::imageops::{clean_transparent, decode, decode_file, resize, write_png};
 use crate::segment::{isolate, SegmentOptions};
@@ -51,6 +51,11 @@ pub struct BatchConfig {
     pub segment: SegmentOptions,
     /// Max worker threads (0 = all cores).
     pub threads: usize,
+    /// Lucent rendering: the plate is built per icon from its silhouette,
+    /// so `background` is ignored.
+    pub lucent: Option<crate::lucent::LucentParams>,
+    /// Local AI background removal (cached model + mask options).
+    pub ai: Option<(Arc<crate::ai::Model>, crate::ai::AiOptions)>,
 }
 
 pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage, JobResult) {
@@ -58,15 +63,33 @@ pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage,
     let pl = job.placement.as_ref().unwrap_or(&cfg.placement);
     let res = if job.skip_isolation {
         isolate(img, &SegmentOptions { mode: crate::segment::SegmentMode::KeepAlpha, ..seg.clone() })
+    } else if let Some((model, opt)) = &cfg.ai {
+        match crate::ai::isolate_ai(img, model, *opt) {
+            Ok(r) => r.seg,
+            Err(e) => {
+                let mut r = isolate(img, seg);
+                r.notes.push(format!("AI non disponibile ({e}): segmentazione classica"));
+                r.ambiguous = true;
+                r
+            }
+        }
     } else {
         isolate(img, seg)
     };
-    let mut canvas = if cfg.background.width() == cfg.size {
-        (*cfg.background).clone()
+    let mut extra = Vec::new();
+    let mut canvas = if let Some(lp) = &cfg.lucent {
+        let o = crate::lucent::render(img, &res.glyph, res.bbox, cfg.size, &crate::lucent::with_placement(lp, pl));
+        extra = o.notes;
+        o.image
     } else {
-        resize(&cfg.background, cfg.size, cfg.size)
+        let mut c = if cfg.background.width() == cfg.size {
+            (*cfg.background).clone()
+        } else {
+            resize(&cfg.background, cfg.size, cfg.size)
+        };
+        crate::compose::place_on_plate(&mut c, img, &res, pl);
+        c
     };
-    place_glyph(&mut canvas, &res.glyph, pl);
     clean_transparent(&mut canvas);
     let r = JobResult {
         id: job.id.clone(),
@@ -77,7 +100,7 @@ pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage,
         ambiguous: res.ambiguous,
         confidence: res.confidence,
         method: res.method,
-        notes: res.notes,
+        notes: res.notes.into_iter().chain(extra).collect(),
     };
     (canvas, r)
 }
@@ -187,6 +210,8 @@ mod tests {
             placement: Placement::default(),
             segment: SegmentOptions::default(),
             threads: 2,
+            lucent: None,
+            ai: None,
         };
         let cancel = AtomicBool::new(false);
         let r = run(&jobs, &cfg, &cancel, &|_, _, _| {});

@@ -7,14 +7,16 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 import '../app/storage.dart';
+import '../l10n/strings.dart';
 
 /// Background removal provider. Local (Rust, offline) is the default; the
 /// cloud option is used only when the user selects it and saves an API key.
-enum BgProvider { local, removeBg }
+enum BgProvider { local, localAi, removeBg }
 
 String bgProviderLabel(BgProvider b) => switch (b) {
-      BgProvider.local => 'Locale (Rust, offline, gratuita)',
-      BgProvider.removeBg => 'remove.bg (cloud, a crediti)',
+      BgProvider.local => S.localeRustOfflineGratuita,
+      BgProvider.localAi => S.aiLocaleOffline,
+      BgProvider.removeBg => S.removeBgCloudCrediti,
     };
 
 class BgRemovalException implements Exception {
@@ -30,8 +32,7 @@ class BgRemovalService {
   static const _storage = FlutterSecureStorage();
   static const _keyName = 'bg_api_key_removebg';
   static const pricingUrl = 'https://www.remove.bg/pricing';
-  static const costNote = 'remove.bg consuma 1 credito per immagine a piena risoluzione; '
-      'i nuovi account ricevono alcuni crediti gratuiti al mese. Verifica il listino ufficiale.';
+  static const costNote = S.removeBgConsuma1Credito;
 
   /// Cache: source key -> cutout PNG path (one API call per image).
   static final Map<String, String> _cache = {};
@@ -49,7 +50,7 @@ class BgRemovalService {
   /// Free call: returns the remaining credits of the account.
   static Future<String> testConnection() async {
     final key = await readKey();
-    if (key == null || key.isEmpty) throw BgRemovalException('API key mancante');
+    if (key == null || key.isEmpty) throw BgRemovalException(S.apiKeyMancante);
     final r = await http
         .get(Uri.parse('https://api.remove.bg/v1.0/account'), headers: {'X-Api-Key': key})
         .timeout(const Duration(seconds: 20));
@@ -58,15 +59,15 @@ class BgRemovalService {
     final credits = j['data']?['attributes']?['credits'];
     final total = credits?['total'];
     final free = j['data']?['attributes']?['api']?['free_calls'];
-    return 'Connessione OK · crediti: ${total ?? '?'} · chiamate gratuite residue: ${free ?? '?'}';
+    return S.connessioneOkCreditiChiamateGratuite(total ?? '?', free ?? '?');
   }
 
   static String _error(http.Response r) {
     try {
       final e = (jsonDecode(r.body)['errors'] as List).first;
-      return 'Errore ${r.statusCode}: ${e['title']}${e['detail'] != null ? ' (${e['detail']})' : ''}';
+      return S.errore3(r.statusCode, e['title'], e['detail'] != null ? ' (${e['detail']})' : '');
     } catch (_) {
-      return 'Errore HTTP ${r.statusCode}';
+      return S.erroreHttp(r.statusCode);
     }
   }
 
@@ -77,7 +78,7 @@ class BgRemovalService {
     if (hit != null && File(hit).existsSync()) return hit;
     final key = await readKey();
     if (key == null || key.isEmpty) {
-      throw BgRemovalException('remove.bg selezionato ma senza API key: impostala in Impostazioni › Processing.');
+      throw BgRemovalException(S.removeBgSelezionatoMaSenza);
     }
     final data = bytes ?? await File(path!).readAsBytes();
     final req = http.MultipartRequest('POST', Uri.parse('https://api.remove.bg/v1.0/removebg'))

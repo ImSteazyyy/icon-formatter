@@ -55,13 +55,14 @@ extension BackgroundSettingsPatterns on BackgroundSettings {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( BackgroundSettings_Transparent value)?  transparent,TResult Function( BackgroundSettings_BaseImage value)?  baseImage,TResult Function( BackgroundSettings_Translucent value)?  translucent,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( BackgroundSettings_Transparent value)?  transparent,TResult Function( BackgroundSettings_BaseImage value)?  baseImage,TResult Function( BackgroundSettings_Translucent value)?  translucent,TResult Function( BackgroundSettings_Lucent value)?  lucent,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent() when transparent != null:
 return transparent(_that);case BackgroundSettings_BaseImage() when baseImage != null:
 return baseImage(_that);case BackgroundSettings_Translucent() when translucent != null:
-return translucent(_that);case _:
+return translucent(_that);case BackgroundSettings_Lucent() when lucent != null:
+return lucent(_that);case _:
   return orElse();
 
 }
@@ -79,13 +80,14 @@ return translucent(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( BackgroundSettings_Transparent value)  transparent,required TResult Function( BackgroundSettings_BaseImage value)  baseImage,required TResult Function( BackgroundSettings_Translucent value)  translucent,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( BackgroundSettings_Transparent value)  transparent,required TResult Function( BackgroundSettings_BaseImage value)  baseImage,required TResult Function( BackgroundSettings_Translucent value)  translucent,required TResult Function( BackgroundSettings_Lucent value)  lucent,}){
 final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent():
 return transparent(_that);case BackgroundSettings_BaseImage():
 return baseImage(_that);case BackgroundSettings_Translucent():
-return translucent(_that);}
+return translucent(_that);case BackgroundSettings_Lucent():
+return lucent(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -99,13 +101,14 @@ return translucent(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( BackgroundSettings_Transparent value)?  transparent,TResult? Function( BackgroundSettings_BaseImage value)?  baseImage,TResult? Function( BackgroundSettings_Translucent value)?  translucent,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( BackgroundSettings_Transparent value)?  transparent,TResult? Function( BackgroundSettings_BaseImage value)?  baseImage,TResult? Function( BackgroundSettings_Translucent value)?  translucent,TResult? Function( BackgroundSettings_Lucent value)?  lucent,}){
 final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent() when transparent != null:
 return transparent(_that);case BackgroundSettings_BaseImage() when baseImage != null:
 return baseImage(_that);case BackgroundSettings_Translucent() when translucent != null:
-return translucent(_that);case _:
+return translucent(_that);case BackgroundSettings_Lucent() when lucent != null:
+return lucent(_that);case _:
   return null;
 
 }
@@ -122,12 +125,13 @@ return translucent(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  transparent,TResult Function( String path)?  baseImage,TResult Function( TranslucentSettings params)?  translucent,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  transparent,TResult Function( String path)?  baseImage,TResult Function( TranslucentSettings params)?  translucent,TResult Function( LucentSettings params)?  lucent,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent() when transparent != null:
 return transparent();case BackgroundSettings_BaseImage() when baseImage != null:
 return baseImage(_that.path);case BackgroundSettings_Translucent() when translucent != null:
-return translucent(_that.params);case _:
+return translucent(_that.params);case BackgroundSettings_Lucent() when lucent != null:
+return lucent(_that.params);case _:
   return orElse();
 
 }
@@ -145,12 +149,13 @@ return translucent(_that.params);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  transparent,required TResult Function( String path)  baseImage,required TResult Function( TranslucentSettings params)  translucent,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  transparent,required TResult Function( String path)  baseImage,required TResult Function( TranslucentSettings params)  translucent,required TResult Function( LucentSettings params)  lucent,}) {final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent():
 return transparent();case BackgroundSettings_BaseImage():
 return baseImage(_that.path);case BackgroundSettings_Translucent():
-return translucent(_that.params);}
+return translucent(_that.params);case BackgroundSettings_Lucent():
+return lucent(_that.params);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -164,12 +169,13 @@ return translucent(_that.params);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  transparent,TResult? Function( String path)?  baseImage,TResult? Function( TranslucentSettings params)?  translucent,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  transparent,TResult? Function( String path)?  baseImage,TResult? Function( TranslucentSettings params)?  translucent,TResult? Function( LucentSettings params)?  lucent,}) {final _that = this;
 switch (_that) {
 case BackgroundSettings_Transparent() when transparent != null:
 return transparent();case BackgroundSettings_BaseImage() when baseImage != null:
 return baseImage(_that.path);case BackgroundSettings_Translucent() when translucent != null:
-return translucent(_that.params);case _:
+return translucent(_that.params);case BackgroundSettings_Lucent() when lucent != null:
+return lucent(_that.params);case _:
   return null;
 
 }
@@ -335,6 +341,72 @@ class _$BackgroundSettings_TranslucentCopyWithImpl<$Res>
   return _then(BackgroundSettings_Translucent(
 params: null == params ? _self.params : params // ignore: cast_nullable_to_non_nullable
 as TranslucentSettings,
+  ));
+}
+
+
+}
+
+/// @nodoc
+
+
+class BackgroundSettings_Lucent extends BackgroundSettings {
+  const BackgroundSettings_Lucent({required this.params}): super._();
+  
+
+ final  LucentSettings params;
+
+/// Create a copy of BackgroundSettings
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$BackgroundSettings_LucentCopyWith<BackgroundSettings_Lucent> get copyWith => _$BackgroundSettings_LucentCopyWithImpl<BackgroundSettings_Lucent>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is BackgroundSettings_Lucent&&(identical(other.params, params) || other.params == params));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,params);
+
+@override
+String toString() {
+  return 'BackgroundSettings.lucent(params: $params)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $BackgroundSettings_LucentCopyWith<$Res> implements $BackgroundSettingsCopyWith<$Res> {
+  factory $BackgroundSettings_LucentCopyWith(BackgroundSettings_Lucent value, $Res Function(BackgroundSettings_Lucent) _then) = _$BackgroundSettings_LucentCopyWithImpl;
+@useResult
+$Res call({
+ LucentSettings params
+});
+
+
+
+
+}
+/// @nodoc
+class _$BackgroundSettings_LucentCopyWithImpl<$Res>
+    implements $BackgroundSettings_LucentCopyWith<$Res> {
+  _$BackgroundSettings_LucentCopyWithImpl(this._self, this._then);
+
+  final BackgroundSettings_Lucent _self;
+  final $Res Function(BackgroundSettings_Lucent) _then;
+
+/// Create a copy of BackgroundSettings
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? params = null,}) {
+  return _then(BackgroundSettings_Lucent(
+params: null == params ? _self.params : params // ignore: cast_nullable_to_non_nullable
+as LucentSettings,
   ));
 }
 

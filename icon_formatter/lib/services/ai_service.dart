@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../app/models.dart';
 import '../app/state.dart';
+import '../l10n/strings.dart';
 
 class AiException implements Exception {
   AiException(this.message);
@@ -30,39 +31,37 @@ class AiProviderInfo {
 
 const aiProviders = {
   AiProviderKind.openai: AiProviderInfo(
-    'OpenAI (Images API)',
+    S.openaiImagesApi,
     'gpt-image-1',
     'https://api.openai.com',
-    'Indicativo: circa 0,01–0,25 USD per immagine 1024×1024 secondo qualità (low/medium/high). '
-        'Limiti di rate in base al tier dell\'account. Verifica sempre il listino ufficiale.',
+    S.indicativoCirca0010,
     'https://openai.com/api/pricing/',
   ),
   AiProviderKind.gemini: AiProviderInfo(
-    'Google Gemini',
+    S.googleGemini,
     'gemini-2.5-flash-image',
     'https://generativelanguage.googleapis.com',
-    'Indicativo: circa 0,04 USD per immagine generata; il piano gratuito ha limiti giornalieri ridotti. '
-        'Verifica sempre il listino ufficiale.',
+    S.indicativoCirca004Usd,
     'https://ai.google.dev/gemini-api/docs/pricing',
   ),
   AiProviderKind.openaiCompatible: AiProviderInfo(
-    'Compatibile OpenAI (endpoint personalizzato)',
+    S.compatibileOpenaiEndpointPersonalizzato,
     'gpt-image-1',
     'https://',
-    'Costi e limiti dipendono dal servizio configurato (endpoint /v1/images/edits).',
+    S.costiLimitiDipendonoDalServizio,
     '',
   ),
 };
 
 /// Theme presets for AI icon theming.
 const aiThemes = <String, String>{
-  'Nothing Translucent':
+  S.nothingTranslucent:
       'Restyle the icon background as neutral dark grey smoked frosted glass, with a subtle thin light rim and soft reflections, '
           'no purple, blue or teal cast. Keep the logo/glyph exactly as it is, same colours and proportions.',
-  'Monocromatico chiaro':
+  S.monocromaticoChiaro:
       'Turn the glyph into a clean single-colour off-white version on a dark charcoal squircle, preserving the exact silhouette.',
-  'Pastello morbido': 'Recolour the icon with soft pastel tones while keeping the glyph silhouette and identity unchanged.',
-  'Neon notturno': 'Give the glyph a restrained neon accent on a deep graphite background, keeping the shape identical.',
+  S.pastelloMorbido: 'Recolour the icon with soft pastel tones while keeping the glyph silhouette and identity unchanged.',
+  S.neonNotturno: 'Give the glyph a restrained neon accent on a deep graphite background, keeping the shape identical.',
   'Personalizzato': '',
 };
 
@@ -99,7 +98,7 @@ class AiService {
   static Future<String> testConnection() async {
     final c = AppState.I.ai;
     final key = await readKey(c.provider);
-    if (key == null || key.isEmpty) throw AiException('API key mancante');
+    if (key == null || key.isEmpty) throw AiException(S.apiKeyMancante);
     final base = _base(c);
     late http.Response r;
     try {
@@ -109,29 +108,29 @@ class AiService {
             .timeout(const Duration(seconds: 20));
       } else {
         r = await http
-            .get(Uri.parse('$base/v1/models'), headers: {'Authorization': 'Bearer $key'})
+            .get(Uri.parse('$base/v1/models'), headers: {'Authorization': S.bearer(key)})
             .timeout(const Duration(seconds: 20));
       }
     } catch (e) {
-      throw AiException('Connessione non riuscita: $e');
+      throw AiException(S.connessioneNonRiuscita(e));
     }
     if (r.statusCode != 200) throw AiException(_errorText(r));
     if (c.provider != AiProviderKind.gemini) {
       final ids = ((jsonDecode(r.body)['data'] as List?) ?? []).map((e) => e['id']).toSet();
       if (ids.isNotEmpty && !ids.contains(c.model)) {
-        return 'Connessione OK, ma il modello "${c.model}" non è nell\'elenco dell\'account.';
+        return S.connessioneOkMaModelloNon(c.model);
       }
     }
-    return 'Connessione OK (${aiProviders[c.provider]!.name}, modello ${c.model})';
+    return S.connessioneOkModello(aiProviders[c.provider]!.name, c.model);
   }
 
   static String _errorText(http.Response r) {
     try {
       final j = jsonDecode(r.body);
       final m = j['error'] is Map ? j['error']['message'] : j['error'] ?? j['message'];
-      return 'Errore ${r.statusCode}: $m';
+      return S.errore2(r.statusCode, m);
     } catch (_) {
-      return 'Errore HTTP ${r.statusCode}';
+      return S.erroreHttp(r.statusCode);
     }
   }
 
@@ -139,9 +138,9 @@ class AiService {
     final base = StringBuffer()
       ..writeln('You are editing an app launcher icon. Output a single square app icon, centred, PNG.')
       ..writeln('Preserve the identity of the logo: same glyph shape, proportions and recognisable colours.')
-      ..writeln('Do not add text, glow, drop shadows, 3D extrusion or extra objects unless requested.')
-      ..writeln('Theme: ${theme.isEmpty ? (custom ?? '') : theme}');
-    if (custom != null && custom.isNotEmpty && theme.isNotEmpty) base.writeln('Additional instructions: $custom');
+      ..writeln(S.doNotAddTextGlow)
+      ..writeln(S.theme(theme.isEmpty ? (custom ?? '') : theme));
+    if (custom != null && custom.isNotEmpty && theme.isNotEmpty) base.writeln(S.additionalInstructions(custom));
     if (regeneration) {
       base
         ..writeln('The first image is the original icon, the second image is the previous result.')
@@ -154,7 +153,7 @@ class AiService {
   static Future<Uint8List> generate({required List<Uint8List> references, required String prompt}) async {
     final c = AppState.I.ai;
     final key = await readKey(c.provider);
-    if (key == null || key.isEmpty) throw AiException('AI non configurata: inserisci la API key in Impostazioni › AI Provider.');
+    if (key == null || key.isEmpty) throw AiException(S.aiNonConfigurataInserisciApi);
     final base = _base(c);
     if (c.provider == AiProviderKind.gemini) {
       final body = {
@@ -182,10 +181,10 @@ class AiService {
           if (d != null && d['data'] != null) return base64Decode(d['data'] as String);
         }
       }
-      throw AiException('Il provider non ha restituito un\'immagine.');
+      throw AiException(S.providerNonHaRestituitoImmagine);
     }
     final req = http.MultipartRequest('POST', Uri.parse('$base/v1/images/edits'))
-      ..headers['Authorization'] = 'Bearer $key'
+      ..headers['Authorization'] = S.bearer(key)
       ..fields['model'] = c.model
       ..fields['prompt'] = prompt
       ..fields['size'] = '1024x1024'
@@ -196,13 +195,13 @@ class AiService {
       req.fields['output_format'] = 'png';
     }
     for (var i = 0; i < references.length; i++) {
-      req.files.add(http.MultipartFile.fromBytes(references.length > 1 ? 'image[]' : 'image', references[i], filename: 'ref$i.png'));
+      req.files.add(http.MultipartFile.fromBytes(references.length > 1 ? S.image : 'image', references[i], filename: S.refPng(i)));
     }
     final streamed = await req.send().timeout(const Duration(minutes: 3));
     final r = await http.Response.fromStream(streamed);
     if (r.statusCode != 200) throw AiException(_errorText(r));
     final data = (jsonDecode(r.body)['data'] as List?) ?? [];
-    if (data.isEmpty) throw AiException('Il provider non ha restituito un\'immagine.');
+    if (data.isEmpty) throw AiException(S.providerNonHaRestituitoImmagine);
     final b64 = data.first['b64_json'] as String?;
     if (b64 != null) return base64Decode(b64);
     final url = data.first['url'] as String?;
@@ -210,6 +209,6 @@ class AiService {
       final img = await http.get(Uri.parse(url));
       if (img.statusCode == 200) return img.bodyBytes;
     }
-    throw AiException('Risposta del provider senza immagine.');
+    throw AiException(S.rispostaDelProviderSenzaImmagine);
   }
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../l10n/strings.dart';
 
 /// App folders. Everything the app writes lives here or in a destination the
 /// user chose explicitly; source files are never modified.
@@ -23,11 +24,15 @@ class AppPaths {
     I = AppPaths._(root, cache);
     await Directory(I.bases).create(recursive: true);
     await Directory(I.outputs).create(recursive: true);
+    await Directory(I.models).create(recursive: true);
     return I;
   }
 
   String get bases => p.join(root.path, 'bases');
   String get outputs => p.join(root.path, 'outputs');
+
+  /// Downloaded local AI models.
+  String get models => p.join(root.path, 'models');
   String get stateFile => p.join(root.path, 'state.json');
 
   /// Fresh unique work folder in the cache.
@@ -88,6 +93,6 @@ String uniquePath(String path) {
 
 String formatBytes(int b) {
   if (b < 1024) return '$b B';
-  if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
-  return '${(b / 1024 / 1024).toStringAsFixed(1)} MB';
+  if (b < 1024 * 1024) return S.kb((b / 1024).toStringAsFixed(1));
+  return S.mb((b / 1024 / 1024).toStringAsFixed(1));
 }

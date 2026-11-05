@@ -55,6 +55,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AiModelKind dco_decode_ai_model_kind(dynamic raw);
+
+  @protected
+  AiPreview dco_decode_ai_preview(dynamic raw);
+
+  @protected
+  AiSettings dco_decode_ai_settings(dynamic raw);
+
+  @protected
   AppfilterItem dco_decode_appfilter_item(dynamic raw);
 
   @protected
@@ -70,7 +79,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  AiSettings dco_decode_box_autoadd_ai_settings(dynamic raw);
+
+  @protected
   BackgroundSettings dco_decode_box_autoadd_background_settings(dynamic raw);
+
+  @protected
+  LucentSettings dco_decode_box_autoadd_lucent_settings(dynamic raw);
 
   @protected
   PlacementSettings dco_decode_box_autoadd_placement_settings(dynamic raw);
@@ -121,6 +136,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<IconPackApp> dco_decode_list_icon_pack_app(dynamic raw);
 
   @protected
+  List<MatchInput> dco_decode_list_match_input(dynamic raw);
+
+  @protected
+  List<MatchOutput> dco_decode_list_match_output(dynamic raw);
+
+  @protected
   List<PackImage> dco_decode_list_pack_image(dynamic raw);
 
   @protected
@@ -136,7 +157,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  LucentSettings dco_decode_lucent_settings(dynamic raw);
+
+  @protected
+  LucentShape dco_decode_lucent_shape(dynamic raw);
+
+  @protected
+  MatchInput dco_decode_match_input(dynamic raw);
+
+  @protected
+  MatchOutput dco_decode_match_output(dynamic raw);
+
+  @protected
+  MatchState dco_decode_match_state(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  AiSettings? dco_decode_opt_box_autoadd_ai_settings(dynamic raw);
 
   @protected
   PlacementSettings? dco_decode_opt_box_autoadd_placement_settings(dynamic raw);
@@ -213,6 +252,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AiModelKind sse_decode_ai_model_kind(SseDeserializer deserializer);
+
+  @protected
+  AiPreview sse_decode_ai_preview(SseDeserializer deserializer);
+
+  @protected
+  AiSettings sse_decode_ai_settings(SseDeserializer deserializer);
+
+  @protected
   AppfilterItem sse_decode_appfilter_item(SseDeserializer deserializer);
 
   @protected
@@ -230,7 +278,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  AiSettings sse_decode_box_autoadd_ai_settings(SseDeserializer deserializer);
+
+  @protected
   BackgroundSettings sse_decode_box_autoadd_background_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LucentSettings sse_decode_box_autoadd_lucent_settings(
     SseDeserializer deserializer,
   );
 
@@ -295,6 +351,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<IconPackApp> sse_decode_list_icon_pack_app(SseDeserializer deserializer);
 
   @protected
+  List<MatchInput> sse_decode_list_match_input(SseDeserializer deserializer);
+
+  @protected
+  List<MatchOutput> sse_decode_list_match_output(SseDeserializer deserializer);
+
+  @protected
   List<PackImage> sse_decode_list_pack_image(SseDeserializer deserializer);
 
   @protected
@@ -310,7 +372,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  LucentSettings sse_decode_lucent_settings(SseDeserializer deserializer);
+
+  @protected
+  LucentShape sse_decode_lucent_shape(SseDeserializer deserializer);
+
+  @protected
+  MatchInput sse_decode_match_input(SseDeserializer deserializer);
+
+  @protected
+  MatchOutput sse_decode_match_output(SseDeserializer deserializer);
+
+  @protected
+  MatchState sse_decode_match_state(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  AiSettings? sse_decode_opt_box_autoadd_ai_settings(
+    SseDeserializer deserializer,
+  );
 
   @protected
   PlacementSettings? sse_decode_opt_box_autoadd_placement_settings(
@@ -400,6 +482,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_ai_model_kind(AiModelKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_preview(AiPreview self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_ai_settings(AiSettings self, SseSerializer serializer);
+
+  @protected
   void sse_encode_appfilter_item(AppfilterItem self, SseSerializer serializer);
 
   @protected
@@ -418,8 +509,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_ai_settings(
+    AiSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_background_settings(
     BackgroundSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_lucent_settings(
+    LucentSettings self,
     SseSerializer serializer,
   );
 
@@ -505,6 +608,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_match_input(
+    List<MatchInput> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_match_output(
+    List<MatchOutput> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_pack_image(
     List<PackImage> self,
     SseSerializer serializer,
@@ -532,7 +647,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_lucent_settings(
+    LucentSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_lucent_shape(LucentShape self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_match_input(MatchInput self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_match_output(MatchOutput self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_match_state(MatchState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_ai_settings(
+    AiSettings? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_placement_settings(

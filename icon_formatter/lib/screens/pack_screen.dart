@@ -12,6 +12,7 @@ import '../src/rust/api/engine.dart';
 import '../widgets/common.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
+import '../l10n/strings.dart';
 
 /// Pack Cleanup: uniform an existing icon pack, keeping names and mapping.
 class PackScreen extends StatefulWidget {
@@ -46,7 +47,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
   Future<void> _open({required bool zip}) async {
     String? input;
     if (zip) {
-      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: 'Icon pack ZIP');
+      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: S.iconPackZip);
       input = r?.files.single.path;
     } else {
       input = await ImportService.pickFolder();
@@ -75,7 +76,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
         sourceName = p.basenameWithoutExtension(input!);
       });
     } catch (e) {
-      if (mounted) showMsg(context, 'Impossibile aprire il pack: $e', error: true);
+      if (mounted) showMsg(context, S.impossibileAprirePack(e), error: true);
     } finally {
       if (mounted) setState(() => opening = false);
     }
@@ -84,7 +85,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
   void _nextAmbiguous() {
     final amb = c.items.where((i) => i.result?.ambiguous == true || i.result?.ok == false).toList();
     if (amb.isEmpty) {
-      showMsg(context, 'Nessun risultato da verificare');
+      showMsg(context, S.nessunRisultatoVerificare);
       return;
     }
     final idx = amb.indexWhere((i) => i.id == c.selectedId);
@@ -118,7 +119,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
       }
       if (notes.isNotEmpty && mounted) showMsg(context, notes.join('\n'));
     } catch (e) {
-      if (mounted) showMsg(context, 'Esportazione non riuscita: $e', error: true);
+      if (mounted) showMsg(context, S.esportazioneNonRiuscita(e), error: true);
     }
   }
 
@@ -133,14 +134,14 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
             child: Glass(
               padding: const EdgeInsets.all(12),
               child: Wrap(spacing: 18, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                _stat('Icone', '${pi.images.length}'),
+                _stat(S.icone, '${pi.images.length}'),
                 _stat('appfilter.xml', pi.appfilter == null ? 'assente' : '${pi.appfilterItems.length} voci'),
-                _stat('Drawable mancanti', '${pi.missingDrawables.length}', warn: pi.missingDrawables.isNotEmpty),
-                _stat('Icone non mappate', '${pi.unmappedIcons.length}'),
-                _stat('Altri file preservati', '${pi.otherFiles}'),
+                _stat(S.drawableMancanti, '${pi.missingDrawables.length}', warn: pi.missingDrawables.isNotEmpty),
+                _stat(S.iconeNonMappate, '${pi.unmappedIcons.length}'),
+                _stat(S.altriFilePreservati, '${pi.otherFiles}'),
                 if (pi.missingDrawables.isNotEmpty || pi.notes.isNotEmpty)
-                  TextButton(onPressed: () => _details(pi), child: const Text('Dettagli')),
-                TextButton.icon(onPressed: _nextAmbiguous, icon: const Icon(Icons.flag_outlined, size: 16), label: const Text('Prossima da verificare')),
+                  TextButton(onPressed: () => _details(pi), child: const Text(S.dettagli)),
+                TextButton.icon(onPressed: _nextAmbiguous, icon: const Icon(Icons.flag_outlined, size: 16), label: const Text(S.prossimaVerificare)),
               ]),
             ),
           );
@@ -148,17 +149,17 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
       listenable: c,
       builder: (context, _) => WorkspaceView(
         c: c,
-        title: 'Pack Cleanup',
+        title: S.packCleanup,
         header: header,
         onOpenBases: widget.onOpenBases,
         toolbar: [
-          ToolButton(icon: Icons.folder_open_outlined, label: 'Apri cartella', onTap: opening ? null : () => _open(zip: false)),
-          ToolButton(icon: Icons.folder_zip_outlined, label: 'Apri ZIP', onTap: opening ? null : () => _open(zip: true)),
+          ToolButton(icon: Icons.folder_open_outlined, label: S.apriCartella, onTap: opening ? null : () => _open(zip: false)),
+          ToolButton(icon: Icons.folder_zip_outlined, label: S.apriZip, onTap: opening ? null : () => _open(zip: true)),
         ],
         emptyHint: opening
             ? const CircularProgressIndicator()
             : const Text(
-                'Apri un icon pack (cartella o ZIP).\nNomi file e appfilter.xml vengono preservati;\ngli originali non vengono modificati.',
+                S.apriIconPackCartellaO,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Palette.text2),
               ),
@@ -168,18 +169,18 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
             builder: (context, _) => FilledButton.icon(
               onPressed: c.items.isEmpty || c.batch.running ? null : () => c.process(),
               icon: const Icon(Icons.cleaning_services_outlined),
-              label: Text(c.batch.running ? 'Elaborazione…' : 'Uniforma pack'),
+              label: Text(c.batch.running ? S.elaborazione : S.uniformaPack),
             ),
           ),
           OutlinedButton.icon(
             onPressed: c.items.isEmpty ? null : () => c.process(only: c.items.where((i) => i.hasOverride || i.result?.ok == false)),
             icon: const Icon(Icons.refresh),
-            label: const Text('Rielabora corrette/errori'),
+            label: const Text(S.rielaboraCorretteErrori),
           ),
-          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text('Esporta cartella')),
-          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text('Esporta ZIP')),
+          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text(S.esportaCartella)),
+          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text(S.esportaZip)),
           if (Platform.isAndroid)
-            OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text('Condividi')),
+            OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text(S.condividi)),
         ],
       ),
     );
@@ -194,25 +195,25 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Dettagli mapping'),
+        title: const Text(S.dettagliMapping),
         content: SizedBox(
           width: 520,
           height: 420,
           child: ListView(children: [
-            if (pi.notes.isNotEmpty) ...[const SectionTitle('Note'), for (final n in pi.notes) Text('• $n')],
+            if (pi.notes.isNotEmpty) ...[const SectionTitle(S.note), for (final n in pi.notes) Text('• $n')],
             if (pi.missingDrawables.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const SectionTitle('Drawable in appfilter.xml senza icona'),
+              const SectionTitle(S.drawableAppfilterXmlSenzaIcona),
               for (final d in pi.missingDrawables) Text(d, style: const TextStyle(fontFamily: 'Consolas', fontSize: 12)),
             ],
             if (pi.unmappedIcons.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const SectionTitle('Icone non referenziate'),
+              const SectionTitle(S.iconeNonReferenziate),
               Text(pi.unmappedIcons.join(', '), style: const TextStyle(fontSize: 12, color: Palette.text2)),
             ],
           ]),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Chiudi'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.chiudi))],
       ),
     );
   }

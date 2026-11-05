@@ -9,8 +9,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'engine.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `background_image`, `check_size`, `handle`, `item_result`, `pack_info`, `placement_dto`, `preview_image`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `ai_kind`, `ai_of`, `background_image`, `candidates`, `check_size`, `handle`, `isolate_with`, `item_result`, `lucent_of`, `pack_info`, `placement_dto`, `preview_image`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
 SegmentSettings defaultSegmentSettings() =>
     RustLib.instance.api.crateApiEngineDefaultSegmentSettings();
@@ -20,6 +20,9 @@ PlacementSettings defaultPlacementSettings() =>
 
 TranslucentSettings defaultTranslucentSettings() =>
     RustLib.instance.api.crateApiEngineDefaultTranslucentSettings();
+
+LucentSettings defaultLucentSettings({required bool dark}) =>
+    RustLib.instance.api.crateApiEngineDefaultLucentSettings(dark: dark);
 
 String coreVersion() => RustLib.instance.api.crateApiEngineCoreVersion();
 
@@ -149,6 +152,32 @@ Future<IconPackResult> buildIconPack({
 String sanitizeDrawableName({required String name}) =>
     RustLib.instance.api.crateApiEngineSanitizeDrawableName(name: name);
 
+/// Runs the local model on one image (model loaded once and cached).
+Future<AiPreview> aiPreview({
+  required String path,
+  required AiSettings settings,
+}) => RustLib.instance.api.crateApiEngineAiPreview(
+  path: path,
+  settings: settings,
+);
+
+/// Frees the cached model.
+Future<void> aiUnloadModel() =>
+    RustLib.instance.api.crateApiEngineAiUnloadModel();
+
+/// Associates originals with generated icons (name, package, file, visual).
+Future<List<MatchOutput>> matchIcons({
+  required List<MatchInput> originals,
+  required List<MatchInput> generated,
+}) => RustLib.instance.api.crateApiEngineMatchIcons(
+  originals: originals,
+  generated: generated,
+);
+
+/// Visual similarity 0..1 between two images (manual verification).
+Future<double> visualSimilarity({required String a, required String b}) =>
+    RustLib.instance.api.crateApiEngineVisualSimilarity(a: a, b: b);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CancelToken>>
 abstract class CancelToken implements RustOpaqueInterface {
   void cancel();
@@ -156,6 +185,85 @@ abstract class CancelToken implements RustOpaqueInterface {
   bool isCancelled();
 
   factory CancelToken() => RustLib.instance.api.crateApiEngineCancelTokenNew();
+}
+
+enum AiModelKind { u2Netp, silueta, isnetGeneral }
+
+class AiPreview {
+  /// Alpha mask (white = kept) at source resolution.
+  final Uint8List maskPng;
+  final Uint8List glyphPng;
+
+  /// False when the source already has a transparent background.
+  final bool needed;
+  final bool uncertain;
+  final double confidence;
+  final List<String> notes;
+  final int millis;
+
+  const AiPreview({
+    required this.maskPng,
+    required this.glyphPng,
+    required this.needed,
+    required this.uncertain,
+    required this.confidence,
+    required this.notes,
+    required this.millis,
+  });
+
+  @override
+  int get hashCode =>
+      maskPng.hashCode ^
+      glyphPng.hashCode ^
+      needed.hashCode ^
+      uncertain.hashCode ^
+      confidence.hashCode ^
+      notes.hashCode ^
+      millis.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiPreview &&
+          runtimeType == other.runtimeType &&
+          maskPng == other.maskPng &&
+          glyphPng == other.glyphPng &&
+          needed == other.needed &&
+          uncertain == other.uncertain &&
+          confidence == other.confidence &&
+          notes == other.notes &&
+          millis == other.millis;
+}
+
+/// Local AI background removal (ONNX model on disk).
+class AiSettings {
+  final String modelPath;
+  final AiModelKind model;
+
+  /// Mask remap thresholds (0..1).
+  final double low;
+  final double high;
+
+  const AiSettings({
+    required this.modelPath,
+    required this.model,
+    required this.low,
+    required this.high,
+  });
+
+  @override
+  int get hashCode =>
+      modelPath.hashCode ^ model.hashCode ^ low.hashCode ^ high.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AiSettings &&
+          runtimeType == other.runtimeType &&
+          modelPath == other.modelPath &&
+          model == other.model &&
+          low == other.low &&
+          high == other.high;
 }
 
 class AppfilterItem {
@@ -187,6 +295,8 @@ sealed class BackgroundSettings with _$BackgroundSettings {
   const factory BackgroundSettings.translucent({
     required TranslucentSettings params,
   }) = BackgroundSettings_Translucent;
+  const factory BackgroundSettings.lucent({required LucentSettings params}) =
+      BackgroundSettings_Lucent;
 }
 
 class BatchItem {
@@ -469,6 +579,156 @@ class ItemResult {
           notes == other.notes;
 }
 
+/// Lucent (Nothing OS 5.0) plate, ported from Nothing IconGen.
+class LucentSettings {
+  /// Ink colour (ARGB) for the optional monochrome glyph.
+  final int ink;
+
+  /// Frosted backdrop (ARGB, alpha 0x66 on Nothing OS).
+  final int backdrop;
+  final LucentShape shape;
+  final bool monochrome;
+  final bool keepComposition;
+  final double glyphScale;
+  final double rim;
+  final bool launcherShadow;
+  final bool nothingEncode;
+
+  const LucentSettings({
+    required this.ink,
+    required this.backdrop,
+    required this.shape,
+    required this.monochrome,
+    required this.keepComposition,
+    required this.glyphScale,
+    required this.rim,
+    required this.launcherShadow,
+    required this.nothingEncode,
+  });
+
+  @override
+  int get hashCode =>
+      ink.hashCode ^
+      backdrop.hashCode ^
+      shape.hashCode ^
+      monochrome.hashCode ^
+      keepComposition.hashCode ^
+      glyphScale.hashCode ^
+      rim.hashCode ^
+      launcherShadow.hashCode ^
+      nothingEncode.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LucentSettings &&
+          runtimeType == other.runtimeType &&
+          ink == other.ink &&
+          backdrop == other.backdrop &&
+          shape == other.shape &&
+          monochrome == other.monochrome &&
+          keepComposition == other.keepComposition &&
+          glyphScale == other.glyphScale &&
+          rim == other.rim &&
+          launcherShadow == other.launcherShadow &&
+          nothingEncode == other.nothingEncode;
+}
+
+enum LucentShape {
+  /// Silhouette of the source icon.
+  original,
+
+  /// Nothing Launcher / IconGen circle.
+  circle,
+
+  /// Reference squircle (0.93, n 4.25).
+  squircle,
+}
+
+class MatchInput {
+  final String id;
+  final String label;
+  final String package;
+  final String file;
+  final String? path;
+  final Uint8List? png;
+
+  const MatchInput({
+    required this.id,
+    required this.label,
+    required this.package,
+    required this.file,
+    this.path,
+    this.png,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      label.hashCode ^
+      package.hashCode ^
+      file.hashCode ^
+      path.hashCode ^
+      png.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MatchInput &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label &&
+          package == other.package &&
+          file == other.file &&
+          path == other.path &&
+          png == other.png;
+}
+
+class MatchOutput {
+  final String original;
+  final String? generated;
+  final double score;
+  final double text;
+  final double visual;
+  final MatchState state;
+  final String reason;
+
+  const MatchOutput({
+    required this.original,
+    this.generated,
+    required this.score,
+    required this.text,
+    required this.visual,
+    required this.state,
+    required this.reason,
+  });
+
+  @override
+  int get hashCode =>
+      original.hashCode ^
+      generated.hashCode ^
+      score.hashCode ^
+      text.hashCode ^
+      visual.hashCode ^
+      state.hashCode ^
+      reason.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MatchOutput &&
+          runtimeType == other.runtimeType &&
+          original == other.original &&
+          generated == other.generated &&
+          score == other.score &&
+          text == other.text &&
+          visual == other.visual &&
+          state == other.state &&
+          reason == other.reason;
+}
+
+enum MatchState { confident, doubtful, missing }
+
 class PackImage {
   final String rel;
   final String abs;
@@ -648,11 +908,15 @@ class ProcessSettings {
   final PlacementSettings placement;
   final SegmentSettings segment;
 
+  /// When set, the glyph is isolated by the local AI model.
+  final AiSettings? ai;
+
   const ProcessSettings({
     required this.size,
     required this.background,
     required this.placement,
     required this.segment,
+    this.ai,
   });
 
   @override
@@ -660,7 +924,8 @@ class ProcessSettings {
       size.hashCode ^
       background.hashCode ^
       placement.hashCode ^
-      segment.hashCode;
+      segment.hashCode ^
+      ai.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -670,7 +935,8 @@ class ProcessSettings {
           size == other.size &&
           background == other.background &&
           placement == other.placement &&
-          segment == other.segment;
+          segment == other.segment &&
+          ai == other.ai;
 }
 
 enum SegMode { auto, keepAlpha, removeBackground, none }

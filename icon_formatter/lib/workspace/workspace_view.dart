@@ -8,6 +8,7 @@ import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
 import 'adjust_panel.dart';
 import 'workspace_controller.dart';
+import '../l10n/strings.dart';
 
 /// Grid tile with source or processed icon and status.
 class WorkTile extends StatelessWidget {
@@ -25,17 +26,17 @@ class WorkTile extends StatelessWidget {
     final r = it.result;
     final out = it.outputPath;
     Color? dot;
-    String tip = 'Non elaborata';
+    String tip = S.nonElaborata;
     if (r != null) {
       if (!r.ok) {
         dot = Palette.danger;
-        tip = r.error ?? 'Errore';
+        tip = r.error ?? S.errore4;
       } else if (r.ambiguous) {
         dot = Palette.warn;
-        tip = 'Da verificare: ${r.notes.join('; ')}';
+        tip = S.verificare(r.notes.join('; '));
       } else {
         dot = Palette.ok;
-        tip = 'OK · ${r.method}';
+        tip = S.ok(r.method);
       }
     }
     final accent = Theme.of(context).colorScheme.primary;
@@ -89,11 +90,11 @@ class WorkTile extends StatelessWidget {
 
   Future<void> _menu(BuildContext context, Offset? pos) async {
     final items = <PopupMenuEntry<String>>[
-      const PopupMenuItem(value: 'zoom', child: Text('Ingrandisci')),
-      PopupMenuItem(value: 'exclude', child: Text(it.excluded ? 'Includi' : 'Escludi')),
-      const PopupMenuItem(value: 'redo', child: Text('Rielabora questa icona')),
-      if (it.hasOverride) const PopupMenuItem(value: 'reset', child: Text('Rimuovi correzioni')),
-      const PopupMenuItem(value: 'remove', child: Text('Rimuovi dalla lista')),
+      const PopupMenuItem(value: 'zoom', child: Text(S.ingrandisci)),
+      PopupMenuItem(value: 'exclude', child: Text(it.excluded ? S.includi : S.escludi)),
+      const PopupMenuItem(value: 'redo', child: Text(S.rielaboraQuestaIcona)),
+      if (it.hasOverride) const PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
+      const PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
     ];
     String? v;
     if (pos != null) {
@@ -139,7 +140,7 @@ class PreviewPane extends StatelessWidget {
       builder: (context, _) {
         final it = c.selected;
         if (it == null) {
-          return const Center(child: Text('Seleziona o importa un\'icona', style: TextStyle(color: Palette.text3)));
+          return const Center(child: Text(S.selezionaOImportaIcona, style: TextStyle(color: Palette.text3)));
         }
         final info = c.previewInfo;
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -173,7 +174,7 @@ class PreviewPane extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${it.label ?? it.name} · ${info.size}px · ${info.method} · confidenza ${(info.confidence * 100).round()}%',
+                  S.pxConfidenza(it.label ?? it.name, info.size, info.method, (info.confidence * 100).round()),
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: Palette.text2),
                 ),
@@ -182,12 +183,12 @@ class PreviewPane extends StatelessWidget {
               const Spacer(),
             if (c.previewBusy) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
             IconButton(
-              tooltip: 'Ingrandisci',
+              tooltip: S.ingrandisci,
               icon: const Icon(Icons.zoom_in),
               onPressed: c.previewPng == null ? null : () => showZoom(context, bytes: c.previewPng, title: it.label ?? it.name),
             ),
             IconButton(
-              tooltip: 'Salva questa icona (PNG)',
+              tooltip: S.salvaQuestaIconaPng,
               icon: const Icon(Icons.download_outlined),
               onPressed: c.previewPng == null
                   ? null
@@ -199,7 +200,7 @@ class PreviewPane extends StatelessWidget {
           ]),
           if (info != null && (info.ambiguous || info.notes.isNotEmpty) && !compact)
             Text(
-              (info.ambiguous ? 'Risultato ambiguo, verifica: ' : '') + info.notes.join(' · '),
+              (info.ambiguous ? S.risultatoAmbiguoVerifica : '') + info.notes.join(' · '),
               style: TextStyle(fontSize: 11, color: info.ambiguous ? Palette.warn : Palette.text3),
             ),
         ]);
@@ -254,7 +255,7 @@ class WorkspaceView extends StatelessWidget {
                 errors: b.errors,
                 running: b.running,
                 onCancel: b.cancel,
-                label: b.cancelled ? 'Annullato' : (b.running && b.phase != null ? b.phase : null),
+                label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
               ),
               if (b.fatal != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(b.fatal!, style: const TextStyle(color: Palette.danger))),
             ]),
@@ -342,7 +343,7 @@ class WorkspaceView extends StatelessWidget {
           Row(children: [
             Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
             GlassIconButton(
-              tooltip: 'Regolazioni',
+              tooltip: S.regolazioni,
               icon: Icons.tune,
               onPressed: () => showModalBottomSheet(
                 context: context,
@@ -373,7 +374,7 @@ class WorkspaceView extends StatelessWidget {
         if (c.items.isEmpty) {
           return Padding(
             padding: EdgeInsets.only(bottom: bottomPad),
-            child: Center(child: emptyHint ?? const Text('Nessuna icona', style: TextStyle(color: Palette.text3))),
+            child: Center(child: emptyHint ?? const Text(S.nessunaIcona, style: TextStyle(color: Palette.text3))),
           );
         }
         return GridView.builder(

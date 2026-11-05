@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -551770612;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2136046261;
 
 // Section: executor
 
@@ -170,6 +170,76 @@ fn wire__crate__api__engine__CancelToken_new_impl(
                 let output_ok = Ok::<_, ()>(crate::api::engine::CancelToken::new())?;
                 std::result::Result::Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__engine__ai_preview_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_preview",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_settings = <crate::api::engine::AiSettings>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::engine::ai_preview(api_path, api_settings)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__engine__ai_unload_model_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ai_unload_model",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::engine::ai_unload_model();
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -351,6 +421,36 @@ fn wire__crate__api__engine__core_version_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::engine::core_version())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__engine__default_lucent_settings_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "default_lucent_settings",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dark = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::engine::default_lucent_settings(api_dark))?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -582,6 +682,45 @@ fn wire__crate__api__engine__init_app_impl(
                     })?;
                     std::result::Result::Ok(output_ok)
                 })())
+            }
+        },
+    )
+}
+fn wire__crate__api__engine__match_icons_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "match_icons",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_originals =
+                <Vec<crate::api::engine::MatchInput>>::sse_decode(&mut deserializer);
+            let api_generated =
+                <Vec<crate::api::engine::MatchInput>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::engine::match_icons(api_originals, api_generated)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
             }
         },
     )
@@ -864,6 +1003,42 @@ fn wire__crate__api__engine__thumbnail_png_impl(
         },
     )
 }
+fn wire__crate__api__engine__visual_similarity_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "visual_similarity",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_a = <String>::sse_decode(&mut deserializer);
+            let api_b = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::engine::visual_similarity(api_a, api_b)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__engine__write_file_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -993,6 +1168,57 @@ impl SseDecode for String {
     }
 }
 
+impl SseDecode for crate::api::engine::AiModelKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::engine::AiModelKind::U2netp,
+            1 => crate::api::engine::AiModelKind::Silueta,
+            2 => crate::api::engine::AiModelKind::IsnetGeneral,
+            _ => unreachable!("Invalid variant for AiModelKind: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::AiPreview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_maskPng = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_glyphPng = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_needed = <bool>::sse_decode(deserializer);
+        let mut var_uncertain = <bool>::sse_decode(deserializer);
+        let mut var_confidence = <f32>::sse_decode(deserializer);
+        let mut var_notes = <Vec<String>>::sse_decode(deserializer);
+        let mut var_millis = <u32>::sse_decode(deserializer);
+        return crate::api::engine::AiPreview {
+            mask_png: var_maskPng,
+            glyph_png: var_glyphPng,
+            needed: var_needed,
+            uncertain: var_uncertain,
+            confidence: var_confidence,
+            notes: var_notes,
+            millis: var_millis,
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::AiSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_modelPath = <String>::sse_decode(deserializer);
+        let mut var_model = <crate::api::engine::AiModelKind>::sse_decode(deserializer);
+        let mut var_low = <f32>::sse_decode(deserializer);
+        let mut var_high = <f32>::sse_decode(deserializer);
+        return crate::api::engine::AiSettings {
+            model_path: var_modelPath,
+            model: var_model,
+            low: var_low,
+            high: var_high,
+        };
+    }
+}
+
 impl SseDecode for crate::api::engine::AppfilterItem {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1021,6 +1247,10 @@ impl SseDecode for crate::api::engine::BackgroundSettings {
                 let mut var_params =
                     <crate::api::engine::TranslucentSettings>::sse_decode(deserializer);
                 return crate::api::engine::BackgroundSettings::Translucent { params: var_params };
+            }
+            3 => {
+                let mut var_params = <crate::api::engine::LucentSettings>::sse_decode(deserializer);
+                return crate::api::engine::BackgroundSettings::Lucent { params: var_params };
             }
             _ => {
                 unimplemented!("");
@@ -1263,6 +1493,30 @@ impl SseDecode for Vec<crate::api::engine::IconPackApp> {
     }
 }
 
+impl SseDecode for Vec<crate::api::engine::MatchInput> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::engine::MatchInput>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::engine::MatchOutput> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::engine::MatchOutput>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::engine::PackImage> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1311,11 +1565,116 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for crate::api::engine::LucentSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ink = <u32>::sse_decode(deserializer);
+        let mut var_backdrop = <u32>::sse_decode(deserializer);
+        let mut var_shape = <crate::api::engine::LucentShape>::sse_decode(deserializer);
+        let mut var_monochrome = <bool>::sse_decode(deserializer);
+        let mut var_keepComposition = <bool>::sse_decode(deserializer);
+        let mut var_glyphScale = <f32>::sse_decode(deserializer);
+        let mut var_rim = <f32>::sse_decode(deserializer);
+        let mut var_launcherShadow = <bool>::sse_decode(deserializer);
+        let mut var_nothingEncode = <bool>::sse_decode(deserializer);
+        return crate::api::engine::LucentSettings {
+            ink: var_ink,
+            backdrop: var_backdrop,
+            shape: var_shape,
+            monochrome: var_monochrome,
+            keep_composition: var_keepComposition,
+            glyph_scale: var_glyphScale,
+            rim: var_rim,
+            launcher_shadow: var_launcherShadow,
+            nothing_encode: var_nothingEncode,
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::LucentShape {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::engine::LucentShape::Original,
+            1 => crate::api::engine::LucentShape::Circle,
+            2 => crate::api::engine::LucentShape::Squircle,
+            _ => unreachable!("Invalid variant for LucentShape: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::MatchInput {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_package = <String>::sse_decode(deserializer);
+        let mut var_file = <String>::sse_decode(deserializer);
+        let mut var_path = <Option<String>>::sse_decode(deserializer);
+        let mut var_png = <Option<Vec<u8>>>::sse_decode(deserializer);
+        return crate::api::engine::MatchInput {
+            id: var_id,
+            label: var_label,
+            package: var_package,
+            file: var_file,
+            path: var_path,
+            png: var_png,
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::MatchOutput {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_original = <String>::sse_decode(deserializer);
+        let mut var_generated = <Option<String>>::sse_decode(deserializer);
+        let mut var_score = <f32>::sse_decode(deserializer);
+        let mut var_text = <f32>::sse_decode(deserializer);
+        let mut var_visual = <f32>::sse_decode(deserializer);
+        let mut var_state = <crate::api::engine::MatchState>::sse_decode(deserializer);
+        let mut var_reason = <String>::sse_decode(deserializer);
+        return crate::api::engine::MatchOutput {
+            original: var_original,
+            generated: var_generated,
+            score: var_score,
+            text: var_text,
+            visual: var_visual,
+            state: var_state,
+            reason: var_reason,
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::MatchState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::engine::MatchState::Confident,
+            1 => crate::api::engine::MatchState::Doubtful,
+            2 => crate::api::engine::MatchState::Missing,
+            _ => unreachable!("Invalid variant for MatchState: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::engine::AiSettings> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::engine::AiSettings>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1457,11 +1816,13 @@ impl SseDecode for crate::api::engine::ProcessSettings {
         let mut var_background = <crate::api::engine::BackgroundSettings>::sse_decode(deserializer);
         let mut var_placement = <crate::api::engine::PlacementSettings>::sse_decode(deserializer);
         let mut var_segment = <crate::api::engine::SegmentSettings>::sse_decode(deserializer);
+        let mut var_ai = <Option<crate::api::engine::AiSettings>>::sse_decode(deserializer);
         return crate::api::engine::ProcessSettings {
             size: var_size,
             background: var_background,
             placement: var_placement,
             segment: var_segment,
+            ai: var_ai,
         };
     }
 }
@@ -1561,24 +1922,28 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        4 => wire__crate__api__engine__build_icon_pack_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__engine__calibrate_base_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__engine__collect_images_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__engine__compose_glyph_png_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__engine__finalize_pack_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
-        19 => {
+        4 => wire__crate__api__engine__ai_preview_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__engine__ai_unload_model_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__engine__build_icon_pack_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__engine__calibrate_base_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__engine__collect_images_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__engine__compose_glyph_png_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__engine__finalize_pack_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
+        23 => {
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
-        20 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1594,13 +1959,16 @@ fn pde_ffi_dispatcher_sync_impl(
         1 => wire__crate__api__engine__CancelToken_cancel_impl(ptr, rust_vec_len, data_len),
         2 => wire__crate__api__engine__CancelToken_is_cancelled_impl(ptr, rust_vec_len, data_len),
         3 => wire__crate__api__engine__CancelToken_new_impl(ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__engine__core_version_impl(ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__engine__default_placement_settings_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__engine__default_segment_settings_impl(ptr, rust_vec_len, data_len),
-        11 => {
+        10 => wire__crate__api__engine__core_version_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__engine__default_lucent_settings_impl(ptr, rust_vec_len, data_len),
+        12 => {
+            wire__crate__api__engine__default_placement_settings_impl(ptr, rust_vec_len, data_len)
+        }
+        13 => wire__crate__api__engine__default_segment_settings_impl(ptr, rust_vec_len, data_len),
+        14 => {
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
-        21 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1622,6 +1990,74 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<CancelToken>> for CancelToken 
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::AiModelKind {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::U2netp => 0.into_dart(),
+            Self::Silueta => 1.into_dart(),
+            Self::IsnetGeneral => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::AiModelKind
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::AiModelKind>
+    for crate::api::engine::AiModelKind
+{
+    fn into_into_dart(self) -> crate::api::engine::AiModelKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::AiPreview {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.mask_png.into_into_dart().into_dart(),
+            self.glyph_png.into_into_dart().into_dart(),
+            self.needed.into_into_dart().into_dart(),
+            self.uncertain.into_into_dart().into_dart(),
+            self.confidence.into_into_dart().into_dart(),
+            self.notes.into_into_dart().into_dart(),
+            self.millis.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::engine::AiPreview {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::AiPreview>
+    for crate::api::engine::AiPreview
+{
+    fn into_into_dart(self) -> crate::api::engine::AiPreview {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::AiSettings {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.model_path.into_into_dart().into_dart(),
+            self.model.into_into_dart().into_dart(),
+            self.low.into_into_dart().into_dart(),
+            self.high.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::AiSettings
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::AiSettings>
+    for crate::api::engine::AiSettings
+{
+    fn into_into_dart(self) -> crate::api::engine::AiSettings {
+        self
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::engine::AppfilterItem {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -1653,6 +2089,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::BackgroundSettings {
             }
             crate::api::engine::BackgroundSettings::Translucent { params } => {
                 [2.into_dart(), params.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::engine::BackgroundSettings::Lucent { params } => {
+                [3.into_dart(), params.into_into_dart().into_dart()].into_dart()
             }
             _ => {
                 unimplemented!("");
@@ -1847,6 +2286,129 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::ItemResult>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentSettings {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ink.into_into_dart().into_dart(),
+            self.backdrop.into_into_dart().into_dart(),
+            self.shape.into_into_dart().into_dart(),
+            self.monochrome.into_into_dart().into_dart(),
+            self.keep_composition.into_into_dart().into_dart(),
+            self.glyph_scale.into_into_dart().into_dart(),
+            self.rim.into_into_dart().into_dart(),
+            self.launcher_shadow.into_into_dart().into_dart(),
+            self.nothing_encode.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::LucentSettings
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::LucentSettings>
+    for crate::api::engine::LucentSettings
+{
+    fn into_into_dart(self) -> crate::api::engine::LucentSettings {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentShape {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Original => 0.into_dart(),
+            Self::Circle => 1.into_dart(),
+            Self::Squircle => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::LucentShape
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::LucentShape>
+    for crate::api::engine::LucentShape
+{
+    fn into_into_dart(self) -> crate::api::engine::LucentShape {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::MatchInput {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.package.into_into_dart().into_dart(),
+            self.file.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.png.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::MatchInput
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::MatchInput>
+    for crate::api::engine::MatchInput
+{
+    fn into_into_dart(self) -> crate::api::engine::MatchInput {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::MatchOutput {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.original.into_into_dart().into_dart(),
+            self.generated.into_into_dart().into_dart(),
+            self.score.into_into_dart().into_dart(),
+            self.text.into_into_dart().into_dart(),
+            self.visual.into_into_dart().into_dart(),
+            self.state.into_into_dart().into_dart(),
+            self.reason.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::MatchOutput
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::MatchOutput>
+    for crate::api::engine::MatchOutput
+{
+    fn into_into_dart(self) -> crate::api::engine::MatchOutput {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::MatchState {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Confident => 0.into_dart(),
+            Self::Doubtful => 1.into_dart(),
+            Self::Missing => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::MatchState
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::MatchState>
+    for crate::api::engine::MatchState
+{
+    fn into_into_dart(self) -> crate::api::engine::MatchState {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::engine::PackImage {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -1953,6 +2515,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::ProcessSettings {
             self.background.into_into_dart().into_dart(),
             self.placement.into_into_dart().into_dart(),
             self.segment.into_into_dart().into_dart(),
+            self.ai.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2083,6 +2646,46 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::api::engine::AiModelKind {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::engine::AiModelKind::U2netp => 0,
+                crate::api::engine::AiModelKind::Silueta => 1,
+                crate::api::engine::AiModelKind::IsnetGeneral => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::engine::AiPreview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<u8>>::sse_encode(self.mask_png, serializer);
+        <Vec<u8>>::sse_encode(self.glyph_png, serializer);
+        <bool>::sse_encode(self.needed, serializer);
+        <bool>::sse_encode(self.uncertain, serializer);
+        <f32>::sse_encode(self.confidence, serializer);
+        <Vec<String>>::sse_encode(self.notes, serializer);
+        <u32>::sse_encode(self.millis, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::AiSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.model_path, serializer);
+        <crate::api::engine::AiModelKind>::sse_encode(self.model, serializer);
+        <f32>::sse_encode(self.low, serializer);
+        <f32>::sse_encode(self.high, serializer);
+    }
+}
+
 impl SseEncode for crate::api::engine::AppfilterItem {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2105,6 +2708,10 @@ impl SseEncode for crate::api::engine::BackgroundSettings {
             crate::api::engine::BackgroundSettings::Translucent { params } => {
                 <i32>::sse_encode(2, serializer);
                 <crate::api::engine::TranslucentSettings>::sse_encode(params, serializer);
+            }
+            crate::api::engine::BackgroundSettings::Lucent { params } => {
+                <i32>::sse_encode(3, serializer);
+                <crate::api::engine::LucentSettings>::sse_encode(params, serializer);
             }
             _ => {
                 unimplemented!("");
@@ -2271,6 +2878,26 @@ impl SseEncode for Vec<crate::api::engine::IconPackApp> {
     }
 }
 
+impl SseEncode for Vec<crate::api::engine::MatchInput> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::engine::MatchInput>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::engine::MatchOutput> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::engine::MatchOutput>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::engine::PackImage> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2311,12 +2938,96 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for crate::api::engine::LucentSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.ink, serializer);
+        <u32>::sse_encode(self.backdrop, serializer);
+        <crate::api::engine::LucentShape>::sse_encode(self.shape, serializer);
+        <bool>::sse_encode(self.monochrome, serializer);
+        <bool>::sse_encode(self.keep_composition, serializer);
+        <f32>::sse_encode(self.glyph_scale, serializer);
+        <f32>::sse_encode(self.rim, serializer);
+        <bool>::sse_encode(self.launcher_shadow, serializer);
+        <bool>::sse_encode(self.nothing_encode, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::LucentShape {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::engine::LucentShape::Original => 0,
+                crate::api::engine::LucentShape::Circle => 1,
+                crate::api::engine::LucentShape::Squircle => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::engine::MatchInput {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <String>::sse_encode(self.package, serializer);
+        <String>::sse_encode(self.file, serializer);
+        <Option<String>>::sse_encode(self.path, serializer);
+        <Option<Vec<u8>>>::sse_encode(self.png, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::MatchOutput {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.original, serializer);
+        <Option<String>>::sse_encode(self.generated, serializer);
+        <f32>::sse_encode(self.score, serializer);
+        <f32>::sse_encode(self.text, serializer);
+        <f32>::sse_encode(self.visual, serializer);
+        <crate::api::engine::MatchState>::sse_encode(self.state, serializer);
+        <String>::sse_encode(self.reason, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::MatchState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::engine::MatchState::Confident => 0,
+                crate::api::engine::MatchState::Doubtful => 1,
+                crate::api::engine::MatchState::Missing => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::engine::AiSettings> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::engine::AiSettings>::sse_encode(value, serializer);
         }
     }
 }
@@ -2411,6 +3122,7 @@ impl SseEncode for crate::api::engine::ProcessSettings {
         <crate::api::engine::BackgroundSettings>::sse_encode(self.background, serializer);
         <crate::api::engine::PlacementSettings>::sse_encode(self.placement, serializer);
         <crate::api::engine::SegmentSettings>::sse_encode(self.segment, serializer);
+        <Option<crate::api::engine::AiSettings>>::sse_encode(self.ai, serializer);
     }
 }
 

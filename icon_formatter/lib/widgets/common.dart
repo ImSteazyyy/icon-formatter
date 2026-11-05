@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/state.dart';
 import '../app/theme.dart';
+import '../l10n/strings.dart';
 import 'liquid_glass.dart';
 
 /// Liquid glass panel (Impostazioni › Appearance › Liquid Glass).
@@ -157,8 +159,8 @@ class _BeforeAfterState extends State<BeforeAfter> {
                 bottom: 0,
                 child: Container(width: 2, color: Colors.white.withValues(alpha: 0.7)),
               ),
-              Positioned(left: 8, top: 8, child: _tag('Prima')),
-              Positioned(right: 8, top: 8, child: _tag('Dopo')),
+              Positioned(left: 8, top: 8, child: _tag(S.prima)),
+              Positioned(right: 8, top: 8, child: _tag(S.dopo)),
             ]),
           ),
         ),
@@ -186,7 +188,7 @@ class _LeftClip extends CustomClipper<Rect> {
 }
 
 /// Labelled slider with value read-out.
-class SliderRow extends StatelessWidget {
+class SliderRow extends StatefulWidget {
   const SliderRow({
     super.key,
     required this.label,
@@ -209,21 +211,166 @@ class SliderRow extends StatelessWidget {
   final int? divisions;
 
   @override
+  State<SliderRow> createState() => _SliderRowState();
+}
+
+/// Display <-> value mapping derived from [SliderRow.format], which is affine
+/// in every control of the app (`v*100`, `v*1000`, `round()`, `°`, …).
+class SliderNumber {
+  SliderNumber(this.format, this.min, this.max, this.divisions);
+
+  final String Function(double) format;
+  final double min;
+  final double max;
+  final int? divisions;
+
+  static double? parse(String s) {
+    final m = RegExp(r'-?\d+(?:[.,]\d+)?').firstMatch(s.trim());
+    if (m == null) return null;
+    return double.tryParse(m.group(0)!.replaceAll(',', '.'));
+  }
+
+  double get displayMin => parse(format(min)) ?? min;
+  double get displayMax => parse(format(max)) ?? max;
+
+  /// Decimal places shown for [v].
+  int decimals(double v) {
+    final m = RegExp(r'[.,](\d+)').firstMatch(format(v));
+    return m?.group(1)?.length ?? 0;
+  }
+
+  String editText(double v) {
+    final d = parse(format(v)) ?? v;
+    return d.toStringAsFixed(decimals(v)).replaceAll('.', ',');
+  }
+
+  /// Value for a typed number, or null when not a number. Out-of-range input
+  /// is clamped; [clamped] reports it.
+  ({double value, bool clamped})? valueOf(String text) {
+    final n = parse(text);
+    if (n == null) return null;
+    final d0 = displayMin, d1 = displayMax;
+    final lo = d0 < d1 ? d0 : d1, hi = d0 < d1 ? d1 : d0;
+    final c = n.clamp(lo, hi).toDouble();
+    var v = d1 == d0 ? min : min + (c - d0) / (d1 - d0) * (max - min);
+    final div = divisions;
+    if (div != null && div > 0) {
+      final step = (max - min) / div;
+      v = min + ((v - min) / step).round() * step;
+    }
+    return (value: v.clamp(min, max).toDouble(), clamped: c != n);
+  }
+}
+
+class _SliderRowState extends State<SliderRow> {
+  final _ctrl = TextEditingController();
+  final _focus = FocusNode();
+  bool _editing = false;
+  bool _invalid = false;
+
+  String Function(double) get _f => widget.format ?? (v) => (v * 100).round().toString();
+  SliderNumber get _num => SliderNumber(_f, widget.min, widget.max, widget.divisions);
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus && _editing) _commit();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    setState(() {
+      _editing = true;
+      _invalid = false;
+      _ctrl.text = _num.editText(widget.value);
+      _ctrl.selection = TextSelection(baseOffset: 0, extentOffset: _ctrl.text.length);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
+  }
+
+  void _commit() {
+    final r = _num.valueOf(_ctrl.text);
+    if (r == null) {
+      // not a number: keep the previous value
+      _cancel();
+      return;
+    }
+    setState(() {
+      _editing = false;
+      _invalid = r.clamped;
+    });
+    widget.onChanged(r.value);
+    widget.onChangeEnd?.call(r.value);
+    if (r.clamped) {
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) setState(() => _invalid = false);
+      });
+    }
+  }
+
+  void _cancel() {
+    setState(() => _editing = false);
+    _focus.unfocus();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final f = format ?? (v) => (v * 100).round().toString();
+    final style = TextStyle(
+      fontSize: 12,
+      color: _invalid ? Palette.warn : Palette.text2,
+      fontFeatures: const [ui.FontFeature.tabularFigures()],
+    );
     return Row(children: [
-      SizedBox(width: 118, child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
+      SizedBox(width: 118, child: Text(widget.label, style: Theme.of(context).textTheme.bodySmall)),
       Expanded(
         child: Slider(
-          value: value.clamp(min, max),
-          min: min,
-          max: max,
-          divisions: divisions,
-          onChanged: onChanged,
-          onChangeEnd: onChangeEnd,
+          value: widget.value.clamp(widget.min, widget.max),
+          min: widget.min,
+          max: widget.max,
+          divisions: widget.divisions,
+          onChanged: widget.onChanged,
+          onChangeEnd: widget.onChangeEnd,
         ),
       ),
-      SizedBox(width: 44, child: Text(f(value), textAlign: TextAlign.right, style: const TextStyle(fontSize: 12, color: Palette.text2, fontFeatures: [ui.FontFeature.tabularFigures()]))),
+      SizedBox(
+        width: 56,
+        child: _editing
+            ? CallbackShortcuts(
+                bindings: {const SingleActivator(LogicalKeyboardKey.escape): _cancel},
+                child: TextField(
+                  key: const ValueKey('slider-edit'),
+                  controller: _ctrl,
+                  focusNode: _focus,
+                  textAlign: TextAlign.right,
+                  style: style.copyWith(color: Palette.text),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-]'))],
+                  decoration: const InputDecoration(isDense: true, contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
+                  onSubmitted: (_) => _commit(),
+                  onTapOutside: (_) => _focus.unfocus(),
+                ),
+              )
+            : Tooltip(
+                message: S.sliderEditHint,
+                child: InkWell(
+                  key: const ValueKey('slider-value'),
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: _start,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                    child: Text(_f(widget.value), textAlign: TextAlign.right, style: style.copyWith(decoration: TextDecoration.underline, decorationStyle: TextDecorationStyle.dotted)),
+                  ),
+                ),
+              ),
+      ),
     ]);
   }
 }
@@ -283,7 +430,7 @@ class ProgressStrip extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text(
-              '${label ?? (running ? 'Elaborazione' : 'Completato')} · $done/$total completate · ${total - done} rimanenti · $errors errori',
+              S.completateRimanentiErrori(label ?? (running ? 'Elaborazione' : 'Completato'), done, total, total - done, errors),
               style: const TextStyle(fontSize: 12, color: Palette.text2),
             ),
             const SizedBox(height: 6),
@@ -295,7 +442,7 @@ class ProgressStrip extends StatelessWidget {
         ),
         if (running && onCancel != null) ...[
           const SizedBox(width: 12),
-          OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: const Text('Annulla')),
+          OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: const Text(S.annulla)),
         ],
       ]),
     );
@@ -318,21 +465,21 @@ Future<String?> askText(BuildContext context, String title, {String initial = ''
       title: Text(title),
       content: TextField(controller: c, autofocus: true, decoration: InputDecoration(hintText: hint), onSubmitted: (v) => Navigator.pop(ctx, v.trim())),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.annulla)),
         FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('OK')),
       ],
     ),
   );
 }
 
-Future<bool> confirm(BuildContext context, String title, String body, {String ok = 'Conferma'}) async {
+Future<bool> confirm(BuildContext context, String title, String body, {String ok = S.conferma}) async {
   final r = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: Text(body),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text(S.annulla)),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(ok)),
       ],
     ),
@@ -350,7 +497,7 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(children: [
-            Expanded(child: Text(title ?? 'Anteprima', style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(title ?? S.anteprima, style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
             IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
           ]),
         ),
@@ -368,7 +515,7 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
         ),
         const Padding(
           padding: EdgeInsets.all(10),
-          child: Text('Rotella / pinch per lo zoom · trascina per spostare', style: TextStyle(fontSize: 11, color: Palette.text3)),
+          child: Text(S.rotellaPinchZoomTrascinaSpostare, style: TextStyle(fontSize: 11, color: Palette.text3)),
         ),
       ]),
     ),

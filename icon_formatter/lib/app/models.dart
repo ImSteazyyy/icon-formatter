@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../src/rust/api/engine.dart';
+import '../l10n/strings.dart';
 
 /// JSON helpers for bridge types (bridge classes are plain data).
 Map<String, dynamic> translucentToJson(TranslucentSettings t) => {
@@ -129,10 +130,10 @@ SegmentSettings copySegment(SegmentSettings s, {SegMode? mode, double? tolerance
 double _d(Object? v, double d) => (v as num?)?.toDouble() ?? d;
 
 String segModeLabel(SegMode m) => switch (m) {
-      SegMode.auto => 'Automatica',
-      SegMode.keepAlpha => 'Usa trasparenza esistente',
-      SegMode.removeBackground => 'Rimuovi sempre lo sfondo',
-      SegMode.none => 'Nessuna (immagine intera)',
+      SegMode.auto => S.automatica,
+      SegMode.keepAlpha => S.usaTrasparenzaEsistente,
+      SegMode.removeBackground => S.rimuoviSempreSfondo,
+      SegMode.none => S.nessunaImmagineIntera,
     };
 
 /// Style preset (procedural translucent background parameters).
@@ -156,26 +157,26 @@ class StylePreset {
 
 /// Built-in presets. Values tuned on the reference pack.
 List<StylePreset> builtInPresets(TranslucentSettings d) => [
-      StylePreset(id: 'nothing', name: 'Nothing Translucent', builtIn: true, params: d),
+      StylePreset(id: 'nothing', name: S.nothingTranslucent, builtIn: true, params: d),
       StylePreset(
         id: 'liquid',
-        name: 'Liquid Glass',
+        name: S.liquidGlass,
         builtIn: true,
         params: copyTranslucent(d, brightness: 0.62, frost: 0.35, reflection: 0.85, border: 0.85, depth: 0.35, contrast: 0.7),
       ),
       StylePreset(
         id: 'minimal',
-        name: 'Minimal',
+        name: S.minimal,
         builtIn: true,
         params: copyTranslucent(d, brightness: 0.55, frost: 0.0, reflection: 0.0, border: 0.25, depth: 0.0, contrast: 0.15),
       ),
       StylePreset(
         id: 'darkflat',
-        name: 'Dark Flat',
+        name: S.darkFlat,
         builtIn: true,
         params: copyTranslucent(d, brightness: 0.25, frost: 0.0, reflection: 0.0, border: 0.0, depth: 0.0, contrast: 0.0),
       ),
-      StylePreset(id: 'custom', name: 'Custom', builtIn: true, params: d),
+      StylePreset(id: 'custom', name: S.custom, builtIn: true, params: d),
     ];
 
 /// User base icon (stored as PNG in the app data folder).
@@ -281,7 +282,7 @@ class ExportSettings {
   /// Output file name for a source name (without extension handling).
   String fileName(String stem, int size) => switch (naming) {
         ExportNaming.original => '$stem.png',
-        ExportNaming.withSize => '${stem}_$size.png',
+        ExportNaming.withSize => S.png(stem, size),
         ExportNaming.prefixed => '$prefix$stem.png',
       };
 }
@@ -367,4 +368,99 @@ class GlassConfig {
   }
 
   void reset() => load(GlassConfig().toJson());
+}
+
+
+/// Lucent (Nothing OS 5.0) plate settings, ported from Nothing IconGen.
+/// The glyph keeps its own colours unless [monochrome] is on.
+class LucentConfig {
+  bool dark = true;
+  LucentShape shape = LucentShape.squircle;
+  bool monochrome = false;
+  bool keepComposition = true;
+  double glyphScale = 1.0;
+  double rim = 0.0;
+  bool launcherShadow = false;
+  bool nothingEncode = false;
+
+  /// Backdrop alpha (Nothing OS: 0x66 = 0.4).
+  double backdropAlpha = 0x66 / 255;
+
+  LucentSettings toSettings() {
+    final d = defaultLucentSettings(dark: dark);
+    final a = (backdropAlpha.clamp(0.0, 1.0) * 255).round();
+    return LucentSettings(
+      ink: d.ink,
+      backdrop: (a << 24) | (d.backdrop & 0xFFFFFF),
+      shape: shape,
+      monochrome: monochrome,
+      keepComposition: keepComposition,
+      glyphScale: glyphScale,
+      rim: rim,
+      launcherShadow: launcherShadow && !nothingEncode,
+      nothingEncode: nothingEncode,
+    );
+  }
+
+  void load(Map<String, dynamic> j) {
+    dark = j['dark'] as bool? ?? dark;
+    shape = LucentShape.values.firstWhere((e) => e.name == j['shape'], orElse: () => shape);
+    monochrome = j['monochrome'] as bool? ?? monochrome;
+    keepComposition = j['keepComposition'] as bool? ?? keepComposition;
+    glyphScale = (j['glyphScale'] as num?)?.toDouble() ?? glyphScale;
+    rim = (j['rim'] as num?)?.toDouble() ?? rim;
+    launcherShadow = j['launcherShadow'] as bool? ?? launcherShadow;
+    nothingEncode = j['nothingEncode'] as bool? ?? nothingEncode;
+    backdropAlpha = (j['backdropAlpha'] as num?)?.toDouble() ?? backdropAlpha;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'dark': dark,
+        'shape': shape.name,
+        'monochrome': monochrome,
+        'keepComposition': keepComposition,
+        'glyphScale': glyphScale,
+        'rim': rim,
+        'launcherShadow': launcherShadow,
+        'nothingEncode': nothingEncode,
+        'backdropAlpha': backdropAlpha,
+      };
+
+  void reset() => load(LucentConfig().toJson());
+}
+
+/// Local AI background removal model catalogue (optional downloads).
+class AiModelInfo {
+  const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note);
+  final String id;
+  final AiModelKind kind;
+  final String label;
+  final int bytes;
+  final int ramMb;
+  final String note;
+
+  String get url => 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/$id.onnx';
+}
+
+/// Only models measured as usable on CPU with tract are offered: U²-Net-p
+/// runs in ~0.8 s per icon; Silueta took ~93 s per icon (tract, i5-13500H),
+/// so it is not listed.
+const aiModels = [
+  AiModelInfo('u2netp', AiModelKind.u2Netp, 'U²-Net-p', 4574861, 350, S.aiModelU2netpNote),
+];
+
+class LocalAiConfig {
+  String modelId = 'u2netp';
+  double low = 0.15;
+  double high = 0.85;
+
+  AiModelInfo get model => aiModels.firstWhere((m) => m.id == modelId, orElse: () => aiModels.first);
+
+  void load(Map<String, dynamic> j) {
+    modelId = j['modelId'] as String? ?? modelId;
+    low = (j['low'] as num?)?.toDouble() ?? low;
+    high = (j['high'] as num?)?.toDouble() ?? high;
+  }
+
+  Map<String, dynamic> toJson() => {'modelId': modelId, 'low': low, 'high': high};
 }
