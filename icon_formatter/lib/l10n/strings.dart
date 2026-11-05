@@ -283,7 +283,7 @@ class S {
   static const fileOriginaliNonVengonoToccati = 'I file originali non vengono toccati.';
   static const elaboraTutte = 'Elabora tutte';
   static const trascinaQuiIconeCartelleO = 'Trascina qui icone, cartelle o ZIP\noppure usa i pulsanti in alto';
-  static const importaIconeCartelleOZip = 'Importa icone, cartelle o ZIP';
+  static const importaIconeCartelleOZip = 'Importa icone, cartelle, ZIP o APK';
   static const rilasciaImportare = 'Rilascia per importare';
   static const openaiImagesApi = 'OpenAI (Images API)';
   static const indicativoCirca0010 = 'Indicativo: circa 0,01–0,25 USD per immagine 1024×1024 secondo qualità (bassa/media/alta). Limiti di frequenza in base al tier dell\'account. Verifica sempre il listino ufficiale.';
@@ -480,4 +480,5 @@ class S {
   static const apkSalvato = 'APK salvato';
   static const apkSdkMancante = 'Android SDK non trovato (ANDROID_HOME).';
   static String apkFallita(Object? e) => 'Compilazione non riuscita: $e';
+  static const asSegnaViste = 'Segna come viste';
 }

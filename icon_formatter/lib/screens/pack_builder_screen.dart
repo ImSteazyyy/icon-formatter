@@ -415,7 +415,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
           final q = query.toLowerCase();
           return r.original.title.toLowerCase().contains(q) || r.original.package.toLowerCase().contains(q);
         }).toList();
-        return Padding(
+        // the whole page scrolls (the grid is not squeezed on phones)
+        return SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + GlassInsets.of(context)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -467,10 +468,13 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
               ]),
             ],
             const SizedBox(height: 8),
-            Expanded(
+            Container(
+              constraints: const BoxConstraints(minHeight: 120),
               child: c.rows.isEmpty
-                  ? Center(child: Text(c.originals.isEmpty ? S.pbVuoto : S.pbPremiAbbina, textAlign: TextAlign.center, style: const TextStyle(color: Palette.text2)))
+                  ? Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Center(child: Text(c.originals.isEmpty ? S.pbVuoto : S.pbPremiAbbina, textAlign: TextAlign.center, style: const TextStyle(color: Palette.text2))))
                   : GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, mainAxisExtent: 150, crossAxisSpacing: 8, mainAxisSpacing: 8),
                       itemCount: rows.length,
                       itemBuilder: (context, i) => _card(rows[i]),
@@ -697,7 +701,18 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
             label: const Text(S.asControllaOra),
             onPressed: busy ? null : () => _load(PlatformService.autoSyncCheckNow),
           ),
-          if (pending.isNotEmpty)
+          if (pending.isNotEmpty && pending.every((m) => m['change'] == 'disinstallata'))
+            OutlinedButton.icon(
+              icon: const Icon(Icons.done_all_rounded, size: 18),
+              label: const Text(S.asSegnaViste),
+              onPressed: busy
+                  ? null
+                  : () async {
+                      await PlatformService.autoSyncClear();
+                      await _load(PlatformService.autoSyncStatus);
+                    },
+            ),
+          if (pending.any((m) => m['change'] != 'disinstallata'))
             FilledButton.tonalIcon(
               icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
               label: Text(S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length)),

@@ -11,3 +11,4 @@ icon_formatter/native/icon_core/examples/refcal.rs
 *.jks
 *.keystore
 Thumbs.db
+.token-savior-cache.json

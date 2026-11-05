@@ -150,14 +150,19 @@ object AutoSync {
         val old = p.getString("snapshot", null)?.let { JSONObject(it) } ?: JSONObject()
         val apps = launcherApps(c)
         val snap = JSONObject()
-        val pending = p.getString("pending", null)?.let { JSONArray(it) } ?: JSONArray()
-        val known = HashSet<String>()
-        for (i in 0 until pending.length()) known.add(pending.getJSONObject(i).getString("component"))
+        var pending = p.getString("pending", null)?.let { JSONArray(it) } ?: JSONArray()
         var added = 0
         fun push(component: String, label: String, kind: String) {
-            if (baseline || component in known) return
-            pending.put(JSONObject().put("component", component).put("label", label).put("change", kind).put("time", now))
-            known.add(component)
+            if (baseline) return
+            // latest change wins (e.g. uninstalled, then installed again)
+            val keep = JSONArray()
+            for (i in 0 until pending.length()) {
+                val o = pending.getJSONObject(i)
+                if (o.getString("component") == component && o.optString("change") == kind) return
+                if (o.getString("component") != component) keep.put(o)
+            }
+            keep.put(JSONObject().put("component", component).put("label", label).put("change", kind).put("time", now))
+            pending = keep
             added++
         }
         for ((comp, label) in apps) {
