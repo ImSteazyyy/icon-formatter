@@ -127,7 +127,7 @@ class S {
   static const selezionaTutte = 'Seleziona tutte';
   static const deseleziona = 'Deseleziona';
   static const toccaSelezionareTieniPremutoAnteprima = 'Tocca per selezionare · tieni premuto per anteprima e correzioni';
-  static String appSelezionate(Object? a, Object? b) => '$a app · $b selezionate';
+  static String appSelezionate(Object? a, Object? b) => '$b/$a selezionate';
   static const originalComposition = 'Composizione originale';
   static const customPreset = 'Preset personalizzato';
   static String impossibileLeggereApp(Object? a) => 'Impossibile leggere le app: $a';
@@ -192,7 +192,7 @@ class S {
   static const aiOnlineSpiega = "L'AI online crea nuovi temi di icone e richiede una API key. Per scontornare le icone non serve: puoi usare l'AI locale qui sotto, gratis e offline.";
   static const aiLocaleSpiega = 'Scarica un modello una volta: lo scontorno resta sul telefono, senza API key e senza internet.';
   static const aiOnlineTitolo = 'AI online (temi di icone)';
-  static const aiTabOnline = 'Tema AI online';
+  static const aiTabOnline = 'AI online';
   static const aiTabLocale = 'AI locale';
   static const aiLocaleCosaFa = "Migliora lo scontorno delle icone difficili nello Studio e nel Pack. Funziona offline, senza API key. Passi: 1) scarica un modello, 2) attiva \"Usa il modello AI locale\".";
   static const aiNessunaChiave = 'Il tema AI online richiede una API key.';
@@ -401,6 +401,10 @@ class S {
   static const dopo = 'Dopo';
   static String completateRimanentiErrori(Object? a, Object? b, Object? c, Object? d, Object? e) => '$a · $b/$c completate · $d rimanenti · $e errori';
   static const annulla = 'Annulla';
+  static const applica = 'Applica';
+  static const coloreSceglitu = 'Scegli un colore qualsiasi';
+  static const accentoTitolo = "Colore dell'app";
+  static const tintaTitolo = 'Tinta del vetro';
   static const conferma = 'Conferma';
   static const anteprima = 'Anteprima';
   static const rotellaPinchZoomTrascinaSpostare = 'Rotella o due dita per lo zoom · trascina per spostare';

@@ -1,5 +1,34 @@
 # Novità
 
+## 1.3.1 — 2026-11-05
+
+### Fluidità e batteria (misurate sul Nothing Phone (2a) Plus)
+- **120 Hz.** Nothing OS teneva l'app a 90 Hz; ora l'app chiede la modalità più veloce dello schermo mentre è aperta e la rilascia quando esce.
+- **Swipe tra le sezioni: da 22 ms a 8,4 ms per frame (120 fps).** Le ombre del testo erano sfocate, e su Impeller ogni ombra sfocata è un passaggio di sfocatura per riga di testo a ogni frame. Ora sono fatte di copie nitide semitrasparenti: stesso aspetto, costo quasi nullo, e ora ci sono su tutti i testi e le icone, pulsanti compresi.
+- **Vetro statico.** Le superfici in vetro sopra lo sfondo fisso non rifanno più la sfocatura a ogni frame; solo il vetro sopra contenuto che si muove (barra in basso, barra azioni, menu) la fa dal vivo.
+- **Durante l'elaborazione: 120 fps invece di scatti fino a 275 ms.**
+  - I thread Rust ereditavano una priorità più alta di quella del disegno: ora girano in sottofondo, solo sui core efficienti, lasciando i core veloci all'interfaccia.
+  - Il sottotitolo di Studio controllava sul disco tutte le icone a ogni aggiornamento (circa 650 letture al secondo sul thread dell'interfaccia): ora usa un conteggio in memoria, e le miniature non leggono il disco mentre il batch scrive.
+  - La barra di avanzamento è una superficie piena, senza sfocatura.
+
+### Icone
+- **Smart Center** perdeva tutto tranne il pallino rosso: la X veniva presa per una piastrella. Ora una piastrella deve avere i quattro lati pieni.
+- **Icone già nello stile traslucido** (Contatti, HoYoLAB) non vengono più rimpicciolite in un riquadro dentro il riquadro: sono riportate intere sulla nuova forma, senza schiarire due volte i toni scuri.
+- **Icone rotonde su sfondo chiaro con il disegno fino al bordo** (NoMoreBackground): lo sfondo chiaro e le forme grigie chiare su di esso vengono tolti, e il disegno occupa il piatto.
+
+### Interfaccia
+- Titoli e sottotitoli centrati; i pulsanti dell'intestazione stanno su una riga sotto il titolo, alla stessa larghezza (Studio: "Aggiungi" e "Personalizza").
+- Tutti i pulsanti, i filtri e le ricerche sono alti 48 dp; i pulsanti dentro le schede sono pieni con il colore d'accento, due per riga.
+- Pack e impostazioni di nuovo con schede in vetro; filtri e schede AI con le stesse pillole della sezione App.
+- "Le tue app": righe più compatte; il numero di app selezionate e "Seleziona tutte" stanno nella barra in basso.
+- AI online senza chiave: un'icona di avviso sulla scheda spiega cosa fare, al posto del riquadro.
+- Color picker vero per il colore dell'app e la tinta del vetro, in una finestra in vetro al centro, con anteprima dal vivo.
+- Testi bianchi nelle barre in basso e sui pulsanti disattivati; la tastiera non fa più salire le barre sopra i filtri; la barra azioni di Studio non ha più i bordi tagliati; niente riquadro verde di focus con le tastiere fisiche.
+
+### Repository
+- Le icone di app di terzi usate come riferimento non sono più nella repository (restano solo in locale).
+- Aggiunte attribuzioni di terze parti, avviso sui marchi e la nota "Sviluppato con Claude".
+
 ## 1.3.0 — 2026-11-05
 
 ### Correzioni

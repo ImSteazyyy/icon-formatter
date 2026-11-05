@@ -1,3 +1,4 @@
+import '../widgets/common.dart' show ImageStamps;
 import 'dart:async';
 import 'dart:io';
 
@@ -39,9 +40,12 @@ class BatchController extends ChangeNotifier {
     notifyListeners();
     final completer = Completer<void>();
     var lastNotify = DateTime.now();
+    ImageStamps.busy++;
     _sub = runBatch(items: items, settings: settings, threads: AppState.I.threads, cancel: token).listen(
       (ev) {
         results[ev.result.id] = ev.result;
+        final out = ev.result.output;
+        if (out != null) ImageStamps.bump(out);
         done = ev.done;
         total = ev.total;
         if (!ev.result.ok) errors++;
@@ -63,6 +67,7 @@ class BatchController extends ChangeNotifier {
       cancelOnError: true,
     );
     await completer.future;
+    ImageStamps.busy--;
     running = false;
     cancelled = token.isCancelled();
     _token = null;

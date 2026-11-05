@@ -104,17 +104,153 @@ pub fn crop_to_content(img: &RgbaImage) -> RgbaImage {
     }
 }
 
+/// Round launcher icon on a light, neutral background whose artwork reaches
+/// the circle's edge (NoMoreBackground: a green robot on an off-white disc
+/// with a grey cloud). Nothing separates from such a disc, so it would be
+/// shrunk whole into the new plate. Here the light background is removed,
+/// together with the light grey shapes painted on it (the cloud), and the
+/// artwork is returned with the disc's box: mapped onto the plate it keeps
+/// its size and place. Dark outlines and coloured parts are kept. None when
+/// the image is not such a disc.
+pub fn strip_light_disc(img: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32))> {
+    let disc = crop_to_content(img);
+    let (w, h) = disc.dimensions();
+    if w < 24 || h < 24 || w.max(h) as f32 / w.min(h) as f32 > 1.08 {
+        return None;
+    }
+    // shape: the inscribed circle, within a few percent (IoU)
+    let (cx, cy, r) = (w as f32 / 2.0, h as f32 / 2.0, w.min(h) as f32 / 2.0);
+    let (mut inter, mut uni) = (0u32, 0u32);
+    for (x, y, p) in disc.enumerate_pixels() {
+        let inside = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt() < r;
+        let on = p[3] > 127;
+        inter += (inside && on) as u32;
+        uni += (inside || on) as u32;
+    }
+    if uni == 0 || (inter as f32) < 0.93 * uni as f32 {
+        return None;
+    }
+    let lut = crate::color::linear_lut();
+    let lab = crate::color::rgba_to_oklab(disc.as_raw(), &lut);
+    let n = (w * h) as usize;
+    // background: the most frequent colour on a ring just inside the edge
+    let mut bins: std::collections::HashMap<(i32, i32, i32), (u32, f32, f32, f32)> = Default::default();
+    for (x, y, p) in disc.enumerate_pixels() {
+        let d = ((x as f32 + 0.5 - cx).powi(2) + (y as f32 + 0.5 - cy).powi(2)).sqrt();
+        if p[3] < 200 || d < r * 0.86 || d > r * 0.94 {
+            continue;
+        }
+        let c = lab[(y * w + x) as usize];
+        let e = bins.entry(((c.l * 30.0) as i32, (c.a * 30.0) as i32, (c.b * 30.0) as i32)).or_insert((0, 0.0, 0.0, 0.0));
+        e.0 += 1;
+        e.1 += c.l;
+        e.2 += c.a;
+        e.3 += c.b;
+    }
+    let (cnt, sl, sa, sb) = bins.values().max_by_key(|v| v.0).copied()?;
+    let bg = (sl / cnt as f32, sa / cnt as f32, sb / cnt as f32);
+    // light and (nearly) neutral, else it is coloured artwork: leave it
+    if bg.0 < 0.80 || bg.1.hypot(bg.2) > 0.05 {
+        return None;
+    }
+    let near = |c: &crate::color::Lab| ((c.l - bg.0).powi(2) + (c.a - bg.1).powi(2) + (c.b - bg.2).powi(2)).sqrt() < 0.06;
+    // light neutral shapes on the background (a soft "cloud" or shadow):
+    // light, grey, and touching the background
+    let light_grey = |c: &crate::color::Lab| c.l > 0.62 && c.a.hypot(c.b) < 0.035;
+    let mut bgm = vec![false; n];
+    let mut queue = std::collections::VecDeque::new();
+    for i in 0..n {
+        if disc.as_raw()[i * 4 + 3] > 8 && near(&lab[i]) {
+            bgm[i] = true;
+            queue.push_back(i);
+        }
+    }
+    let seeded = queue.len();
+    while let Some(i) = queue.pop_front() {
+        let (x, y) = ((i as u32) % w, (i as u32) / w);
+        for (dx, dy) in [(-1i32, 0i32), (1, 0), (0, -1), (0, 1)] {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= w as i32 || ny >= h as i32 {
+                continue;
+            }
+            let j = (ny as u32 * w + nx as u32) as usize;
+            if !bgm[j] && disc.as_raw()[j * 4 + 3] > 8 && light_grey(&lab[j]) {
+                bgm[j] = true;
+                queue.push_back(j);
+            }
+        }
+    }
+    let removed = bgm.iter().filter(|&&b| b).count();
+    let visible = disc.pixels().filter(|p| p[3] > 127).count();
+    // something must be background, and something must be left
+    if (seeded as f32) < 0.08 * visible as f32 || removed as f32 > 0.92 * visible as f32 {
+        return None;
+    }
+    // soft edge: a slightly blurred keep mask, un-mixed from the background
+    let keep: Vec<f32> = bgm.iter().map(|&b| if b { 0.0 } else { 1.0 }).collect();
+    let soft = crate::lucent::gaussian_blur(&keep, w as usize, h as usize, (w as f32 * 0.003).max(0.8));
+    let bg_rgb = {
+        let lin = bg.0.powi(3);
+        (if lin <= 0.003_130_8 { lin * 12.92 } else { 1.055 * lin.powf(1.0 / 2.4) - 0.055 }) * 255.0
+    };
+    let mut out = RgbaImage::new(w, h);
+    for (i, (p, o)) in disc.pixels().zip(out.pixels_mut()).enumerate() {
+        let k = if keep[i] > 0.5 { soft[i].max(0.5) * 2.0 - 1.0 } else { 0.0 };
+        let k = k.clamp(0.0, 1.0);
+        if k <= 0.0 {
+            continue;
+        }
+        let un = |v: u8| if k >= 0.999 { v } else { ((v as f32 - bg_rgb * (1.0 - k)) / k).clamp(0.0, 255.0) as u8 };
+        *o = Rgba([un(p[0]), un(p[1]), un(p[2]), (p[3] as f32 * k).round() as u8]);
+    }
+    Some((out, (0, 0, w, h)))
+}
+
 /// True when the glyph is itself a filled tile ("icon inside the icon": a
 /// rounded square or circle that fills most of its own box). Such glyphs
 /// are stretched to the plate edge and clipped by the plate shape.
 pub fn is_tile(glyph: &RgbaImage) -> bool {
+    tile_check(glyph, 127)
+}
+
+/// Like [is_tile], counting every visible pixel: also a translucent tile (an
+/// icon that already went through the frosted style, alpha ~0.5-0.8).
+pub fn is_tile_loose(glyph: &RgbaImage) -> bool {
+    tile_check(glyph, 24)
+}
+
+fn tile_check(glyph: &RgbaImage, min_alpha: u8) -> bool {
     let (w, h) = glyph.dimensions();
     if w < 8 || h < 8 {
         return false;
     }
     let aspect = w.max(h) as f32 / w.min(h) as f32;
-    let filled = glyph.pixels().filter(|p| p[3] > 127).count() as f32 / (w * h) as f32;
-    aspect < 1.25 && filled > 0.80
+    let seen = |p: &Rgba<u8>| p[3] > min_alpha;
+    let filled = glyph.pixels().filter(|p| seen(p)).count() as f32 / (w * h) as f32;
+    if aspect >= 1.25 || filled <= 0.80 {
+        return false;
+    }
+    // a tile has four straight, full sides; a compact symbol that happens to
+    // fill most of its box (an X, a cross, a ring) leaves gaps in the middle
+    // of its sides
+    let band = ((w.min(h) as f32) * 0.03).ceil().max(1.0) as u32;
+    let side_full = |horizontal: bool, far: bool| {
+        let (len, other) = if horizontal { (w, h) } else { (h, w) };
+        let (a0, a1) = ((len as f32 * 0.2) as u32, (len as f32 * 0.8) as u32);
+        let mut hit = 0u32;
+        let mut tot = 0u32;
+        for t in a0..a1 {
+            let covered = (0..band).any(|k| {
+                let d = if far { other - 1 - k } else { k };
+                let (x, y) = if horizontal { (t, d) } else { (d, t) };
+                seen(glyph.get_pixel(x, y))
+            });
+            hit += covered as u32;
+            tot += 1;
+        }
+        tot > 0 && hit as f32 >= 0.85 * tot as f32
+    };
+    side_full(true, false) && side_full(true, true) && side_full(false, false) && side_full(false, true)
 }
 
 /// Coloured plate with a neutral glyph (e.g. a dark tag on a yellow disc):
@@ -340,7 +476,13 @@ pub fn strip_border_background(img: &RgbaImage) -> Option<RgbaImage> {
 /// background is removed too. Returns the inner content and its box inside
 /// the tile, or None when there is no inner plate to strip.
 pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32))> {
-    if !is_tile(glyph) {
+    unwrap_tile_with(glyph, false)
+}
+
+/// [unwrap_tile]; with `loose` a translucent tile qualifies too (see
+/// [is_tile_loose]).
+pub fn unwrap_tile_with(glyph: &RgbaImage, loose: bool) -> Option<(RgbaImage, (u32, u32, u32, u32))> {
+    if !(if loose { is_tile_loose(glyph) } else { is_tile(glyph) }) {
         return None;
     }
     let (w, h) = glyph.dimensions();
@@ -680,6 +822,62 @@ mod tests {
         let (g, _, _) = recolor_on_colored_plate(&img, false).expect("recoloured");
         let c = g.get_pixel(3, g.height() / 2);
         assert!(c[0] > 200 && c[2] < 80, "{:?}", c);
+    }
+
+    #[test]
+    fn light_disc_background_and_cloud_go_artwork_stays() {
+        // off-white disc, a light grey cloud, a green body with a dark outline
+        // that runs off the edge
+        let img = RgbaImage::from_fn(120, 120, |x, y| {
+            let (fx, fy) = (x as f32 + 0.5 - 60.0, y as f32 + 0.5 - 60.0);
+            if fx.hypot(fy) >= 60.0 {
+                return Rgba([0, 0, 0, 0]);
+            }
+            let body = (fx - 25.0).hypot(fy - 25.0);
+            if body < 40.0 {
+                Rgba([120, 200, 80, 255])
+            } else if body < 46.0 {
+                Rgba([15, 20, 15, 255])
+            } else if (fx + 20.0).hypot(fy + 5.0) < 22.0 {
+                Rgba([190, 192, 186, 255])
+            } else {
+                Rgba([236, 242, 228, 255])
+            }
+        });
+        let (art, bx) = strip_light_disc(&img).expect("light disc");
+        assert_eq!(bx, (0, 0, 120, 120));
+        assert!(art.get_pixel(85, 85)[3] > 250, "green body kept");
+        assert!(art.get_pixel(85, 85)[1] > 180);
+        assert!(art.get_pixel(40, 55)[3] < 10, "cloud removed");
+        assert!(art.get_pixel(20, 100)[3] < 10, "background removed");
+        let edge = art.get_pixel(85 - 43, 85);
+        assert!(edge[3] > 200 && edge[0] < 60, "dark outline kept {:?}", edge);
+        // a dark or coloured disc is not this case
+        let dark = RgbaImage::from_fn(120, 120, |x, y| {
+            if (x as f32 - 59.5).hypot(y as f32 - 59.5) < 60.0 { Rgba([30, 30, 34, 255]) } else { Rgba([0, 0, 0, 0]) }
+        });
+        assert!(strip_light_disc(&dark).is_none());
+        // a square tile is not a disc
+        assert!(strip_light_disc(&RgbaImage::from_pixel(120, 120, Rgba([236, 242, 228, 255]))).is_none());
+    }
+
+    #[test]
+    fn x_shaped_symbol_is_not_a_tile_but_a_translucent_tile_is() {
+        // thick X filling most of its box (Smart Center): sides open in the middle
+        let x = RgbaImage::from_fn(100, 100, |x, y| {
+            let (fx, fy) = (x as f32, y as f32);
+            let d1 = (fx - fy).abs();
+            let d2 = (fx + fy - 99.0).abs();
+            if d1 < 34.0 || d2 < 34.0 { Rgba([200, 200, 200, 255]) } else { Rgba([0, 0, 0, 0]) }
+        });
+        assert!(x.pixels().filter(|p| p[3] > 127).count() as f32 > 0.8 * 10000.0);
+        assert!(!is_tile(&x) && !is_tile_loose(&x));
+        // frosted tile at alpha ~0.45: a tile only for the loose test
+        let t = RgbaImage::from_pixel(100, 100, Rgba([40, 40, 46, 110]));
+        assert!(!is_tile(&t) && is_tile_loose(&t));
+        // opaque tile: both
+        let o = RgbaImage::from_pixel(100, 100, Rgba([40, 40, 46, 255]));
+        assert!(is_tile(&o) && is_tile_loose(&o));
     }
 
     #[test]

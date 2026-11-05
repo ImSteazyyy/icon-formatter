@@ -531,6 +531,9 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // launcher icons often carry a transparent margin around the tile:
     // detect the tile on the icon cropped to its visible box
     let src_tile = crate::compose::crop_to_content(src);
+    // the source is already a finished frosted icon: its tones were already
+    // lifted once, a second lift turns dark outlines into speckled grey
+    let mut already_styled = false;
     let src_unwrap = match st {
         G::Auto | G::FullBleed if crate::compose::is_tile(&src_tile) => crate::compose::unwrap_tile(&src_tile),
         _ => None,
@@ -579,7 +582,23 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     } else if st == G::AsIs {
         (glyph.dimensions(), None)
     } else {
-        (glyph.dimensions(), if fallback { None } else { crate::compose::unwrap_tile(glyph) })
+        // the "symbol" is the whole icon and that icon is a translucent tile:
+        // an icon already in the frosted style whose artwork touches the edge
+        // (Contacts' tabs, HoYoLAB's mascot), so nothing could be separated
+        // from it. Re-mask it onto the new plate as it is, edge to edge,
+        // instead of shrinking it into a tile inside the tile.
+        if bare && crate::compose::is_tile_loose(glyph) && !crate::compose::is_tile(glyph) {
+            notes.push("Icona già nello stile: riportata sulla nuova forma".to_string());
+            already_styled = true;
+            (glyph.dimensions(), Some((glyph.clone(), (0, 0, glyph.width(), glyph.height()))))
+        } else if let Some((art, bx)) = if bare { crate::compose::strip_light_disc(glyph) } else { None } {
+            // round icon on a light background, artwork to the edge: the
+            // background goes, the artwork keeps its place on the plate
+            notes.push("Icona rotonda: sfondo chiaro rimosso, disegno esteso al piatto".to_string());
+            (art.dimensions(), Some((art, bx)))
+        } else {
+            (glyph.dimensions(), if fallback { None } else { crate::compose::unwrap_tile(glyph) })
+        }
     };
     let fallback = fallback && unwrapped.is_none();
     let inner_box = unwrapped.as_ref().map(|u| u.1);
@@ -591,7 +610,7 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // ---- glyph layer (straight RGBA at glyph resolution)
     let mut layer = glyph.clone();
     let dark_plate = (p.backdrop[0] as u32 + p.backdrop[1] as u32 + p.backdrop[2] as u32) < 384;
-    if p.lift_greys && dark_plate && !p.monochrome {
+    if p.lift_greys && dark_plate && !p.monochrome && !already_styled {
         // neutral greys get a gamma lift (v^0.35): dark details (roads, keys)
         // become visible on the dark frosted plate while the tonal steps
         // between greys (e.g. a figure on a grey disc) are kept

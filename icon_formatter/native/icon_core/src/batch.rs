@@ -156,7 +156,7 @@ pub fn run(
             .collect::<Vec<_>>()
     };
     if cfg.threads > 0 {
-        match rayon::ThreadPoolBuilder::new().num_threads(cfg.threads).build() {
+        match worker_pool(cfg.threads).build() {
             Ok(pool) => pool.install(work),
             Err(_) => work(),
         }
@@ -226,5 +226,64 @@ mod tests {
 /// Sizes the shared worker pool (matching, batches with `threads == 0`).
 /// Must run before the first parallel job; later calls return false.
 pub fn set_global_threads(n: usize) -> bool {
-    n > 0 && rayon::ThreadPoolBuilder::new().num_threads(n).build_global().is_ok()
+    n > 0 && worker_pool(n).build_global().is_ok()
 }
+
+/// Worker pool with named, background-priority threads.
+///
+/// On Android the workers are spawned from a thread of the app's top-app
+/// group and inherit its nice -10, above Flutter's raster thread (-5): during
+/// a batch they won the CPU over drawing and scrolling stuttered (p90 190 ms
+/// on the Phone (2a) Plus). At nice 10 they still use every idle cycle but
+/// yield to the UI.
+fn worker_pool(n: usize) -> rayon::ThreadPoolBuilder {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(n)
+        .thread_name(|i| format!("icon-worker-{i}"))
+        .start_handler(|_| lower_thread_priority())
+}
+
+#[cfg(target_os = "android")]
+fn lower_thread_priority() {
+    // who = 0 is the calling thread on Linux (nice is per thread)
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, 10);
+    }
+    // Keep the workers off the fastest cores. On big.LITTLE phones (Phone
+    // (2a) Plus: six 2.0 GHz + two 3.0 GHz cores) a niced worker still sits
+    // on a big core and Flutter's UI/raster threads end up on a little one,
+    // where a 120 Hz frame (8.3 ms) no longer fits. Phones with one cluster
+    // keep every core.
+    let slow = slow_cores();
+    if slow.is_empty() {
+        return;
+    }
+    unsafe {
+        let mut set: libc::cpu_set_t = std::mem::zeroed();
+        libc::CPU_ZERO(&mut set);
+        for c in slow {
+            libc::CPU_SET(c, &mut set);
+        }
+        libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &set);
+    }
+}
+
+/// Cores whose top frequency is below the fastest one (empty when all match
+/// or the frequencies can't be read).
+#[cfg(target_os = "android")]
+fn slow_cores() -> Vec<usize> {
+    let freqs: Vec<(usize, u64)> = (0..64)
+        .map_while(|c| {
+            std::fs::read_to_string(format!("/sys/devices/system/cpu/cpu{c}/cpufreq/cpuinfo_max_freq"))
+                .ok()
+                .map(|f| (c, f.trim().parse().unwrap_or(0)))
+        })
+        .collect();
+    let max = freqs.iter().map(|f| f.1).max().unwrap_or(0);
+    let slow: Vec<usize> = freqs.iter().filter(|f| f.1 > 0 && f.1 < max).map(|f| f.0).collect();
+    // at least two cores for the workers, else don't restrict
+    if slow.len() >= 2 { slow } else { Vec::new() }
+}
+
+#[cfg(not(target_os = "android"))]
+fn lower_thread_priority() {}

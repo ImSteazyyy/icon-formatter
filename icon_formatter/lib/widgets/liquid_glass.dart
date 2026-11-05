@@ -87,14 +87,37 @@ List<BoxShadow> glassDepthShadows(double radius) {
 }
 
 /// Configurable shadow behind text and icons on glass (legibility).
-List<Shadow> glassTextShadows() {
-  final g = AppState.I.glass;
+///
+/// Drawn without blur. On Impeller a blurred text shadow is an offscreen
+/// blur pass per text run per frame: with the default 60 / 6.0 the glass
+/// labels cost dozens of blur passes per frame and page swipes dropped to
+/// 30-60 fps on the Phone (2a) Plus. The soft edge is rebuilt from a few
+/// crisp copies placed on rings as wide as the blur, each faint; a crisp
+/// glyph copy costs about as much as the text itself.
+List<Shadow> glassTextShadows() => glassTextShadowsFor(AppState.I.glass);
+
+List<Shadow> glassTextShadowsFor(GlassConfig g) {
   if (g.textShadow <= 0.01) return const [];
-  return [
-    Shadow(color: Colors.black.withValues(alpha: (g.textShadow * 0.9).clamp(0.0, 1.0)), blurRadius: g.textShadowBlur, offset: const Offset(0, 1)),
-    if (g.textShadow > 0.5) Shadow(color: Colors.black.withValues(alpha: (g.textShadow - 0.5) * 0.8), blurRadius: g.textShadowBlur * 2.2),
-  ];
+  final key = Object.hash(g.textShadow, g.textShadowBlur);
+  if (key == _shadowKey) return _shadowCache;
+  _shadowKey = key;
+  final strength = g.textShadow.clamp(0.0, 1.0);
+  final soft = g.textShadowBlur.clamp(0.0, 20.0);
+  final out = <Shadow>[Shadow(color: Colors.black.withValues(alpha: strength * 0.55), offset: const Offset(0, 1))];
+  void ring(double radius, double alpha, int n, double phase) {
+    if (radius < 0.5 || alpha <= 0.004) return;
+    for (var i = 0; i < n; i++) {
+      final a = phase + i * 2 * math.pi / n;
+      out.add(Shadow(color: Colors.black.withValues(alpha: alpha), offset: Offset(math.cos(a) * radius, 1 + math.sin(a) * radius)));
+    }
+  }
+  ring(soft * 0.30, strength * 0.22, 6, 0);
+  if (g.textShadow > 0.5) ring(soft * 0.65, (g.textShadow - 0.5) * 0.30, 6, math.pi / 6);
+  return _shadowCache = out;
 }
+
+Object? _shadowKey;
+List<Shadow> _shadowCache = const [];
 
 /// Applies the glass text/icon shadow to a subtree.
 Widget withGlassShadows(Widget child) {
@@ -123,9 +146,18 @@ class LiquidGlass extends StatelessWidget {
     this.chromatic = 0.6,
     this.dark = false,
     this.role = GlassRole.panel,
+    this.live = false,
   });
 
   final Widget child;
+
+  /// True for glass that floats over content that moves (bottom action bar,
+  /// pop-up menus, the settings preview): it blurs what is behind it every
+  /// frame. Everything else sits on the fixed app background, where a live
+  /// blur looks the same as none but costs a full-screen copy and a blur pass
+  /// per surface per frame on Impeller; that glass keeps its tint, rim and
+  /// light but skips the backdrop read (the same idea as a frozen backdrop).
+  final bool live;
   final double radius;
   final EdgeInsetsGeometry padding;
 
@@ -158,18 +190,22 @@ class LiquidGlass extends StatelessWidget {
             child: child,
           );
         } else {
-          body = GlossOverlay(
-            radius: radius,
-            child: GlassContainer(
-              shape: LiquidRoundedSuperellipse(borderRadius: radius),
-              padding: padding,
-              settings: appGlassSettings(dark: dark, chromatic: chromatic),
-              useOwnLayer: true,
-              quality: appGlassQuality,
-              clipBehavior: Clip.antiAlias,
-              child: withGlassShadows(child),
-            ),
+          final settings = appGlassSettings(dark: dark, chromatic: chromatic);
+          Widget glass = GlassContainer(
+            shape: LiquidRoundedSuperellipse(borderRadius: radius),
+            padding: padding,
+            settings: settings,
+            useOwnLayer: true,
+            quality: appGlassQuality,
+            clipBehavior: Clip.antiAlias,
+            child: withGlassShadows(child),
           );
+          if (!live) {
+            // tells the lightweight renderer the blur is already there, so it
+            // pushes no BackdropFilterLayer for this surface
+            glass = InheritedLiquidGlass(settings: settings, quality: appGlassQuality, isBlurProvidedByAncestor: true, child: glass);
+          }
+          body = GlossOverlay(radius: radius, child: glass);
         }
         if (shadows.isEmpty) return body;
         return DecoratedBox(
@@ -244,28 +280,38 @@ class GlossPainter extends CustomPainter {
     final r = math.min(radius, size.shortestSide / 2);
     final rr = RRect.fromRectAndRadius(rect.deflate(0.8), Radius.circular(math.max(0, r - 0.8)));
     final a = lightAngle * math.pi / 180;
+    final a0 = a;
     final begin = Alignment(math.cos(a), -math.sin(a));
     final end = Alignment(-math.cos(a), math.sin(a));
     final i = intensity.clamp(0.0, 1.0);
     if (chroma > 0.01) {
-      // dispersion: cool fringe on the lit side, warm/magenta on the far side
+      // dispersion: cool fringe on the lit side, warm/magenta on the far side.
+      // A wide faint stroke under a narrow one reads as the soft fringe that a
+      // mask blur gave, without an offscreen blur pass every frame.
       final c = chroma.clamp(0.0, 1.0);
+      Shader fringe(double a) => SweepGradient(
+            colors: [
+              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c * a),
+              const Color(0xFFFF4FD8).withValues(alpha: 0.55 * c * a),
+              const Color(0xFFFFA43A).withValues(alpha: 0.70 * c * a),
+              const Color(0xFF7A5CFF).withValues(alpha: 0.55 * c * a),
+              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c * a),
+            ],
+            transform: GradientRotation(a0 + math.pi),
+          ).createShader(rect);
       canvas.drawRRect(
         rr.deflate(1.0),
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5 + 3.5 * c
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 1.2 + 2.5 * c)
-          ..shader = SweepGradient(
-            colors: [
-              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c),
-              const Color(0xFFFF4FD8).withValues(alpha: 0.55 * c),
-              const Color(0xFFFFA43A).withValues(alpha: 0.70 * c),
-              const Color(0xFF7A5CFF).withValues(alpha: 0.55 * c),
-              const Color(0xFF3FD5FF).withValues(alpha: 0.75 * c),
-            ],
-            transform: GradientRotation(a + math.pi),
-          ).createShader(rect),
+          ..strokeWidth = 2.5 + 4.5 * c
+          ..shader = fringe(0.30),
+      );
+      canvas.drawRRect(
+        rr.deflate(1.0),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0 + 1.5 * c
+          ..shader = fringe(0.55),
       );
     }
     if (i <= 0.01) return;
@@ -292,8 +338,7 @@ class GlossPainter extends CustomPainter {
       rr.deflate(1.5),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5)
+        ..strokeWidth = 4
         ..shader = LinearGradient(
           begin: begin,
           end: Alignment.center,

@@ -12,3 +12,8 @@ icon_formatter/native/icon_core/examples/refcal.rs
 *.keystore
 Thumbs.db
 .token-savior-cache.json
+
+# Icone di app di terzi usate come riferimento in locale (marchi e loghi dei
+# rispettivi proprietari): restano sul PC, non vanno nella repo pubblica
+/*.png
+/*.webp

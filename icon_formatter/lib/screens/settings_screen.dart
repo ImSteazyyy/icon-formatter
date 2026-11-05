@@ -9,13 +9,14 @@ import '../services/ai_service.dart';
 import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/ai_mask.dart';
+import '../widgets/color_picker.dart';
 import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
 import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
 import '../l10n/strings.dart';
 
-const appVersion = '1.3.0';
+const appVersion = '1.3.1';
 
 enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
 
@@ -849,104 +850,35 @@ class _AccentPicker extends StatefulWidget {
 }
 
 class _AccentPickerState extends State<_AccentPicker> {
-  late final TextEditingController hex = TextEditingController(text: _toHex(AppState.I.appearance.accent));
-  String? error;
-
-  static String _toHex(int argb) => '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
-
-  static int? _parse(String s) {
-    var v = s.trim().replaceAll('#', '');
-    if (v.length == 3) v = v.split('').map((c) => '$c$c').join();
-    if (v.length != 6 || int.tryParse(v, radix: 16) == null) return null;
-    return 0xFF000000 | int.parse(v, radix: 16);
-  }
-
-  void _set(int argb, {bool fromField = false}) {
-    AppState.I.update(() => AppState.I.appearance.accent = argb);
-    if (!fromField) hex.text = _toHex(argb);
-    setState(() => error = null);
-  }
+  void _set(int argb) => AppState.I.update(() => AppState.I.appearance.accent = argb);
 
   @override
   Widget build(BuildContext context) {
     final a = AppState.I.appearance;
-    final hsl = HSLColor.fromColor(a.accentColor);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Wrap(spacing: 10, runSpacing: 10, children: [
-        for (final c in _AppearancePage.accents)
-          GestureDetector(
-            onTap: () => _set(c),
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Color(c),
-                shape: BoxShape.circle,
-                border: Border.all(color: a.accent == c ? Colors.white : Colors.transparent, width: 2),
-              ),
+    final preset = _AppearancePage.accents.contains(a.accent);
+    return Wrap(spacing: 10, runSpacing: 10, children: [
+      for (final c in _AppearancePage.accents)
+        GestureDetector(
+          onTap: () => _set(c),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Color(c),
+              shape: BoxShape.circle,
+              border: Border.all(color: a.accent == c ? Colors.white : Colors.transparent, width: 2.5),
             ),
           ),
-      ]),
-      const SizedBox(height: 12),
-      Row(children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: a.accentColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-          ),
         ),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 160,
-          child: TextField(
-            controller: hex,
-            decoration: InputDecoration(labelText: S.hex, hintText: S.ba4cd4, errorText: error),
-            style: const TextStyle(fontFamily: 'Consolas', letterSpacing: 1),
-            onChanged: (v) {
-              final c = _parse(v);
-              if (c != null) {
-                _set(c, fromField: true);
-              } else {
-                setState(() => error = v.trim().isEmpty ? null : S.formatoRrggbb);
-              }
-            },
-          ),
-        ),
-        const SizedBox(width: 8),
-        TextButton(onPressed: () => _set(Appearance.defaultAccent), child: const Text(S.predefinito)),
-      ]),
-      const SizedBox(height: 8),
-      SliderRow(
-        label: S.tonalita,
-        value: hsl.hue,
-        min: 0,
-        max: 360,
-        format: (v) => '${v.round()}°',
-        onChanged: (v) => _set(hsl.withHue(v).toColor().toARGB32()),
-      ),
-      SliderRow(
-        label: S.saturazione,
-        value: hsl.saturation,
-        onChanged: (v) => _set(hsl.withSaturation(v).toColor().toARGB32()),
-      ),
-      SliderRow(
-        label: S.luminosita,
-        value: hsl.lightness,
-        min: 0.2,
-        max: 0.85,
-        onChanged: (v) => _set(hsl.withLightness(v).toColor().toARGB32()),
+      // any colour: saturation/brightness square, hue, hex (live preview)
+      CustomColorSwatch(
+        selected: !preset,
+        onTap: () => showColorPicker(context, initial: a.accent, title: S.accentoTitolo, onChanged: _set),
       ),
     ]);
   }
 }
 
-
-/// Live Liquid Glass preview over coloured content (sticky at the top of
-/// Impostazioni › Vetro). It uses the same [LiquidGlass] surfaces as the
-/// rest of the app, so what it shows is what every screen gets.
 class GlassPreview extends StatelessWidget {
   const GlassPreview({super.key});
 
@@ -986,6 +918,7 @@ class GlassPreview extends StatelessWidget {
             child: LiquidGlass(
               radius: 28,
               role: GlassRole.panel,
+              live: true,
               padding: const EdgeInsets.all(6),
               child: Row(children: [
                 Expanded(
@@ -1024,6 +957,7 @@ class GlassPreview extends StatelessWidget {
             child: LiquidGlass(
               radius: 31,
               role: GlassRole.nav,
+              live: true,
               child: Row(children: [
                 const SizedBox(width: 5),
                 SizedBox(
@@ -1034,6 +968,7 @@ class GlassPreview extends StatelessWidget {
                     dark: true,
                     chromatic: 1,
                     role: GlassRole.lens,
+                    live: true,
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       const Icon(Icons.auto_awesome_mosaic_outlined, color: Colors.white, size: 20),
                       Text(S.studio, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, shadows: glassTextShadows())),
@@ -1111,7 +1046,6 @@ class _TintPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hue = value == 0 ? 0.0 : HSVColor.fromColor(Color(value | 0xFF000000)).hue;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         const IconChip(icon: Icons.palette_outlined),
@@ -1120,27 +1054,13 @@ class _TintPicker extends StatelessWidget {
         TextButton(onPressed: value == 0 ? null : () => onChanged(0), child: Text(value == 0 ? S.nessuna : S.rimuovi)),
       ]),
       const SizedBox(height: 8),
-      // hue strip: tap/drag picks any colour
-      LayoutBuilder(builder: (context, box) {
-        void pick(double x) => onChanged(HSVColor.fromAHSV(1, (x / box.maxWidth * 360).clamp(0, 359.9), 0.85, 1).toColor().toARGB32());
-        return GestureDetector(
-          onTapDown: (d) => pick(d.localPosition.dx),
-          onHorizontalDragUpdate: (d) => pick(d.localPosition.dx),
-          child: Container(
-            height: 26,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(13),
-              gradient: LinearGradient(colors: [for (var h = 0; h <= 360; h += 60) HSVColor.fromAHSV(1, h % 360, 0.85, 1).toColor()]),
-            ),
-            alignment: Alignment((hue / 180) - 1, 0),
-            child: value == 0
-                ? null
-                : Container(width: 8, height: 26, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
-          ),
-        );
-      }),
-      const SizedBox(height: 12),
+      const SizedBox(height: 8),
       Wrap(spacing: 10, runSpacing: 10, children: [
+        // any colour (full picker, live on the glass)
+        CustomColorSwatch(
+          selected: value != 0 && !colors.contains(value | 0xFF000000),
+          onTap: () => showColorPicker(context, initial: value == 0 ? 0xFF8E44F2 : value, title: S.tintaTitolo, onChanged: onChanged),
+        ),
         for (final c in colors)
           GestureDetector(
             onTap: () => onChanged(c),

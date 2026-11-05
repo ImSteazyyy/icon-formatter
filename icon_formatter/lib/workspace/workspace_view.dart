@@ -285,8 +285,9 @@ class WorkspaceView extends StatelessWidget {
   String _hint() {
     if (c.items.isEmpty) return S.hintVuoto;
     if (c.batch.running) return S.hintInCorso;
-    if (c.processed.isEmpty) return S.hintDaElaborare;
-    if (c.processed.length < c.active.length) return S.hintParziale(c.processed.length, c.active.length);
+    final n = c.processedCount;
+    if (n == 0) return S.hintDaElaborare;
+    if (n < c.active.length) return S.hintParziale(n, c.active.length);
     return S.hintFatto;
   }
 
@@ -410,6 +411,7 @@ class WorkspaceView extends StatelessWidget {
           else if (bottomActions.isNotEmpty && onAdd == null)
           LiquidGlass(
             radius: 30,
+            live: true,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               clipBehavior: Clip.none,
@@ -421,26 +423,27 @@ class WorkspaceView extends StatelessWidget {
       );
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-        child: Stack(children: [
+        // the floating bars reach 8 dp past the page padding to line up with
+        // the navigation pill: no clip, or their rounded ends are cut straight
+        child: Stack(clipBehavior: Clip.none, children: [
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           LargeHeader(
             title,
             // empty list: the centre card explains; then one line of guidance
             subtitle: c.items.isEmpty ? null : _hint(),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (onAdd != null && c.items.isNotEmpty) ...[
-                Builder(builder: (bctx) => GlassIconButton(key: const ValueKey('studio-add'), tooltip: S.aggiungi, icon: Icons.add_rounded, size: 44, onPressed: () => onAdd!(anchorOf(bctx)))),
-                const SizedBox(width: 8),
-              ],
+            // "Aggiungi" (once the list has icons: the empty state has its
+            // own central button) and "Personalizza", equal pills
+            actions: [
+              if (onAdd != null && c.items.isNotEmpty)
+                Builder(builder: (bctx) => GlassIconButton(key: const ValueKey('studio-add'), tooltip: S.aggiungi, icon: Icons.add_rounded, label: S.aggiungi, onPressed: () => onAdd!(anchorOf(bctx)))),
               GlassIconButton(
                 key: const ValueKey('open-style'),
                 tooltip: S.regolazioni,
                 icon: Icons.tune,
                 label: S.stile,
-                size: 44,
                 onPressed: () => openStyleSheet(context),
               ),
-            ]),
+            ],
           ),
           // progress / completion floats over the content right under the
           // title (nothing moves); a sideways swipe removes it
@@ -459,7 +462,7 @@ class WorkspaceView extends StatelessWidget {
             ]),
           ),
           ]),
-          floating,
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) floating,
         ]),
       );
     });
@@ -513,9 +516,12 @@ class MoreAction {
 /// Bottom bar on phones: one big start button and "Altro" (the other
 /// actions, in a glass pop-up menu).
 class ActionBar extends StatelessWidget {
-  const ActionBar({super.key, required this.primary, required this.more});
+  const ActionBar({super.key, required this.primary, required this.more, this.header});
   final Widget primary;
   final List<MoreAction> more;
+
+  /// Small line above the buttons (e.g. selection count + "Seleziona tutte").
+  final Widget? header;
 
   Future<void> _open(BuildContext context, [Rect? anchor]) async {
     final i = await showGlassMenu<int>(context, anchor: anchor ?? anchorOf(context), title: S.altreAzioni, items: [
@@ -530,14 +536,18 @@ class ActionBar extends StatelessWidget {
     return LiquidGlass(
         key: const ValueKey('action-bar'),
         radius: 30,
+        live: true,
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (header != null) Padding(padding: const EdgeInsets.fromLTRB(8, 0, 0, 6), child: header),
             Row(children: [
-              Expanded(child: primary),
+              // both buttons share one height (the start button used the
+              // theme's own, shorter than "Altro")
+              Expanded(child: SizedBox(height: kButtonHeight, child: primary)),
               const SizedBox(width: 8),
               SizedBox(
-                height: 50,
+                height: kButtonHeight,
                 child: Builder(builder: (bctx) => OutlinedButton.icon(
                   key: const ValueKey('more-actions'),
                   onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),

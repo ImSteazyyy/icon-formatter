@@ -32,6 +32,51 @@ class MainActivity : FlutterActivity() {
     private var pendingTree: MethodChannel.Result? = null
     private val reqTree = 4711
 
+    /** Display mode last written to the window (0 = no preference). */
+    private var requestedMode = 0
+
+    // Nothing OS (and other phones that pick the rate per app) keeps an app
+    // that asks for nothing at its middle rate: 90 Hz on the Phone (2a) Plus,
+    // while the panel can do 120. A frame rate voted from a view is clamped
+    // the same way; a window naming the display mode it wants is honoured.
+    // Asked while the app is on screen and released when it leaves. With no
+    // frames to draw the phone still lowers the rate where its panel can.
+    override fun onStart() {
+        super.onStart()
+        requestDisplayMode(fastestMode())
+        // a key event (hardware keyboard, adb) leaves touch mode and Android
+        // then rings the focused FlutterView with its default focus highlight:
+        // a green frame around the whole app. Flutter draws its own focus.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            findViewById<android.view.View>(FLUTTER_VIEW_ID)?.defaultFocusHighlightEnabled = false
+        }
+    }
+
+    override fun onStop() {
+        requestDisplayMode(0)
+        super.onStop()
+    }
+
+    /** The fastest mode at the current resolution (a different resolution would be a resolution change). */
+    @Suppress("DEPRECATION")
+    private fun fastestMode(): Int {
+        val display = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay) ?: return 0
+        val current = display.mode
+        return display.supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .maxByOrNull { it.refreshRate }?.modeId ?: 0
+    }
+
+    private fun requestDisplayMode(modeId: Int) {
+        if (modeId == requestedMode) return
+        requestedMode = modeId
+        runCatching {
+            val attrs = window.attributes
+            attrs.preferredDisplayModeId = modeId
+            window.attributes = attrs
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         AutoSync.registerUnlock(applicationContext)

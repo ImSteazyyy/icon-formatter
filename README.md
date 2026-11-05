@@ -4,5 +4,9 @@ App per Windows e Android (Flutter + Rust) che compone, stilizza e ripulisce le 
 
 - Sorgente, architettura, benchmark e limiti: [icon_formatter/README.md](icon_formatter/README.md)
 - Novità di ogni versione: [CHANGELOG.md](CHANGELOG.md)
-- Icone di riferimento per calibrazione e test: i PNG nella radice e in `base/` (icona base vuota)
+- Icona base vuota per la calibrazione: `base/` (le icone di app di terzi usate per i test restano solo in locale)
 - Build per Windows e APK: nelle Release della repository
+
+Progetto indipendente, non affiliato a Nothing Technology. Licenza AGPL-3.0; componenti di terze parti e marchi: [icon_formatter/README.md](icon_formatter/README.md#licenza).
+
+**Sviluppato con Claude** (Anthropic), tramite Claude Code: Claude è co-autore dei commit.

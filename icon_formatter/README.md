@@ -82,7 +82,7 @@ ONNX Runtime (modelli tipo U²-Net/BiRefNet) è stato valutato e scartato: aggiu
 
 ## Icone di riferimento
 
-Le 26 icone in `D:\Icon Formatter` (192 px, squircle 0,93 × esponente 4,25, piatto nero semitrasparente α 105→176) sono il materiale di test: `native/icon_core/tests/reference.rs`. La base "Reference Translucent" (`assets/bases/`) è l'icona vuota fornita dall'utente; la sua calibrazione (glifo 66,9 %, centro 0,500/0,500, 26/26 campioni) è stata misurata con lo stesso algoritmo dell'app.
+Le icone di riferimento usate per calibrare e testare (192 px, squircle 0,93 × esponente 4,25, piatto nero semitrasparente α 105→176) sono icone di app di terzi: restano solo sul PC di sviluppo e **non sono incluse nella repository**, perché loghi e marchi appartengono ai rispettivi proprietari. I test che le usano (`native/icon_core/tests/reference.rs`) le cercano nella cartella del progetto e si saltano se non ci sono. La base "Reference Translucent" (`assets/bases/`) è un'icona vuota senza loghi; la sua calibrazione (glifo 66,9 %, centro 0,500/0,500, 26/26 campioni) è stata misurata con lo stesso algoritmo dell'app.
 
 Banco di regressione: `cargo run --release --example regress -- OUT in*.png` rende ogni icona due volte con la pipeline dell'app, verifica che il risultato sia deterministico e stampa un hash per confrontare le versioni.
 
@@ -152,7 +152,28 @@ Shizuku si avvia sul telefono stesso (Debug wireless, Android 11+). Senza Shizuk
 
 ## Licenza
 
-AGPL-3.0-only (vedi `LICENSE`, testo ufficiale in inglese). `lucent.rs` contiene codice derivato da Nothing IconGen (© linuxct, AGPL-3.0). Il modello U²-Net-p (Apache-2.0) non è incluso: viene scaricato su richiesta.
+AGPL-3.0-only (vedi `LICENSE`, testo ufficiale in inglese).
+
+### Componenti di terze parti
+
+| Componente | Licenza | Note |
+|---|---|---|
+| Nothing IconGen (© linuxct) | AGPL-3.0-only | `native/icon_core/src/lucent.rs` contiene codice derivato (render "Nothing Translucent"). |
+| Cargokit (© Matej Knopp) | MIT o Apache-2.0 | Copiato in `rust_builder/cargokit/` come previsto da flutter_rust_bridge; licenza in `rust_builder/cargokit/LICENSE`. |
+| Gradle Wrapper | Apache-2.0 | `iconpack_template/gradle/wrapper/`. |
+| Pacchetti Dart (119) | BSD, MIT, Apache-2.0; `dbus` MPL-2.0 | Scaricati da pub.dev, non modificati. |
+| Crate Rust (~210) | MIT, Apache-2.0, BSD, Zlib, Unlicense | Scaricati da crates.io, non modificati. |
+| Modelli U²-Net-p e ISNet (rembg) | Apache-2.0 | **Non inclusi**: vengono scaricati su richiesta dalle release di rembg (MIT). |
+
+I servizi online (OpenAI, Google Gemini, remove.bg) si usano con le chiavi API dell'utente, salvate nell'archivio sicuro del sistema.
+
+### Marchi
+
+Icon Formatter è un progetto indipendente e non è affiliato né approvato da Nothing Technology Limited. "Nothing", "Nothing OS", "Nothing Launcher" e "Phone (2a) Plus" sono marchi dei rispettivi proprietari, citati solo per indicare con quali prodotti l'app è compatibile. Lo stesso vale per i nomi e le icone delle app che l'utente elabora: l'app lavora sulle icone presenti sul suo dispositivo e non ne distribuisce nessuna.
+
+### Sviluppato con Claude
+
+Il codice di Icon Formatter è scritto in collaborazione con Claude (Anthropic) tramite Claude Code: i commit generati insieme riportano Claude come co-autore.
 
 ## Compilazione
 

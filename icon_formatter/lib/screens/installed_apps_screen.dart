@@ -279,13 +279,12 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       child: Stack(children: [
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
           child: LargeHeader(
             S.leTueApp,
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            actions: [
               GlassIconButton(
                 tooltip: S.regolazioni,
-                size: 44,
                 icon: Icons.tune,
                 label: S.stile,
                 onPressed: () => showModalBottomSheet(
@@ -320,7 +319,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ),
                 ),
               ),
-            ]),
+            ],
           ),
         ),
         // progress / completion floats over the list right under the title
@@ -330,8 +329,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
+          // a pill like the buttons and filters below it
           child: TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: S.cercaNomeOPackage),
+            decoration: pillSearchDecoration(context, S.cercaNomeOPackage),
             onChanged: (v) => setState(() => query = v),
           ),
         ),
@@ -340,29 +340,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
           // two equal toggles, edge to edge
           child: Row(children: [
-            Expanded(child: _Toggle(label: S.mostraAppSistema, on: !hideSystem, onTap: () => setState(() => hideSystem = !hideSystem))),
+            Expanded(child: ChoicePill(label: S.mostraAppSistema, on: !hideSystem, onTap: () => setState(() => hideSystem = !hideSystem))),
             const SizedBox(width: 10),
-            Expanded(child: _Toggle(label: S.soloNonElaborate, on: onlyUnprocessed, onTap: () => setState(() => onlyUnprocessed = !onlyUnprocessed))),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(children: [
-            Tooltip(
-              message: S.toccaSelezionareTieniPremutoAnteprima,
-              child: Text(S.appSelezionate(list.length, selected.length), style: const TextStyle(fontSize: 12, color: Palette.text2)),
-            ),
-            TextButton(
-              key: const ValueKey('apps-select-all'),
-              onPressed: list.isEmpty
-                  ? null
-                  : () => setState(() {
-                        final all = list.every((a) => selected.contains(a.key));
-                        all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
-                      }),
-              child: Text(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? S.deseleziona : S.selezionaTutte),
-            ),
-
+            Expanded(child: ChoicePill(label: S.soloNonElaborate, on: onlyUnprocessed, onTap: () => setState(() => onlyUnprocessed = !onlyUnprocessed))),
           ]),
         ),
         Expanded(
@@ -376,7 +356,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                         // one lookup table per build (not a scan per cell)
                         final byId = {for (final x in c.items) x.id: x};
                         return GridView.builder(
-                        padding: EdgeInsets.fromLTRB(20, 8, 20, under + 160),
+                        padding: EdgeInsets.fromLTRB(20, 8, 20, under + 200),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 100, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 0.72),
                         itemCount: list.length,
                         itemBuilder: (context, i) {
@@ -447,7 +427,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
           ]),
         ),
       ]),
-      // floating liquid-glass action bar (content scrolls underneath)
+      // floating liquid-glass action bar (content scrolls underneath);
+      // hidden while the keyboard is open, so it never covers the filters
+      if (MediaQuery.viewInsetsOf(context).bottom == 0)
       Positioned(
         left: 12,
         right: 12,
@@ -455,14 +437,38 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           // one start button; exports in "Altro" (tap or drag the bar up)
           ActionBar(
+            // how many are selected, and select all / none, under the
+            // thumb next to the start button
+            header: Row(children: [
+              const Icon(Icons.check_box_outlined, size: 16, color: Palette.text),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Tooltip(
+                  message: S.toccaSelezionareTieniPremutoAnteprima,
+                  child: Text(S.appSelezionate(list.length, selected.length), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.text)),
+                ),
+              ),
+              TextButton.icon(
+                key: const ValueKey('apps-select-all'),
+                style: TextButton.styleFrom(minimumSize: const Size(0, 34), padding: const EdgeInsets.symmetric(horizontal: 12), tapTargetSize: MaterialTapTargetSize.shrinkWrap, disabledForegroundColor: Colors.white.withValues(alpha: 0.85)),
+                onPressed: list.isEmpty
+                    ? null
+                    : () => setState(() {
+                          final all = list.every((a) => selected.contains(a.key));
+                          all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
+                        }),
+                icon: Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.deselect_rounded : Icons.select_all_rounded, size: 18),
+                label: Text(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? S.deseleziona : S.selezionaTutte),
+              ),
+            ]),
             primary: ListenableBuilder(
               listenable: c.batch,
               builder: (context, _) => FilledButton.icon(
                 key: const ValueKey('apps-start'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
                 onPressed: c.batch.running || aiRunning || selected.isEmpty ? null : _process,
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length), style: const TextStyle(fontSize: 16)),
+                // one line in the bar, whatever the count
+                label: FittedBox(fit: BoxFit.scaleDown, child: Text(selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length), maxLines: 1, style: const TextStyle(fontSize: 16))),
               ),
             ),
             more: [
@@ -482,33 +488,3 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
 
 
 /// Full-width on/off pill (filters of the apps list).
-class _Toggle extends StatelessWidget {
-  const _Toggle({required this.label, required this.on, required this.onTap});
-  final String label;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    return Material(
-      color: on ? accent.withValues(alpha: 0.18) : Colors.transparent,
-      shape: StadiumBorder(side: BorderSide(color: on ? accent.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.14))),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          height: 44,
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              child: on ? Icon(Icons.check_rounded, key: const ValueKey(1), size: 18, color: accent) : const SizedBox(key: ValueKey(0), width: 0),
-            ),
-            if (on) const SizedBox(width: 6),
-            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Palette.text : Palette.text2))),
-          ]),
-        ),
-      ),
-    );
-  }
-}

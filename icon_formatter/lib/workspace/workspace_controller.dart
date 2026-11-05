@@ -390,7 +390,13 @@ class WorkspaceController extends ChangeNotifier {
   SegmentSettings _keepAlpha(SegmentSettings s) =>
       SegmentSettings(mode: SegMode.keepAlpha, tolerance: s.tolerance, removeHoles: s.removeHoles, refineEdges: s.refineEdges);
 
+  /// Processed items whose output is still on disk (sync I/O per item: for
+  /// actions such as export, not for build methods).
   List<WorkItem> get processed => items.where((i) => !i.excluded && i.outputPath != null && File(i.outputPath!).existsSync()).toList();
+
+  /// How many items have an output, without touching the disk: safe to call
+  /// on every rebuild (a batch rebuilds the screen several times a second).
+  int get processedCount => items.where((i) => !i.excluded && i.outputPath != null).length;
 
   List<WorkItem> get ambiguous => items.where((i) => i.result?.ambiguous == true && i.result?.ok == true).toList();
 

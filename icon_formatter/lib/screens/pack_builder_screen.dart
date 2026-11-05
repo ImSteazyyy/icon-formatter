@@ -838,9 +838,11 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               sliver: SliverList.list(children: [
+                // the last summary ("N su M abbinate") is the subtitle once the
+                // work is done; while working the strip floats over card 1
                 LargeHeader(
                   S.pbTitolo,
-                  subtitle: S.pbSottotitoloBreve,
+                  subtitle: !c.busy && c.status != null ? c.status : S.pbSottotitoloBreve,
                 ),
                 // status floats over the first card, right under the title
                 Stack(clipBehavior: Clip.none, children: [
@@ -856,7 +858,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                     ToolButton(icon: Icons.inventory_2_outlined, label: Platform.isAndroid ? S.pbDaFile : S.pbOriginali, onTap: c.busy ? null : () => _run(() => c.addSource(original: true))),
                   ],
                 ),
-                  if (status != null) Positioned(left: 0, right: 0, top: 0, child: status),
+                  if (status != null && c.busy) Positioned(left: 0, right: 0, top: 0, child: status),
                 ]),
                 StepCard(
                   step: 2,
@@ -872,25 +874,26 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                 ),
                 if (c.rows.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                    ChoiceChip(label: Text(S.pbTutte(c.rows.length)), selected: filter == null, onSelected: (_) => setState(() => filter = null)),
+                  // same pills and search pill as "Le tue app"
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    ChoicePill(label: S.pbTutte(c.rows.length), on: filter == null, onTap: () => setState(() => filter = null)),
                     for (final s in PbState.values)
                       if (counts[s]! > 0 || s == PbState.missing)
-                        ChoiceChip(
+                        ChoicePill(
                           key: ValueKey('pb-filter-${s.name}'),
-                          avatar: Icon(Icons.circle, size: 9, color: _color(s)),
-                          label: Text('${_label(s)} ${counts[s]}'),
-                          selected: filter == s,
-                          onSelected: (_) => setState(() => filter = filter == s ? null : s),
+                          icon: Icons.circle,
+                          iconSize: 10,
+                          iconColor: _color(s),
+                          label: '${_label(s)} ${counts[s]}',
+                          on: filter == s,
+                          onTap: () => setState(() => filter = filter == s ? null : s),
                         ),
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        decoration: const InputDecoration(isDense: true, prefixIcon: Icon(Icons.search, size: 18), hintText: S.cercaNomeOPackage),
-                        onChanged: (v) => setState(() => query = v),
-                      ),
-                    ),
                   ]),
+                  const SizedBox(height: 10),
+                  TextField(
+                    decoration: pillSearchDecoration(context, S.cercaNomeOPackage),
+                    onChanged: (v) => setState(() => query = v),
+                  ),
                   const SizedBox(height: 4),
                   const Text(S.pbTieniPremuto, style: TextStyle(fontSize: 11, color: Palette.text3)),
                 ],

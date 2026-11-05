@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/common.dart' show kButtonHeight;
+import '../widgets/liquid_glass.dart';
+
 import 'models.dart';
 
 /// Charcoal palette; accent is user-configurable (default pink #BA4CD4).
@@ -41,6 +44,10 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
   );
   final r = BorderRadius.circular(a.radius * 0.6);
   final density = a.compact ? VisualDensity.compact : VisualDensity.standard;
+  // "Ombra testo" on every label and icon of the app, buttons included, so
+  // no text has it and the next one not (drawn without blur, see
+  // glassTextShadows: cheap enough for the whole UI)
+  final shadows = glassTextShadowsFor(g);
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
@@ -48,7 +55,7 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
     scaffoldBackgroundColor: Palette.bg,
     canvasColor: Palette.bg,
     fontFamily: 'Segoe UI',
-    textTheme: const TextTheme(
+    textTheme: _withShadows(Typography.material2021(platform: TargetPlatform.android).white.merge(const TextTheme(
       // page titles (Studio, AI, Pack, App, ...): large, like Impostazioni
       headlineSmall: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text),
       titleLarge: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.7, color: Palette.text),
@@ -57,7 +64,9 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
       bodyMedium: TextStyle(color: Palette.text, height: 1.35),
       bodySmall: TextStyle(color: Palette.text2, height: 1.35),
       labelLarge: TextStyle(fontWeight: FontWeight.w600),
-    ),
+    )), shadows),
+    iconTheme: IconThemeData(color: Palette.text, shadows: shadows),
+    primaryTextTheme: _withShadows(Typography.material2021(platform: TargetPlatform.android).white, shadows),
     dividerColor: Colors.white.withValues(alpha: 0.07),
     sliderTheme: SliderThemeData(
       trackHeight: 6,
@@ -70,17 +79,26 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
       showValueIndicator: ShowValueIndicator.never,
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+      // disabled ("Seleziona delle app", busy steps): white label on a dim
+      // pill, readable instead of grey on grey
+      style: FilledButton.styleFrom(
+        shape: const StadiumBorder(),
+        minimumSize: const Size(64, kButtonHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        disabledForegroundColor: Colors.white.withValues(alpha: 0.92),
+        disabledBackgroundColor: Colors.white.withValues(alpha: 0.10),
+      ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: Palette.text,
         side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
         shape: const StadiumBorder(),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        minimumSize: const Size(64, kButtonHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
       ),
     ),
-    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: accent, shape: const StadiumBorder())),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: accent, shape: const StadiumBorder(), minimumSize: const Size(48, kButtonHeight), padding: const EdgeInsets.symmetric(horizontal: 16))),
     iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(shape: const CircleBorder())),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -93,6 +111,7 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(
         shape: const WidgetStatePropertyAll(StadiumBorder()),
+        minimumSize: const WidgetStatePropertyAll(Size(48, kButtonHeight)),
         side: WidgetStatePropertyAll(BorderSide(color: Colors.white.withValues(alpha: 0.12))),
       ),
     ),
@@ -174,4 +193,27 @@ class _NoTransition extends PageTransitionsBuilder {
   Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
           Animation<double> secondaryAnimation, Widget child) =>
       child;
+}
+
+
+TextTheme _withShadows(TextTheme t, List<Shadow> s) {
+  if (s.isEmpty) return t;
+  TextStyle? f(TextStyle? x) => x?.copyWith(shadows: s);
+  return t.copyWith(
+    displayLarge: f(t.displayLarge),
+    displayMedium: f(t.displayMedium),
+    displaySmall: f(t.displaySmall),
+    headlineLarge: f(t.headlineLarge),
+    headlineMedium: f(t.headlineMedium),
+    headlineSmall: f(t.headlineSmall),
+    titleLarge: f(t.titleLarge),
+    titleMedium: f(t.titleMedium),
+    titleSmall: f(t.titleSmall),
+    bodyLarge: f(t.bodyLarge),
+    bodyMedium: f(t.bodyMedium),
+    bodySmall: f(t.bodySmall),
+    labelLarge: f(t.labelLarge),
+    labelMedium: f(t.labelMedium),
+    labelSmall: f(t.labelSmall),
+  );
 }

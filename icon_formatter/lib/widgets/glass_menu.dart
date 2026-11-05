@@ -123,6 +123,7 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
       child: LiquidGlass(
         radius: 26,
         role: GlassRole.panel,
+        live: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: size.height * 0.6),

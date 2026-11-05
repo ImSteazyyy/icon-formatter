@@ -145,11 +145,17 @@ class _ShellState extends State<Shell> {
       final covered = _navCovered + inset;
       final accent = Theme.of(context).colorScheme.primary;
       return Scaffold(
+        // the keyboard slides over the page instead of squeezing it: the
+        // floating bars stay at the bottom, under the keyboard, and never
+        // jump up over the search field and filters
+        resizeToAvoidBottomInset: false,
         body: Backdrop(
           child: Stack(children: [
             Positioned.fill(
               child: GlassInsets(bottom: covered, child: SafeArea(bottom: false, child: stack)),
             ),
+            // typing (search): the keyboard owns the bottom, the bar steps aside
+            if (MediaQuery.viewInsetsOf(context).bottom == 0)
             Positioned(
               left: 0,
               right: 0,
@@ -180,8 +186,9 @@ class _ShellState extends State<Shell> {
                 indicatorColor: Color.lerp(const Color(0xFF26252B), HSLColor.fromColor(accent).withSaturation(0.28).toColor(), 0.42)!.withValues(alpha: 0.62),
                 selectedIconColor: Color.lerp(Colors.white, accent, 0.22),
                 selectedLabelColor: Color.lerp(Colors.white, accent, 0.22),
-                unselectedIconColor: const Color(0xFFBDBAC4),
-                unselectedLabelColor: const Color(0xFFBDBAC4),
+                // white labels on the bar (grey read as disabled)
+                unselectedIconColor: Colors.white.withValues(alpha: 0.92),
+                unselectedLabelColor: Colors.white.withValues(alpha: 0.92),
                 labelFontSize: 11,
                 selectedLabelStyle: TextStyle(fontWeight: FontWeight.w700, shadows: glassTextShadows()),
                 unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, shadows: glassTextShadows()),

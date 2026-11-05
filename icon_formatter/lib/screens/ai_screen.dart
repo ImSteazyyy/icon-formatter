@@ -86,11 +86,30 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
     setState(() => sel = sel < 0 && items.isNotEmpty ? 0 : sel);
   }
 
+  /// The online theme has no API key yet: say so, with the two ways out.
+  Future<void> _explainOnline() async {
+    final go = await showAppDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.error_outline_rounded, color: Palette.warn),
+        title: const Text(S.aiTabOnline),
+        content: const Text(S.aiNessunaChiave),
+        actions: [
+          TextButton.icon(onPressed: () => Navigator.pop(ctx, 1), icon: const Icon(Icons.memory_rounded, size: 18), label: const Text(S.aiProvaLocale)),
+          FilledButton.icon(onPressed: () => Navigator.pop(ctx, 0), icon: const Icon(Icons.key_outlined, size: 18), label: const Text(S.configura)),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (go == 0) widget.onOpenSettings();
+    if (go == 1) setState(() => tab = 1);
+  }
+
   Future<void> _generate({required bool regenerate}) async {
     final it = cur;
     if (it == null || busy) return;
     if (configured != true) {
-      showMsg(context, S.aiNonConfigurataImpostaProvider, error: true);
+      _explainOnline();
       return;
     }
     setState(() {
@@ -139,7 +158,7 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
     final info = aiProviders[AppState.I.ai.provider]!;
     final banner = configured == false
         ? Tile(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Row(children: [
                 Icon(Icons.key_off_outlined, color: Palette.warn),
@@ -147,14 +166,19 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
                 Expanded(child: Text(S.aiNessunaChiave)),
               ]),
               const SizedBox(height: 8),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                FilledButton.tonalIcon(onPressed: widget.onOpenSettings, icon: const Icon(Icons.key_outlined, size: 18), label: const Text(S.configura)),
-                if (!wide)
-                  OutlinedButton.icon(
-                    onPressed: () => setState(() => tab = 1),
-                    icon: const Icon(Icons.memory_rounded, size: 18),
-                    label: const Text(S.aiProvaLocale),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(child: FilledButton.icon(onPressed: widget.onOpenSettings, icon: const Icon(Icons.key_outlined, size: 18), label: const FittedBox(fit: BoxFit.scaleDown, child: Text(S.configura, maxLines: 1)))),
+                if (!wide) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => tab = 1),
+                      icon: const Icon(Icons.memory_rounded, size: 18),
+                      label: const FittedBox(fit: BoxFit.scaleDown, child: Text(S.aiProvaLocale, maxLines: 1)),
+                    ),
                   ),
+                ],
               ]),
             ]),
           )
@@ -343,19 +367,23 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
       );
     }
     // phones: two clear tabs, the online theme generator and the local AI
-    final tabs = SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<int>(
-        key: const ValueKey('ai-tabs'),
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(value: 0, icon: Icon(Icons.cloud_outlined), label: Text(S.aiTabOnline)),
-          ButtonSegment(value: 1, icon: Icon(Icons.memory_rounded), label: Text(S.aiTabLocale)),
-        ],
-        selected: {tab},
-        onSelectionChanged: (v) => setState(() => tab = v.first),
+    final tabs = Row(key: const ValueKey('ai-tabs'), children: [
+      // without an API key the tab carries a warning; tapping it explains
+      Expanded(
+        child: ChoicePill(
+          icon: configured == false ? Icons.error_outline_rounded : Icons.cloud_outlined,
+          iconColor: configured == false ? Palette.warn : null,
+          label: S.aiTabOnline,
+          on: tab == 0,
+          onTap: () {
+            setState(() => tab = 0);
+            if (configured == false) _explainOnline();
+          },
+        ),
       ),
-    );
+      const SizedBox(width: 10),
+      Expanded(child: ChoicePill(icon: Icons.memory_rounded, label: S.aiTabLocale, on: tab == 1, onTap: () => setState(() => tab = 1))),
+    ]);
     if (tab == 1) {
       return SafeArea(
         bottom: false,
@@ -375,12 +403,10 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
         LargeHeader(
           S.aiIconTheme,
           subtitle: S.aiSottotitolo,
-          trailing: items.isEmpty ? null : GlassIconButton(onPressed: _import, size: 44, tooltip: S.importaIcona, icon: Icons.add_rounded),
+          actions: [if (items.isNotEmpty) GlassIconButton(onPressed: _import, tooltip: S.importaIcona, icon: Icons.add_rounded, label: S.aggiungi)],
         ),
         tabs,
-        const SizedBox(height: 8),
-        banner,
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (items.isNotEmpty)
           SizedBox(
             height: 64,

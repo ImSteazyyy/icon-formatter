@@ -11,16 +11,22 @@ import 'toasts.dart';
 import 'liquid_glass.dart';
 
 /// Liquid glass panel (Impostazioni › Appearance › Liquid Glass).
+/// Height of every button in the app (pills, tool buttons, bars).
+const double kButtonHeight = 48;
+
 class Glass extends StatelessWidget {
-  const Glass({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius});
+  const Glass({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.radius, this.live = false});
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double? radius;
 
+  /// Floats over other content: blur it (see [LiquidGlass.live]).
+  final bool live;
+
   @override
   Widget build(BuildContext context) =>
-      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, child: child);
+      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, live: live, child: child);
 }
 
 /// Solid anthracite card for cells of long scrolling grids. A glass panel
@@ -159,16 +165,8 @@ class IconImage extends StatelessWidget {
 }
 
 class _VersionedFileImage extends FileImage {
-  _VersionedFileImage(super.file) : stamp = _stamp(file);
+  _VersionedFileImage(super.file) : stamp = ImageStamps.of(file);
   final int stamp;
-
-  static int _stamp(File f) {
-    try {
-      return f.lastModifiedSync().microsecondsSinceEpoch ^ f.lengthSync();
-    } catch (_) {
-      return 0;
-    }
-  }
 
   @override
   bool operator ==(Object other) => other is _VersionedFileImage && other.file.path == file.path && other.stamp == stamp && other.scale == scale;
@@ -495,8 +493,16 @@ class ProgressStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = total == 0 ? 0.0 : done / total;
     final closable = !running && onDismiss != null;
-    final strip = Glass(
+    // the same dark surface as the notices: it floats over moving content,
+    // and live glass there costs a full-screen blur on every frame of a batch
+    final strip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xF2242329),
+        borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
+      ),
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -624,59 +630,29 @@ class ToolButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
+  /// Accent pill like Studio's "Importa icone". Inside a card: half its
+  /// width, two per row (the card's Wrap spaces them 8 apart); in a
+  /// scrolling toolbar (unbounded width): its own width.
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    final enabled = onTap != null;
-    // inside scrolling cards the pill is solid: moving glass re-captures and
-    // blurs its background on every scroll frame
-    final solid = context.dependOnInheritedWidgetOfExactType<SolidSurfaces>() != null;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-      child: solid
-          ? Material(
-              color: Colors.white.withValues(alpha: 0.06),
-              shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
-              child: InkWell(
-                customBorder: const StadiumBorder(),
-                onTap: onTap,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(icon, size: 18, color: enabled ? accent : Palette.text3),
-                    const SizedBox(width: 8),
-                    Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: enabled ? Palette.text : Palette.text3)),
-                  ]),
-                ),
-              ),
-            )
-          : LiquidGlass(
-        radius: 22,
-        chromatic: 0.3,
-        role: GlassRole.button,
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            customBorder: const StadiumBorder(),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(icon, size: 18, color: enabled ? accent : Palette.text3),
-                const SizedBox(width: 8),
-                Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: enabled ? Palette.text : Palette.text3)),
-              ]),
-            ),
-          ),
-        ),
-      ),
+    final button = FilledButton.icon(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14)),
+      icon: Icon(icon, size: 20),
+      // one size for every label; a long one takes two lines in the 48 dp
+      label: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, height: 1.15)),
+    );
+    return LayoutBuilder(
+      builder: (context, box) => box.hasBoundedWidth
+          ? SizedBox(width: ((box.maxWidth - 8) / 2).floorToDouble(), height: kButtonHeight, child: button)
+          : Padding(padding: const EdgeInsets.only(right: 8), child: SizedBox(height: kButtonHeight, child: button)),
     );
   }
 }
 
 /// Round liquid glass icon button.
 class GlassIconButton extends StatelessWidget {
-  const GlassIconButton({super.key, required this.icon, required this.onPressed, this.tooltip, this.size = 48, this.label});
+  const GlassIconButton({super.key, required this.icon, required this.onPressed, this.tooltip, this.size = kButtonHeight, this.label});
 
   final IconData icon;
 
@@ -702,7 +678,7 @@ class GlassIconButton extends StatelessWidget {
               onTap: onPressed,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(icon, color: Colors.white, size: 20),
                   const SizedBox(width: 8),
                   Text(label!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
@@ -760,38 +736,56 @@ class IconChip extends StatelessWidget {
 
 /// Large page title with an optional round glass back button.
 class LargeHeader extends StatelessWidget {
-  const LargeHeader(this.title, {super.key, this.onBack, this.trailing, this.subtitle});
+  const LargeHeader(this.title, {super.key, this.onBack, this.trailing, this.subtitle, this.actions = const []});
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+
+  /// One control shown centred under the title (e.g. "Ripristina").
   final Widget? trailing;
+
+  /// Header buttons: one row under the title, equal width, [kButtonHeight].
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
+    final titleBlock = Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text, height: 1.15)),
+      if (subtitle != null) ...[
+        const SizedBox(height: 4),
+        Text(subtitle!, key: const ValueKey('header-subtitle'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.3)),
+      ],
+    ]);
     return Padding(
-      // no side inset: titles line up with the cards below
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 14),
-      // title and subtitle share one column; the buttons stay on the right,
-      // centred on the title block (the subtitle never runs under them)
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        if (onBack != null) ...[
-          GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: 50, tooltip: S.indietro),
-          const SizedBox(width: 16),
-        ],
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text, height: 1.15)),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(subtitle!, key: const ValueKey('header-subtitle'), style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.3)),
+      // buttons under the title: the same 10 dp gap as between the rows below
+      padding: EdgeInsets.fromLTRB(0, 8, 0, actions.isNotEmpty ? 10 : 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+        // title and subtitle centred; with a back button an equal empty slot
+        // on the right keeps them on the screen's centre line
+        if (onBack != null)
+          Row(children: [
+            GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: kButtonHeight, tooltip: S.indietro),
+            const SizedBox(width: 8),
+            Expanded(child: titleBlock),
+            const SizedBox(width: 8 + kButtonHeight),
+          ])
+        else
+          titleBlock,
+        if (actions.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Row(children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(child: SizedBox(height: kButtonHeight, child: actions[i])),
             ],
           ]),
-        ),
-        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+        ],
+        if (trailing != null) ...[const SizedBox(height: 10), Center(child: trailing!)],
       ]),
     );
   }
@@ -811,8 +805,8 @@ class SettingsCard extends StatelessWidget {
       if (i > 0) rows.add(Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)));
       rows.add(Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: children[i]));
     }
-    // solid card: settings pages scroll, moving glass would re-blur per frame
-    return Tile(
+    // glass card (static glass: no backdrop blur, cheap while scrolling)
+    return Glass(
       padding: padding,
       radius: AppState.I.appearance.radius + 6,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: rows),
@@ -969,7 +963,9 @@ class StepCard extends StatelessWidget {
     final accent = Theme.of(context).colorScheme.primary;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Tile(
+      // glass like the Studio card: static glass skips the backdrop blur, so
+      // it scrolls as cheaply as a solid card
+      child: Glass(
         radius: AppState.I.appearance.radius + 6,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
@@ -995,10 +991,105 @@ class StepCard extends StatelessWidget {
           ]),
           if (children.isNotEmpty) ...[
             const SizedBox(height: 10),
-            SolidSurfaces(child: Wrap(children: children)),
+            Wrap(spacing: 8, runSpacing: 8, children: children),
           ],
         ]),
       ),
     );
   }
+}
+
+/// Stadium on/off choice, [kButtonHeight] high: filters ("App di sistema")
+/// and tabs ("Tema AI online" / "AI locale"). Selected: accent tint and a
+/// check, or the [icon] when it has one.
+class ChoicePill extends StatelessWidget {
+  const ChoicePill({super.key, required this.label, required this.on, required this.onTap, this.icon, this.iconColor, this.iconSize = 18});
+
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  /// Leading icon colour (status dots); accent / grey by default.
+  final Color? iconColor;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final Widget lead = icon != null
+        ? Icon(icon, key: ValueKey(on), size: iconSize, color: iconColor ?? (on ? accent : Palette.text2))
+        : (on ? Icon(Icons.check_rounded, key: const ValueKey(1), size: 18, color: accent) : const SizedBox(key: ValueKey(0), width: 0));
+    return Material(
+      color: on ? accent.withValues(alpha: 0.18) : Colors.transparent,
+      shape: StadiumBorder(side: BorderSide(color: on ? accent.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.14))),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          height: kButtonHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            // centred when stretched, own width inside a Wrap
+            child: Center(
+              widthFactor: 1,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                AnimatedSwitcher(duration: const Duration(milliseconds: 150), child: lead),
+                if (icon != null || on) const SizedBox(width: 6),
+                // shrinks a little instead of cutting the word
+                Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Palette.text : Palette.text2)))),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Search field shaped like the buttons: a [kButtonHeight] pill.
+InputDecoration pillSearchDecoration(BuildContext context, String hint) {
+  OutlineInputBorder b(Color c) => OutlineInputBorder(borderRadius: BorderRadius.circular(kButtonHeight / 2), borderSide: BorderSide(color: c));
+  return InputDecoration(
+    prefixIcon: const Icon(Icons.search),
+    hintText: hint,
+    isDense: false,
+    constraints: const BoxConstraints(minHeight: kButtonHeight, maxHeight: kButtonHeight),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+    fillColor: Colors.white.withValues(alpha: 0.05),
+    border: b(Colors.white.withValues(alpha: 0.14)),
+    enabledBorder: b(Colors.white.withValues(alpha: 0.14)),
+    focusedBorder: b(Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+  );
+}
+
+/// Version of each image file shown by [IconImage], so a file rewritten in
+/// place never shows stale cached pixels.
+///
+/// Normally read from the file (modification time and length). While a batch
+/// is writing ([busy] > 0) the disk is not touched from build methods: a
+/// file stat on the UI thread competing with four workers writing PNGs
+/// stalled frames for 200 ms on the Phone (2a) Plus. The batch reports every
+/// file it rewrites through [bump] instead.
+class ImageStamps {
+  static final Map<String, int> _memo = {};
+  static int busy = 0;
+
+  static int of(File f) {
+    final p = f.path;
+    if (busy > 0) {
+      final m = _memo[p];
+      if (m != null) return m;
+    }
+    int s;
+    try {
+      s = f.lastModifiedSync().microsecondsSinceEpoch ^ f.lengthSync();
+    } catch (_) {
+      s = 0;
+    }
+    return _memo[p] = s;
+  }
+
+  /// [path] was just (re)written.
+  static void bump(String path) => _memo[path] = DateTime.now().microsecondsSinceEpoch;
 }
