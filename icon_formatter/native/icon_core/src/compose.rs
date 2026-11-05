@@ -160,7 +160,7 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
     for y in rim..h.saturating_sub(rim) {
         for x in rim..w.saturating_sub(rim) {
             let i = (y * w + x) as usize;
-            if dist(&lab[i], bg) < 0.025 {
+            if dist(&lab[i], bg) < 0.05 {
                 bgm[i] = true;
                 queue.push_back(i);
             }
@@ -193,6 +193,12 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
     let key: Vec<f32> = (0..n)
         .map(|i| if !fg[i] { 0.0 } else if labels[i] > 0 && sizes[labels[i] as usize] < min_size { 0.0 } else { 1.0 })
         .collect();
+    // background in sRGB (for edge un-mixing): OKLab L of a neutral -> sRGB
+    let bg_rgb = {
+        let lin = bg.0.powi(3);
+        let v = if lin <= 0.003_130_8 { lin * 12.92 } else { 1.055 * lin.powf(1.0 / 2.4) - 0.055 };
+        v * 255.0
+    };
     let sigma = (w.min(h) as f32 * 0.004).max(1.0);
     let key = crate::lucent::gaussian_blur(&key, w as usize, h as usize, sigma);
     let mut out = RgbaImage::new(w, h);
@@ -207,6 +213,13 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
             let a = (base_a * k * 255.0).round() as u8;
             if a > 127 {
                 kept += 1;
+            }
+            if k > 0.02 && k < 0.98 {
+                // edge pixel mixed with the old dark tile: un-mix it from the
+                // background colour so the edge is not "burnt"
+                let un = |v: u8| ((v as f32 - bg_rgb * (1.0 - k)) / k).clamp(0.0, 255.0) as u8;
+                out.put_pixel(x, y, Rgba([un(p[0]), un(p[1]), un(p[2]), a]));
+                continue;
             }
             out.put_pixel(x, y, Rgba([p[0], p[1], p[2], a]));
         }

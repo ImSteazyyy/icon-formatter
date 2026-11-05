@@ -6,6 +6,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../screens/ai_screen.dart';
 import '../screens/bases_screen.dart';
 import '../screens/installed_apps_screen.dart';
+import '../screens/pack_builder_screen.dart';
 import '../screens/pack_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/studio_screen.dart';
@@ -32,7 +33,8 @@ class _Dest {
 List<_Dest> get _dests => [
       const _Dest('studio', S.studio, Icons.auto_awesome_mosaic_outlined),
       const _Dest('ai', S.aiTheme, Icons.auto_awesome_outlined, 'AI'),
-      const _Dest('pack', S.packCleanup, Icons.cleaning_services_outlined, S.pack),
+      const _Dest('builder', S.pbTitolo, Icons.dashboard_customize_outlined, S.pack),
+      if (!Platform.isAndroid) const _Dest('pack', S.packCleanup, Icons.cleaning_services_outlined),
       if (Platform.isAndroid) const _Dest('apps', S.app, Icons.apps_rounded),
       if (!Platform.isAndroid) const _Dest('bases', S.baseIcons, Icons.crop_square_rounded),
       const _Dest('settings', S.impostazioni, Icons.settings_outlined, S.opzioni),
@@ -62,6 +64,7 @@ class _ShellState extends State<Shell> {
           'studio' => StudioScreen(onOpenBases: _openBases),
           'ai' => AiScreen(onOpenSettings: () => _openSettings(SettingsCat.ai)),
           'pack' => PackScreen(onOpenBases: _openBases),
+          'builder' => const PackBuilderScreen(),
           'apps' => InstalledAppsScreen(onOpenBases: _openBases),
           'bases' => const BasesScreen(),
           _ => SettingsScreen(key: _settingsKey),

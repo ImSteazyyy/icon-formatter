@@ -519,19 +519,6 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         let light = opaque.iter().filter(|q| q[0].min(q[1]).min(q[2]) > 150).count();
         !opaque.is_empty() && light as f32 > 0.5 * opaque.len() as f32
     };
-    if p.lift_greys && !dark_plate && !p.monochrome && mostly_light {
-        // light plate: light neutral greys (a white glyph) are scaled down so
-        // they stay readable on the light frosted plate; ratios are kept
-        for px in layer.pixels_mut() {
-            let mx = px[0].max(px[1]).max(px[2]);
-            let mn = px[0].min(px[1]).min(px[2]);
-            if mx - mn < 24 && mx > 90 {
-                let w = ((mx as f32 - 90.0) / 60.0).clamp(0.0, 1.0);
-                let k = 1.0 - 0.42 * w;
-                *px = Rgba([(px[0] as f32 * k) as u8, (px[1] as f32 * k) as u8, (px[2] as f32 * k) as u8, px[3]]);
-            }
-        }
-    }
     if p.monochrome && glyph.width() > 0 && glyph.height() > 0 {
         let (mut mask, complex) = monochrome_mask(glyph);
         let ink_dark = 0.2126 * p.ink[0] as f32 + 0.7152 * p.ink[1] as f32 + 0.0722 * p.ink[2] as f32 <= 128.0;
@@ -588,6 +575,23 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     let ox = (cx - tw as f32 / 2.0).round() as i64;
     let oy = (cy - th as f32 / 2.0).round() as i64;
 
+    // light plate + mostly light glyph: soft dark shadow under the glyph so a
+    // white figure stays readable (the glyph keeps its own colours)
+    let glyph_shadow: Option<Vec<f32>> = if p.lift_greys && !dark_plate && !p.monochrome && mostly_light {
+        let mut a = vec![0.0f32; n * n];
+        for y in 0..th {
+            for x in 0..tw {
+                let (gx, gy) = (ox + x as i64, oy + y as i64 + (size as f32 * 0.012) as i64);
+                if gx >= 0 && gy >= 0 && (gx as u32) < size && (gy as u32) < size {
+                    a[(gy as u32 * size + gx as u32) as usize] = scaled.get_pixel(x, y)[3] as f32 / 255.0;
+                }
+            }
+        }
+        Some(gaussian_blur(&a, n, n, size as f32 * 0.022))
+    } else {
+        None
+    };
+
     // ---- composite: plate (backdrop tint) then glyph clipped to the plate
     let bd = p.backdrop;
     let mut out = RgbaImage::new(size, size);
@@ -620,6 +624,13 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
                 g = ra + g * (1.0 - ra);
                 b = ra + b * (1.0 - ra);
                 a = ra + a * (1.0 - ra);
+            }
+            if let Some(sh) = &glyph_shadow {
+                let sa = (sh[i] * 0.45).min(1.0) * m;
+                r *= 1.0 - sa;
+                g *= 1.0 - sa;
+                b *= 1.0 - sa;
+                a = sa + a * (1.0 - sa);
             }
             let gx = x as i64 - ox;
             let gy = y as i64 - oy;

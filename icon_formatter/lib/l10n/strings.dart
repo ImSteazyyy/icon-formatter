@@ -421,4 +421,41 @@ class S {
   static const aiCorrezioneInfo = 'Sotto la soglia bassa il pixel diventa trasparente, sopra quella alta resta pieno; in mezzo la transizione è graduale.';
   static const aiAnteprimaMascheraSelezionata = "Maschera AI dell'icona selezionata";
   static const zipOApk = 'ZIP o APK';
+
+  // Icon Pack Builder
+  static const pbTitolo = 'Icon Pack Builder';
+  static const pbSottotitolo = "Carica le icone originali (app installate, cartella, ZIP o APK) e quelle generate: l'abbinamento usa nome dell'app, package, nome file e somiglianza visiva. Correggi quelle dubbie, poi esporta il pack.";
+  static const pbAppInstallate = 'App installate';
+  static const pbOriginali = 'Originali';
+  static const pbGeneraDaStudio = 'Genera con lo Studio';
+  static const pbImportaGenerate = 'Importa generate';
+  static const pbAbbina = 'Abbina';
+  static const pbLetturaApp = 'Lettura delle app installate…';
+  static const pbLettura = 'Lettura…';
+  static String pbOriginaliCaricati(Object? n) => '$n icone originali';
+  static String pbGenerateCaricate(Object? n) => '$n icone generate';
+  static String pbGenerazione(Object? a, Object? b) => 'Generazione $a/$b';
+  static const pbAbbinamento = 'Abbinamento in corso…';
+  static String pbRisultatoAbbinamento(Object? a, Object? b) => '$a su $b abbinate con sicurezza';
+  static const pbRielaborata = 'Rielaborata dallo Studio';
+  static const pbCorrezioneSalvata = 'Correzione salvata';
+  static const pbAssegnataManualmente = 'Assegnata manualmente';
+  static String pbEsportate(Object? n) => '$n icone nel pack';
+  static const pbEsportaZip = 'Esporta ZIP';
+  static const pbNienteDaEsportare = 'Nessuna icona abbinata da esportare';
+  static const pbSicura = 'Sicura';
+  static const pbVerificata = 'Verificata';
+  static const pbDubbia = 'Dubbia';
+  static const pbMancante = 'Mancante';
+  static const pbEsclusa = 'Esclusa';
+  static String pbTutte(Object? n) => 'Tutte $n';
+  static const pbVuoto = 'Aggiungi le icone originali per iniziare.';
+  static const pbPremiAbbina = 'Genera le icone con lo Studio o importale, poi premi Abbina.';
+  static const pbScegliIcona = 'Scegli icona';
+  static const pbSostituisci = 'Sostituisci con file';
+  static const pbRielabora = 'Rielabora';
+  static const pbSegnaVerificata = 'Segna come verificata';
+  static const pbEscludi = 'Escludi';
+  static const pbIncludi = 'Includi';
+  static const pbCercaGenerate = 'Cerca tra le icone generate';
 }

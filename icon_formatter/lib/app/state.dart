@@ -55,6 +55,9 @@ class AppState extends ChangeNotifier {
   // Android: packages processed into the current pack
   Set<String> processedPackages = {};
 
+  /// Icon Pack Builder: manual corrections by original key (package or file).
+  Map<String, Map<String, dynamic>> packCorrections = {};
+
   bool _loaded = false;
 
   Future<void> load() async {
@@ -113,6 +116,7 @@ class AppState extends ChangeNotifier {
     packMode = StudioMode.values.firstWhere((m) => m.name == j['packMode'], orElse: () => packMode);
     packPresetId = j['packPresetId'] as String? ?? packPresetId;
     processedPackages = ((j['processedPackages'] as List?) ?? []).cast<String>().toSet();
+    packCorrections = ((j['packCorrections'] as Map?) ?? {}).map((k, v) => MapEntry(k as String, (v as Map).cast<String, dynamic>()));
   }
 
   Map<String, dynamic> toJson() => {
@@ -139,6 +143,7 @@ class AppState extends ChangeNotifier {
         'packMode': packMode.name,
         'packPresetId': packPresetId,
         'processedPackages': processedPackages.toList(),
+        'packCorrections': packCorrections,
       };
 
   Future<void>? _pending;
