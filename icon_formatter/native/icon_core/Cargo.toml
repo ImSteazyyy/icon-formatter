@@ -3,7 +3,7 @@ name = "icon_core"
 version = "1.1.0"
 edition = "2021"
 description = "Icon Formatter shared image-processing core (segmentation, composition, calibration, batch, pack cleanup)"
-license = "MIT"
+license = "AGPL-3.0-only"
 
 [lib]
 path = "src/lib.rs"
