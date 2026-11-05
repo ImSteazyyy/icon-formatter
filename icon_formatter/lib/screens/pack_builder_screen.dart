@@ -9,6 +9,7 @@ import '../app/state.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
+import '../services/apk_pack_service.dart';
 import '../services/export_service.dart';
 import '../services/import_service.dart';
 import '../services/platform_service.dart';
@@ -103,6 +104,23 @@ class PackBuilderController extends ChangeNotifier {
     }
   }
 
+  /// Installed apps limited to [components] ("package/activity"), e.g. the
+  /// ones reported by the automatic change check.
+  Future<void> addInstalledComponents(Set<String> components) async {
+    _set(S.pbLetturaApp, running: true);
+    try {
+      final apps = (await PlatformService.listApps(includeSystem: true)).where((a) => components.contains(a.key)).toList();
+      final icons = await PlatformService.getIcons(apps, size: 432, glyphOnly: false);
+      for (var i = 0; i < apps.length; i++) {
+        final a = apps[i];
+        if (icons[i] == null || originals.any((o) => o.package == a.package && o.activity == a.activity)) continue;
+        originals.add(PbIcon(id: 'o${originals.length}', label: a.label, package: a.package, activity: a.activity, bytes: icons[i]));
+      }
+    } finally {
+      _set(S.pbOriginaliCaricati(originals.length), running: false);
+    }
+  }
+
   /// Folder, ZIP or APK. Uses appfilter.xml (text or binary) when present to
   /// recover package and activity of each drawable.
   Future<List<PbIcon>> _readSource(String input, String prefix) async {
@@ -168,12 +186,15 @@ class PackBuilderController extends ChangeNotifier {
         if (r.ok && r.output != null) {
           final gid = 'gen:${o.id}';
           generated.removeWhere((g) => g.id == gid);
-          generated.add(PbIcon(id: gid, label: o.label, package: o.package, activity: o.activity, file: p.basename(r.output!), path: r.output));
+          // same name/package as the original: the association is exact
+          generated.add(PbIcon(id: gid, label: o.label, package: o.package, activity: o.activity, file: o.file.isNotEmpty ? o.file : p.basename(r.output!), path: r.output));
           final row = rows.where((x) => x.original.id == o.id).firstOrNull;
           if (row != null) {
             row.generatedId = gid;
             row.auto = MatchState.confident;
+            row.manual = false;
             row.reason = S.pbRielaborata;
+            _save(row);
           }
         }
         _set(S.pbGenerazione(done, ev.total), prog: ev.total == 0 ? null : done / ev.total);
@@ -263,6 +284,42 @@ class PackBuilderController extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------ export
+
+  /// Builds the pack folder (drawables, appfilter.xml, mapping.json).
+  Future<String?> _buildPackDir(String name) async {
+    final ok = rows.where((r) => !r.excluded && r.generatedId != null).toList();
+    if (ok.isEmpty) return null;
+    final dir = await AppPaths.I.workDir('iconpack');
+    final apps = [
+      for (final r in ok)
+        IconPackApp(
+          label: r.original.title,
+          package: r.original.package,
+          activity: r.original.activity,
+          png: generatedById(r.generatedId)!.path ?? await _materialize(generatedById(r.generatedId)!),
+        ),
+    ];
+    final res = await buildIconPack(apps: apps, outDir: dir, packName: name, zipPath: null);
+    return res.outDir;
+  }
+
+  /// Windows: installable icon pack APK with its own icon browser.
+  Future<ExportResult?> exportApk(String name) async {
+    _set(S.apkCompilazione, running: true);
+    try {
+      final dir = await _buildPackDir(name);
+      if (dir == null) return null;
+      final apk = await ApkPackService.build(packDir: dir, name: name, log: (l) => _set(l, running: true));
+      _set(S.apkPronto, running: false);
+      return await ExportService.saveApk(apk, '${sanitizeDrawableName(name: name)}.apk');
+    } catch (e) {
+      _set(S.errore(e), running: false);
+      rethrow;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
 
   Future<ExportResult?> export({required bool zip}) async {
     final ok = rows.where((r) => !r.excluded && r.generatedId != null).toList();
@@ -371,6 +428,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
             ]),
             const SizedBox(height: 4),
             Text(S.pbSottotitolo, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+            if (Platform.isAndroid) AutoSyncCard(builder: c),
             const SizedBox(height: 10),
             Wrap(children: [
               if (Platform.isAndroid) ToolButton(icon: Icons.apps_rounded, label: S.pbAppInstallate, onTap: c.busy ? null : () => _run(c.addInstalledApps)),
@@ -422,6 +480,23 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
               Wrap(alignment: WrapAlignment.end, children: [
                 ToolButton(icon: Icons.drive_folder_upload_outlined, label: S.esportaCartella, onTap: c.busy ? null : () => _export(false)),
                 ToolButton(icon: Icons.folder_zip_outlined, label: S.pbEsportaZip, onTap: c.busy ? null : () => _export(true)),
+                if (ApkPackService.available)
+                  ToolButton(
+                    icon: Icons.android_rounded,
+                    label: S.apkCrea,
+                    onTap: c.busy
+                        ? null
+                        : () async {
+                            final name = await askText(context, S.apkNome, initial: 'Icon Formatter Pack');
+                            if (name == null || name.trim().isEmpty) return;
+                            try {
+                              final r = await c.exportApk(name.trim());
+                              if (mounted && r != null) showMsg(context, '${r.message} · ${r.location}');
+                            } catch (e) {
+                              if (mounted) showMsg(context, S.errore(e), error: true);
+                            }
+                          },
+                  ),
               ]),
           ]),
         );
@@ -559,5 +634,113 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
       },
     );
     if (picked != null) c.assign(r, picked);
+  }
+}
+
+
+/// Android: automatic change detection and launcher refresh helpers.
+class AutoSyncCard extends StatefulWidget {
+  const AutoSyncCard({super.key, required this.builder});
+  final PackBuilderController builder;
+
+  @override
+  State<AutoSyncCard> createState() => _AutoSyncCardState();
+}
+
+class _AutoSyncCardState extends State<AutoSyncCard> {
+  Map<String, dynamic> st = {};
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(PlatformService.autoSyncStatus);
+  }
+
+  Future<void> _load(Future<Map<String, dynamic>> Function() f) async {
+    setState(() => busy = true);
+    try {
+      final r = await f();
+      if (mounted) setState(() => st = r);
+    } catch (e) {
+      if (mounted) showMsg(context, S.errore(e), error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pending = ((st['pending'] as List?) ?? []).cast<Map>();
+    final last = (st['lastCheck'] as num?)?.toInt() ?? 0;
+    return Glass(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SwitchListTile(
+          key: const ValueKey('autosync-switch'),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: const Text(S.asTitolo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            last == 0 ? S.asMai : S.asUltimo(DateTime.fromMillisecondsSinceEpoch(last).toLocal().toString().substring(0, 16)),
+            style: const TextStyle(fontSize: 11),
+          ),
+          value: st['enabled'] == true,
+          onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v)),
+        ),
+        const Text(S.asInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 6, children: [
+          OutlinedButton.icon(
+            key: const ValueKey('autosync-check'),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text(S.asControllaOra),
+            onPressed: busy ? null : () => _load(PlatformService.autoSyncCheckNow),
+          ),
+          if (pending.isNotEmpty)
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
+              label: Text(S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length)),
+              onPressed: busy || widget.builder.busy
+                  ? null
+                  : () async {
+                      final comps = pending.where((m) => m['change'] != 'disinstallata').map((m) => m['component'] as String).toSet();
+                      await widget.builder.addInstalledComponents(comps);
+                      await widget.builder.generateFromOriginals();
+                      await PlatformService.autoSyncClear(pending.map((m) => m['component'] as String).toList());
+                      await _load(PlatformService.autoSyncStatus);
+                    },
+            ),
+          TextButton.icon(
+            icon: const Icon(Icons.home_outlined, size: 18),
+            label: const Text(S.asApplicaLauncher),
+            onPressed: () async {
+              await showDialog<void>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text(S.asApplicaLauncher),
+                  content: const Text(S.asLimiteLauncher),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.chiudi)),
+                    FilledButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        PlatformService.openHomeSettings();
+                      },
+                      child: const Text(S.asApriImpostazioniLauncher),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ]),
+        if (pending.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: const TextStyle(fontSize: 12, color: Palette.text2)),
+          if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: const TextStyle(fontSize: 11, color: Palette.text3)),
+        ],
+      ]),
+    );
   }
 }

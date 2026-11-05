@@ -458,4 +458,26 @@ class S {
   static const pbEscludi = 'Escludi';
   static const pbIncludi = 'Includi';
   static const pbCercaGenerate = 'Cerca tra le icone generate';
+
+  // Automazione Android
+  static const asTitolo = 'Aggiornamento automatico del pack';
+  static const asMai = 'Nessun controllo eseguito';
+  static String asUltimo(Object? t) => 'Ultimo controllo: $t';
+  static const asInfo = "Controllo leggero allo sblocco (finché l'app è in memoria) e ogni 6 ore con JobScheduler: niente root, niente servizi sempre attivi. Se nessuna app è cambiata non viene fatto alcun lavoro. Le modifiche arrivano con una notifica silenziosa.";
+  static const asControllaOra = 'Controlla ora';
+  static String asRielabora(Object? n) => 'Rielabora $n app';
+  static String asAltre(Object? n) => '…e altre $n';
+  static const asApplicaLauncher = 'Applica nel launcher';
+  static const asApriImpostazioniLauncher = 'Apri impostazioni Home';
+  static const asLimiteLauncher = "Android non permette a un'app di sostituire le icone di altre app né di ricaricare il pack del launcher senza root. Nothing IconGen ci riesce scrivendo l'impostazione di sistema nothing_icon_pack, cosa possibile solo con targetSdk 22 e permessi concessi via ADB (WRITE_SETTINGS / WRITE_SECURE_SETTINGS), e ricostruendo e installando sul telefono un APK del pack. Icon Formatter usa un targetSdk moderno, quindi qui il refresh silenzioso non è disponibile: esporta il pack (cartella o ZIP con appfilter.xml), compilalo in un APK di icon pack e selezionalo dalle impostazioni del launcher.";
+
+  // APK del pack
+  static const apkCrea = 'Crea APK';
+  static const apkNome = 'Nome del pack';
+  static const apkCompilazione = "Compilazione dell'APK del pack (Gradle)…";
+  static const apkPronto = 'APK del pack pronto';
+  static const apkSalva = "Salva l'APK del pack";
+  static const apkSalvato = 'APK salvato';
+  static const apkSdkMancante = 'Android SDK non trovato (ANDROID_HOME).';
+  static String apkFallita(Object? e) => 'Compilazione non riuscita: $e';
 }

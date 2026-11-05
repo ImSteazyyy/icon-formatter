@@ -1,7 +1,7 @@
 name: icon_formatter
 description: "Icon Formatter: icon composition, Nothing Translucent styling, AI theming, pack cleanup and Android icon packs."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.13.7
@@ -38,3 +38,4 @@ flutter:
   assets:
     - assets/bases/
     - assets/branding/
+    - assets/iconpack_template.zip

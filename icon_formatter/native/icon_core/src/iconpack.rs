@@ -83,7 +83,10 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
             notes.push(format!("{}: processed icon missing, skipped", e.package));
             continue;
         }
-        let mut name = sanitize_drawable(&e.package);
+        // drawable named after the package, or after the app/file name when
+        // the package is unknown (folder/ZIP sources without appfilter.xml)
+        let key = if e.package.is_empty() { e.label.as_str() } else { e.package.as_str() };
+        let mut name = sanitize_drawable(key);
         let base = name.clone();
         let mut k = 2;
         while !used.insert(name.clone()) {
@@ -91,8 +94,11 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
             k += 1;
         }
         fs::copy(&e.png, out_dir.join(format!("res/drawable-nodpi/{name}.png")))?;
-        fs::copy(&e.png, out_dir.join(format!("icons/{} ({}).png", file_safe(&e.label), file_safe(&e.package))))?;
-        if e.activity.is_empty() {
+        let human = if e.package.is_empty() { format!("icons/{}.png", file_safe(&e.label)) } else { format!("icons/{} ({}).png", file_safe(&e.label), file_safe(&e.package)) };
+        fs::copy(&e.png, out_dir.join(human))?;
+        if e.package.is_empty() {
+            notes.push(format!("{}: package sconosciuto, PNG incluso senza voce in appfilter.xml", e.label));
+        } else if e.activity.is_empty() {
             appfilter.push_str(&format!(
                 "    <item component=\"ComponentInfo{{{}}}\" drawable=\"{}\" />\n",
                 xml_escape(&e.package),

@@ -102,6 +102,22 @@ class ExportService {
     return ExportResult(S.pngSalvato, location: target);
   }
 
+  /// Windows: save a built APK through the native save dialog.
+  static Future<ExportResult?> saveApk(String apk, String fileName) async {
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: S.apkSalva,
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: ['apk'],
+      initialDirectory: AppState.I.export.destination,
+    );
+    if (path == null) return null;
+    final target = path.toLowerCase().endsWith('.apk') ? path : '$path.apk';
+    await File(apk).copy(target);
+    AppState.I.update(() => AppState.I.export.destination = p.dirname(target));
+    return ExportResult(S.apkSalvato, location: target);
+  }
+
   /// Android Share Sheet (also works on Windows where supported).
   static Future<void> share(List<String> files, {String? text}) async {
     await SharePlus.instance.share(ShareParams(files: files.map((f) => XFile(f)).toList(), text: text));

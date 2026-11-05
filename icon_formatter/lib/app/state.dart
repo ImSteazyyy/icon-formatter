@@ -91,6 +91,8 @@ class AppState extends ChangeNotifier {
     ai.load((j['ai'] as Map?)?.cast() ?? {});
     glass.load((j['glass'] as Map?)?.cast() ?? {});
     lucent.load((j['lucent'] as Map?)?.cast() ?? {});
+    // v3: the Lucent plate is the reference squircle (the clipping edge)
+    if ((j['version'] as num? ?? 1) < 3) lucent.shape = LucentShape.squircle;
     localAi.load((j['localAi'] as Map?)?.cast() ?? {});
     final ps = (j['presets'] as List?)?.map((e) => StylePreset.fromJson((e as Map).cast(), defaultTranslucent)).toList();
     if (ps != null && ps.isNotEmpty) {
@@ -120,7 +122,7 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, dynamic> toJson() => {
-        'version': 2,
+        'version': 3,
         'appearance': appearance.toJson(),
         'export': export.toJson(),
         'ai': ai.toJson(),

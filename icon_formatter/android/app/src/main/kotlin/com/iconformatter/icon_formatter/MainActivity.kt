@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AutoSync.registerUnlock(applicationContext)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
             when (call.method) {
                 "listApps" -> background(result) { listApps(call.argument<Boolean>("includeSystem") ?: true) }
@@ -42,9 +43,36 @@ class MainActivity : FlutterActivity() {
                 "copyTreeToDir" -> background(result) {
                     copyTreeToDir(call.argument<String>("treeUri")!!, call.argument<String>("destDir")!!)
                 }
+                "autoSyncStatus" -> background(result) { AutoSync.status(applicationContext) }
+                "autoSyncSetEnabled" -> {
+                    val on = call.argument<Boolean>("enabled") ?: false
+                    if (on && Build.VERSION.SDK_INT >= 33 &&
+                        checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 4712)
+                    }
+                    background(result) { AutoSync.setEnabled(applicationContext, on); AutoSync.status(applicationContext) }
+                }
+                "autoSyncCheckNow" -> background(result) { AutoSync.check(applicationContext, notify = false); AutoSync.status(applicationContext) }
+                "autoSyncClear" -> background(result) { AutoSync.clearPending(applicationContext, call.argument<List<String>>("components")); true }
+                "takeLaunchAction" -> {
+                    val open = intent?.getBooleanExtra("openBuilder", false) ?: false
+                    intent?.removeExtra("openBuilder")
+                    result.success(if (open) "builder" else null)
+                }
+                "openHomeSettings" -> {
+                    // launcher settings (icon pack choice lives there on most launchers)
+                    val i = Intent(android.provider.Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    result.success(try { startActivity(i); true } catch (e: Exception) { false })
+                }
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 
     private fun background(result: MethodChannel.Result, work: () -> Any?) {

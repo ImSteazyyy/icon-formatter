@@ -7,6 +7,7 @@ import '../screens/ai_screen.dart';
 import '../screens/bases_screen.dart';
 import '../screens/installed_apps_screen.dart';
 import '../screens/pack_builder_screen.dart';
+import '../services/platform_service.dart';
 import '../screens/pack_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/studio_screen.dart';
@@ -58,6 +59,13 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
+    if (Platform.isAndroid) {
+      // opened from the "icon pack da aggiornare" notification
+      PlatformService.takeLaunchAction().then((a) {
+        final i = dests.indexWhere((d) => d.id == a);
+        if (a != null && i >= 0 && mounted) setState(() => index = i);
+      });
+    }
     pages = [
       for (final d in dests)
         switch (d.id) {
@@ -123,11 +131,12 @@ class _ShellState extends State<Shell> {
                 onTabSelected: (i) => setState(() => index = i),
                 settings: appGlassSettings(chromatic: 0.6),
                 quality: appGlassQuality,
-                indicatorColor: Colors.black.withValues(alpha: 0.35),
-                selectedIconColor: Colors.white,
-                selectedLabelColor: Colors.white,
-                unselectedIconColor: Color.lerp(const Color(0xFFF2EBDD), accent, 0.18),
-                unselectedLabelColor: Color.lerp(const Color(0xFFF2EBDD), accent, 0.18),
+                // dark grey lens tinted with a desaturated pink-lilac accent
+                indicatorColor: Color.lerp(const Color(0xFF26252B), HSLColor.fromColor(accent).withSaturation(0.28).toColor(), 0.42)!.withValues(alpha: 0.62),
+                selectedIconColor: Color.lerp(Colors.white, accent, 0.22),
+                selectedLabelColor: Color.lerp(Colors.white, accent, 0.22),
+                unselectedIconColor: const Color(0xFFBDBAC4),
+                unselectedLabelColor: const Color(0xFFBDBAC4),
                 labelFontSize: 11,
                 selectedLabelStyle: TextStyle(fontWeight: FontWeight.w700, shadows: glassTextShadows()),
                 unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, shadows: glassTextShadows()),

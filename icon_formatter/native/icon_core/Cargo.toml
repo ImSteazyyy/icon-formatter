@@ -1,6 +1,6 @@
 [package]
 name = "icon_core"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "Icon Formatter shared image-processing core (segmentation, composition, calibration, batch, pack cleanup)"
 license = "MIT"
