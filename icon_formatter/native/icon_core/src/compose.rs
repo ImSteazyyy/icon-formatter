@@ -208,7 +208,9 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
         for x in rim..w.saturating_sub(rim) {
             let i = (y * w + x) as usize;
             let p = glyph.get_pixel(x, y);
-            let t = ((key[i] - 0.35) / 0.3).clamp(0.0, 1.0);
+            // edge moved slightly inwards: drops the dark fringe objects had
+            // against the old tile
+            let t = ((key[i] - 0.55) / 0.3).clamp(0.0, 1.0);
             let k = t * t * (3.0 - 2.0 * t);
             let base_a = (p[3] as f32 / level).min(1.0);
             let a = (base_a * k * 255.0).round() as u8;
