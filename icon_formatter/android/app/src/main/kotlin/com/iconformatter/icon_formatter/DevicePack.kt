@@ -196,16 +196,62 @@ object DevicePack {
         }
     }
 
-    /** Next pack version: installed versionCode + 1 (1.0, 1.1, 1.2, ...). */
+    /**
+     * Next pack version: the highest known versionCode + 1 (1.0, 1.1, ...).
+     * "Known" includes a pack opened from another phone or replaced after a
+     * signature change, so the numbering continues across devices.
+     */
     fun nextVersion(context: Context): Pair<Int, String> {
-        val installed = try {
-            @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(PACKAGE, 0).versionCode
-        } catch (_: PackageManager.NameNotFoundException) {
-            0
-        }
-        val code = maxOf(1, installed + 1)
+        val installed = installedVersionCode(context) ?: 0
+        val known = prefs(context).getInt("minVersion", 0)
+        val code = maxOf(1, maxOf(installed, known) + 1)
         return code to versionName(code)
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences("device_pack", Context.MODE_PRIVATE)
+
+    fun installedVersionCode(context: Context): Int? = try {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(PACKAGE, 0).versionCode
+    } catch (_: PackageManager.NameNotFoundException) {
+        null
+    }
+
+    /** Remembers a version seen elsewhere (next builds continue after it). */
+    fun rememberVersion(context: Context, code: Int) {
+        val p = prefs(context)
+        if (code > p.getInt("minVersion", 0)) p.edit().putInt("minVersion", code).apply()
+    }
+
+    /** APK of the installed pack (readable by apps), or null. */
+    fun installedSource(context: Context): String? = try {
+        context.packageManager.getApplicationInfo(PACKAGE, 0).sourceDir
+    } catch (_: PackageManager.NameNotFoundException) {
+        null
+    }
+
+    /**
+     * Package and versionCode of a pack APK file; a pack of this app (same
+     * package) makes the next build continue its numbering.
+     */
+    fun archiveInfo(context: Context, path: String): Map<String, Any?> {
+        @Suppress("DEPRECATION")
+        val pi = context.packageManager.getPackageArchiveInfo(path, 0)
+        @Suppress("DEPRECATION")
+        val code = pi?.versionCode ?: 0
+        if (pi?.packageName == PACKAGE) rememberVersion(context, code)
+        return mapOf("package" to pi?.packageName, "version" to pi?.versionName, "code" to code)
+    }
+
+    /**
+     * Removes the installed pack (Shizuku). Used only after the user agreed,
+     * when it was signed on another phone and cannot be updated in place;
+     * its version is remembered so the numbering goes on.
+     */
+    fun uninstallShizuku(context: Context) {
+        installedVersionCode(context)?.let { rememberVersion(context, it) }
+        val (code, out) = shell("pm uninstall $PACKAGE")
+        check(code == 0 && out.contains("Success")) { "pm uninstall: $out" }
     }
 
     fun versionName(code: Int): String = "${1 + (code - 1) / 10}.${(code - 1) % 10}"
@@ -451,6 +497,11 @@ object DevicePack {
     fun installShizuku(context: Context, apk: File): String {
         val before = installedVersion(context)
         val (code, out) = apk.inputStream().use { shell("pm install -r -S ${apk.length()}", it) }
+        // installed pack signed with another phone's key: Android refuses the
+        // update; the app asks the user before replacing it
+        if (out.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE") || out.contains("signatures do not match")) {
+            throw IllegalStateException("SIGNATURE_MISMATCH")
+        }
         check(code == 0 && out.contains("Success")) { "pm install: $out" }
         val after = installedVersion(context)
         check(after != null && after != before) { "Il pacchetto non risulta aggiornato dopo l'installazione" }

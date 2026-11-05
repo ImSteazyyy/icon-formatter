@@ -222,3 +222,9 @@ mod tests {
         assert!(r.iter().all(|r| !r.ok));
     }
 }
+
+/// Sizes the shared worker pool (matching, batches with `threads == 0`).
+/// Must run before the first parallel job; later calls return false.
+pub fn set_global_threads(n: usize) -> bool {
+    n > 0 && rayon::ThreadPoolBuilder::new().num_threads(n).build_global().is_ok()
+}

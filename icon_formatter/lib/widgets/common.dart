@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
+import 'toasts.dart';
 import 'liquid_glass.dart';
 
 /// Liquid glass panel (Impostazioni › Appearance › Liquid Glass).
@@ -20,6 +21,29 @@ class Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, child: child);
+}
+
+/// Solid anthracite card for cells of long scrolling grids. A glass panel
+/// re-samples (and blurs) what is behind it whenever it moves, so dozens of
+/// glass cells make every scroll frame expensive; this surface costs nothing.
+class Tile extends StatelessWidget {
+  const Tile({super.key, required this.child, this.padding = const EdgeInsets.all(8), this.radius});
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double? radius;
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1B20),
+            borderRadius: BorderRadius.circular(radius ?? AppState.I.appearance.radius),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      );
 }
 
 /// Soft ambient background so the glass panels have something to frost.
@@ -121,11 +145,36 @@ class IconImage extends StatelessWidget {
       final cache = side.isFinite && side > 0 ? (side * dpr).ceil().clamp(32, 2048) : null;
       final Widget img = bytes != null
           ? Image.memory(bytes!, fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache)
-          : Image.file(File(path!), fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache,
+          : Image(
+              // keyed by path + modification time: a file rewritten in place
+              // (re-processing, Rielabora) never shows the old cached pixels
+              image: ResizeImage.resizeIfNeeded(cache, null, _VersionedFileImage(File(path!))),
+              fit: fit,
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
               errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Palette.text3)));
       return RepaintBoundary(child: img);
     });
   }
+}
+
+class _VersionedFileImage extends FileImage {
+  _VersionedFileImage(super.file) : stamp = _stamp(file);
+  final int stamp;
+
+  static int _stamp(File f) {
+    try {
+      return f.lastModifiedSync().microsecondsSinceEpoch ^ f.lengthSync();
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) => other is _VersionedFileImage && other.file.path == file.path && other.stamp == stamp && other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(file.path, stamp, scale);
 }
 
 /// Before/After comparison with a draggable divider.
@@ -478,26 +527,19 @@ class ProgressStrip extends StatelessWidget {
       ]),
     );
     if (!closable) return strip;
-    // finished: swipe down to close (a grab handle hints the gesture)
+    // finished: swipe left or right to remove it (like the notices)
     return Dismissible(
       key: const ValueKey('progress-strip'),
-      direction: DismissDirection.down,
+      direction: DismissDirection.horizontal,
       onDismissed: (_) => onDismiss!(),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        strip,
-        const SizedBox(height: 4),
-        Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(2))),
-      ]),
+      child: strip,
     );
   }
 }
 
-void showMsg(BuildContext context, String msg, {bool error = false}) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(msg),
-    backgroundColor: error ? const Color(0xFF3A2422) : null,
-    duration: Duration(seconds: error ? 6 : 3),
-  ));
+/// Notice at the top of the app (swipe sideways to remove it).
+void showMsg(BuildContext context, String msg, {bool error = false, String? actionLabel, VoidCallback? onAction}) {
+  Toasts.show(msg, error: error, actionLabel: actionLabel, onAction: onAction);
 }
 
 Future<String?> askText(BuildContext context, String title, {String initial = '', String hint = ''}) async {
@@ -566,6 +608,15 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
 }
 
 /// Toolbar action as a liquid glass pill.
+/// Marks a subtree that scrolls (cards of long pages): buttons inside it
+/// use solid surfaces instead of glass.
+class SolidSurfaces extends InheritedWidget {
+  const SolidSurfaces({super.key, required super.child});
+
+  @override
+  bool updateShouldNotify(SolidSurfaces oldWidget) => false;
+}
+
 class ToolButton extends StatelessWidget {
   const ToolButton({super.key, required this.icon, required this.label, required this.onTap});
 
@@ -577,9 +628,29 @@ class ToolButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
     final enabled = onTap != null;
+    // inside scrolling cards the pill is solid: moving glass re-captures and
+    // blurs its background on every scroll frame
+    final solid = context.dependOnInheritedWidgetOfExactType<SolidSurfaces>() != null;
     return Padding(
       padding: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-      child: LiquidGlass(
+      child: solid
+          ? Material(
+              color: Colors.white.withValues(alpha: 0.06),
+              shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
+              child: InkWell(
+                customBorder: const StadiumBorder(),
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(icon, size: 18, color: enabled ? accent : Palette.text3),
+                    const SizedBox(width: 8),
+                    Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: enabled ? Palette.text : Palette.text3)),
+                  ]),
+                ),
+              ),
+            )
+          : LiquidGlass(
         radius: 22,
         chromatic: 0.3,
         role: GlassRole.button,
@@ -605,15 +676,43 @@ class ToolButton extends StatelessWidget {
 
 /// Round liquid glass icon button.
 class GlassIconButton extends StatelessWidget {
-  const GlassIconButton({super.key, required this.icon, required this.onPressed, this.tooltip, this.size = 48});
+  const GlassIconButton({super.key, required this.icon, required this.onPressed, this.tooltip, this.size = 48, this.label});
 
   final IconData icon;
+
+  /// With a label the button is a pill "icon + text" (self-explaining).
+  final String? label;
   final VoidCallback? onPressed;
   final String? tooltip;
   final double size;
 
   @override
   Widget build(BuildContext context) {
+    if (label != null) {
+      return SizedBox(
+        height: size,
+        child: LiquidGlass(
+          radius: size / 2,
+          chromatic: 0.5,
+          role: GlassRole.button,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              customBorder: const StadiumBorder(),
+              onTap: onPressed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(label!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final b = SizedBox(
       width: size,
       height: size,
@@ -671,25 +770,28 @@ class LargeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          if (onBack != null) ...[
-            GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: 50, tooltip: S.indietro),
-            const SizedBox(width: 16),
-          ],
-          Expanded(
-            child: Text(title,
+      // no side inset: titles line up with the cards below
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 14),
+      // title and subtitle share one column; the buttons stay on the right,
+      // centred on the title block (the subtitle never runs under them)
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        if (onBack != null) ...[
+          GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: 50, tooltip: S.indietro),
+          const SizedBox(width: 16),
+        ],
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text)),
-          ),
-          ?trailing,
-        ]),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(subtitle!, style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.35)),
-        ],
+                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text, height: 1.15)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(subtitle!, key: const ValueKey('header-subtitle'), style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.3)),
+            ],
+          ]),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
       ]),
     );
   }
@@ -709,7 +811,8 @@ class SettingsCard extends StatelessWidget {
       if (i > 0) rows.add(Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.06)));
       rows.add(Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: children[i]));
     }
-    return Glass(
+    // solid card: settings pages scroll, moving glass would re-blur per frame
+    return Tile(
       padding: padding,
       radius: AppState.I.appearance.radius + 6,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: rows),
@@ -762,12 +865,12 @@ class SettingsList extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottom = 24 + GlassInsets.of(context);
     final body = ListView(
-      padding: EdgeInsets.fromLTRB(16, header == null ? 4 : 14, 16, bottom),
+      padding: EdgeInsets.fromLTRB(20, header == null ? 4 : 14, 20, bottom),
       children: sectioned(children),
     );
     if (header == null) return body;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), child: header!),
+      Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), child: header!),
       Expanded(
         // content fades under the sticky preview instead of being covered
         child: ShaderMask(
@@ -866,7 +969,7 @@ class StepCard extends StatelessWidget {
     final accent = Theme.of(context).colorScheme.primary;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Glass(
+      child: Tile(
         radius: AppState.I.appearance.radius + 6,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
@@ -892,7 +995,7 @@ class StepCard extends StatelessWidget {
           ]),
           if (children.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Wrap(children: children),
+            SolidSurfaces(child: Wrap(children: children)),
           ],
         ]),
       ),

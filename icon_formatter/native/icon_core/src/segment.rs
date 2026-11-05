@@ -292,7 +292,13 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
     let mut border_uniform = 1.0f32;
     let mut method = String::new();
 
-    if opt.mode == SegmentMode::Auto && transparent_border > 0.6 {
+    // already cut out (transparent surroundings): there is no background to
+    // remove, also with "always remove background" — removing colours similar
+    // to a guessed background would erase white/coloured glyphs (Camera, Chrome)
+    if transparent_border > 0.6 {
+        if opt.mode == SegmentMode::RemoveBackground {
+            notes.push("sfondo già trasparente: rimozione saltata".into());
+        }
         for i in 0..n {
             bg[i] = alpha[i] < 16;
         }
@@ -339,7 +345,11 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
             break;
         }
         let model = median_model(&lab, &alpha, &ring);
-        let uniform = ring.iter().filter(|&&i| dist(&lab, &alpha, i, &model) <= tol).count() as f32
+        // a plate is one flat colour: judged with a strict tolerance, not the
+        // (possibly high) background sensitivity, or a multicolour logo ring
+        // (Chrome) passes as "uniform" and the whole logo is erased
+        let ptol = tol.min(0.10);
+        let uniform = ring.iter().filter(|&&i| dist(&lab, &alpha, i, &model) <= ptol).count() as f32
             / ring.len() as f32;
         // The plate must span most of the canvas, otherwise it is a big glyph.
         let fg_mask: Vec<bool> = bg.iter().map(|b| !b).collect();
@@ -362,15 +372,22 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
         let seeds: Vec<usize> = ring
             .iter()
             .copied()
-            .filter(|&i| dist(&lab, &alpha, i, &model) <= tol)
+            .filter(|&i| dist(&lab, &alpha, i, &model) <= ptol)
             .collect();
         let pm = [model];
-        flood(&lab, &alpha, w, h, &seeds, &|i| !before[i], &pm, tol, &mut bg);
+        flood(&lab, &alpha, w, h, &seeds, &|i| !before[i], &pm, ptol, &mut bg);
         // the plate rim (highlights, borders) is never part of the glyph
         for i in 0..n {
             if !before[i] && d[i] < band {
                 bg[i] = true;
             }
+        }
+        // safety net: a "plate" that took almost everything was the logo
+        let left = bg.iter().filter(|b| !**b).count();
+        if (left as f32) < 0.03 * fg_count as f32 {
+            bg = before;
+            notes.push("piatto non rimosso: avrebbe cancellato il simbolo".into());
+            break;
         }
         models.push(model);
         plate_removed = true;
@@ -654,5 +671,26 @@ mod tests {
         let r = isolate(&img, &SegmentOptions::default());
         assert!(r.method.contains("plate"), "{}", r.method);
         assert!(r.glyph.width() <= 42 && r.glyph.width() >= 38, "{}", r.glyph.width());
+    }
+}
+
+#[cfg(test)]
+mod transparent_source_tests {
+    use super::*;
+    use image::Rgba;
+
+    #[test]
+    fn remove_background_keeps_an_already_cut_out_white_glyph() {
+        // white rounded glyph on a transparent canvas (an adaptive foreground)
+        let mut img = RgbaImage::new(100, 100);
+        for y in 25..75u32 {
+            for x in 20..80u32 {
+                img.put_pixel(x, y, Rgba([250, 250, 250, 255]));
+            }
+        }
+        let opt = SegmentOptions { mode: SegmentMode::RemoveBackground, tolerance: 0.25, ..Default::default() };
+        let r = isolate(&img, &opt);
+        let kept = r.glyph.pixels().filter(|p| p[3] > 200).count();
+        assert!(kept > 2500, "glyph erased: {kept} px left");
     }
 }

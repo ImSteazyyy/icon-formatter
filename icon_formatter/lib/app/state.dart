@@ -61,6 +61,10 @@ class AppState extends ChangeNotifier {
   /// Icon Pack Builder: manual corrections by original key (package or file).
   Map<String, Map<String, dynamic>> packCorrections = {};
 
+  /// Section guides closed with "Ho capito" (ids), and the first-run tour.
+  Set<String> seenGuides = {};
+  bool tourDone = false;
+
   bool _loaded = false;
 
   Future<void> load() async {
@@ -123,6 +127,8 @@ class AppState extends ChangeNotifier {
     packPresetId = j['packPresetId'] as String? ?? packPresetId;
     processedPackages = ((j['processedPackages'] as List?) ?? []).cast<String>().toSet();
     packCorrections = ((j['packCorrections'] as Map?) ?? {}).map((k, v) => MapEntry(k as String, (v as Map).cast<String, dynamic>()));
+    seenGuides = ((j['seenGuides'] as List?) ?? []).cast<String>().toSet();
+    tourDone = j['tourDone'] as bool? ?? false;
   }
 
   Map<String, dynamic> toJson() => {
@@ -151,6 +157,8 @@ class AppState extends ChangeNotifier {
         'packPresetId': packPresetId,
         'processedPackages': processedPackages.toList(),
         'packCorrections': packCorrections,
+        'seenGuides': seenGuides.toList(),
+        'tourDone': tourDone,
       };
 
   Future<void>? _pending;

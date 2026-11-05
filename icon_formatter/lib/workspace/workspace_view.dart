@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/theme.dart';
 import '../services/export_service.dart';
 import '../widgets/common.dart';
+import '../widgets/glass_menu.dart';
 import '../widgets/liquid_glass.dart';
 import 'adjust_panel.dart';
 import 'workspace_controller.dart';
@@ -255,7 +256,20 @@ class WorkspaceView extends StatelessWidget {
     this.showModes = true,
     this.onOpenBases,
     this.tileBuilder,
+    this.onAdd,
+    this.primaryAction,
+    this.moreActions = const [],
   });
+
+  /// Phones: round "+" next to Personalizza, shown once the list has icons
+  /// (before that the centre button does the same). Gets the button rect.
+  final void Function(Rect anchor)? onAdd;
+
+  /// Phones: the one big action of the bottom bar ("Elabora tutte").
+  final Widget? primaryAction;
+
+  /// Phones: the other actions, in a sheet opened from "Altro" (tap or drag up).
+  final List<MoreAction> moreActions;
 
   final WorkspaceController c;
   final String title;
@@ -266,6 +280,36 @@ class WorkspaceView extends StatelessWidget {
   final bool showModes;
   final VoidCallback? onOpenBases;
   final Widget Function(WorkItem it)? tileBuilder;
+
+  /// One-line guide for the current state of the list.
+  String _hint() {
+    if (c.items.isEmpty) return S.hintVuoto;
+    if (c.batch.running) return S.hintInCorso;
+    if (c.processed.isEmpty) return S.hintDaElaborare;
+    if (c.processed.length < c.active.length) return S.hintParziale(c.processed.length, c.active.length);
+    return S.hintFatto;
+  }
+
+  /// "Stile": every adjustment of the icons, with a title that explains it.
+  Future<void> openStyleSheet(BuildContext context) => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (ctx) => SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.80,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text(S.stileTitolo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text)),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(S.stileSpiegazione, style: TextStyle(fontSize: 13, color: Palette.text2)),
+            ),
+            Expanded(child: AdjustPanel(c: c, showModes: showModes, onOpenBases: onOpenBases)),
+          ]),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -353,15 +397,17 @@ class WorkspaceView extends StatelessWidget {
       }
       // phone portrait: grid scrolls under floating liquid-glass bars
       final under = GlassInsets.of(context);
+      // floating bars line up with the navigation pill (12 dp from the edge)
       final floating = Positioned(
-        left: 0,
-        right: 0,
+        left: -8,
+        right: -8,
         bottom: under - 4, // the nav box includes 12dp of top padding
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          progress,
-          const SizedBox(height: 6),
           // the glass shape clips the scrolling actions, so they disappear
           // along its rounded edge instead of a straight inner line
+          if (primaryAction != null)
+            ActionBar(primary: primaryAction!, more: moreActions)
+          else if (bottomActions.isNotEmpty && onAdd == null)
           LiquidGlass(
             radius: 30,
             child: SingleChildScrollView(
@@ -374,31 +420,44 @@ class WorkspaceView extends StatelessWidget {
         ]),
       );
       return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         child: Stack(children: [
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            Expanded(child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
-            GlassIconButton(
-              tooltip: S.regolazioni,
-              icon: Icons.tune,
-              onPressed: () => showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (ctx) => SizedBox(
-                  height: MediaQuery.of(ctx).size.height * 0.78,
-                  child: AdjustPanel(c: c, showModes: showModes, onOpenBases: onOpenBases),
-                ),
+          LargeHeader(
+            title,
+            // empty list: the centre card explains; then one line of guidance
+            subtitle: c.items.isEmpty ? null : _hint(),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (onAdd != null && c.items.isNotEmpty) ...[
+                Builder(builder: (bctx) => GlassIconButton(key: const ValueKey('studio-add'), tooltip: S.aggiungi, icon: Icons.add_rounded, size: 44, onPressed: () => onAdd!(anchorOf(bctx)))),
+                const SizedBox(width: 8),
+              ],
+              GlassIconButton(
+                key: const ValueKey('open-style'),
+                tooltip: S.regolazioni,
+                icon: Icons.tune,
+                label: S.stile,
+                size: 44,
+                onPressed: () => openStyleSheet(context),
               ),
-            ),
-          ]),
-          // chips scroll out to the screen edge (no straight cut at the page padding)
-          SingleChildScrollView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, child: Row(children: toolbar)),
-          ?header,
-          // the preview appears once there is something to show
-          if (c.items.isNotEmpty) SizedBox(height: (box.maxHeight * 0.36).clamp(200, 360), child: PreviewPane(c: c, compact: true)),
-          const SizedBox(height: 8),
-          Expanded(child: _grid(context, 92, bottomPad: under + 150)),
+            ]),
+          ),
+          // progress / completion floats over the content right under the
+          // title (nothing moves); a sideways swipe removes it
+          Expanded(
+            child: Stack(children: [
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                // chips scroll out to the screen edge (no straight cut at the page padding)
+                if (toolbar.isNotEmpty && onAdd == null) SingleChildScrollView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, child: Row(children: toolbar)),
+                ?header,
+                // the preview appears once there is something to show
+                if (c.items.isNotEmpty) SizedBox(height: (box.maxHeight * 0.36).clamp(200, 360), child: PreviewPane(c: c, compact: true)),
+                const SizedBox(height: 8),
+                Expanded(child: _grid(context, 92, bottomPad: under + 150)),
+              ]),
+              Positioned(left: 0, right: 0, top: -10, child: progress),
+            ]),
+          ),
           ]),
           floating,
         ]),
@@ -440,3 +499,55 @@ Future<void> showExportDone(BuildContext context, ExportResult r) async {
 }
 
 bool get isMobile => Platform.isAndroid || Platform.isIOS;
+
+
+/// One entry of the "Altro" sheet.
+class MoreAction {
+  const MoreAction(this.icon, this.label, this.subtitle, this.onTap);
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback? onTap;
+}
+
+/// Bottom bar on phones: one big start button and "Altro" (the other
+/// actions, in a glass pop-up menu).
+class ActionBar extends StatelessWidget {
+  const ActionBar({super.key, required this.primary, required this.more});
+  final Widget primary;
+  final List<MoreAction> more;
+
+  Future<void> _open(BuildContext context, [Rect? anchor]) async {
+    final i = await showGlassMenu<int>(context, anchor: anchor ?? anchorOf(context), title: S.altreAzioni, items: [
+      for (var k = 0; k < more.length; k++)
+        GlassMenuItem(value: k, label: more[k].label, subtitle: more[k].subtitle, icon: more[k].icon, enabled: more[k].onTap != null),
+    ]);
+    if (i != null) more[i].onTap?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LiquidGlass(
+        key: const ValueKey('action-bar'),
+        radius: 30,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Expanded(child: primary),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 50,
+                child: Builder(builder: (bctx) => OutlinedButton.icon(
+                  key: const ValueKey('more-actions'),
+                  onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                  label: const Text(S.altro),
+                )),
+              ),
+            ]),
+          ]),
+        ),
+      );
+  }
+}

@@ -40,6 +40,9 @@ class AiScreen extends StatefulWidget {
 }
 
 class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin {
+  /// Phones: 0 = online theme generator, 1 = local AI models.
+  int tab = 0;
+
   final List<_AiItem> items = [];
   int sel = -1;
   String theme = aiThemes.keys.first;
@@ -135,13 +138,24 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
     final it = cur;
     final info = aiProviders[AppState.I.ai.provider]!;
     final banner = configured == false
-        ? Glass(
+        ? Tile(
             padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              const Icon(Icons.key_off_outlined, color: Palette.warn),
-              const SizedBox(width: 10),
-              const Expanded(child: Text(S.aiNonConfigurataNessunaGenerazione)),
-              TextButton(onPressed: widget.onOpenSettings, child: const Text(S.configura)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Row(children: [
+                Icon(Icons.key_off_outlined, color: Palette.warn),
+                SizedBox(width: 10),
+                Expanded(child: Text(S.aiNessunaChiave)),
+              ]),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                FilledButton.tonalIcon(onPressed: widget.onOpenSettings, icon: const Icon(Icons.key_outlined, size: 18), label: const Text(S.configura)),
+                if (!wide)
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => tab = 1),
+                    icon: const Icon(Icons.memory_rounded, size: 18),
+                    label: const Text(S.aiProvaLocale),
+                  ),
+              ]),
             ]),
           )
         : const SizedBox.shrink();
@@ -175,7 +189,17 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
 
     final preview = Glass(
       child: it == null
-          ? const Center(child: Text(S.nessunaIconaSelezionata, style: TextStyle(color: Palette.text3)))
+          ? Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.auto_awesome_outlined, size: 40, color: Palette.text3),
+                const SizedBox(height: 10),
+                const Text(S.aiVuotoTitolo, textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
+                const SizedBox(height: 4),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text(S.aiVuotoSub, textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Palette.text2))),
+                const SizedBox(height: 14),
+                FilledButton.icon(onPressed: _import, icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text(S.importaIcona)),
+              ]),
+            )
           : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(
                 child: Center(
@@ -318,13 +342,43 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
         ]),
       );
     }
+    // phones: two clear tabs, the online theme generator and the local AI
+    final tabs = SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<int>(
+        key: const ValueKey('ai-tabs'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: 0, icon: Icon(Icons.cloud_outlined), label: Text(S.aiTabOnline)),
+          ButtonSegment(value: 1, icon: Icon(Icons.memory_rounded), label: Text(S.aiTabLocale)),
+        ],
+        selected: {tab},
+        onSelectionChanged: (v) => setState(() => tab = v.first),
+      ),
+    );
+    if (tab == 1) {
+      return SafeArea(
+        bottom: false,
+        child: ListView(padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + GlassInsets.of(context)), children: [
+          const LargeHeader(S.aiIconTheme, subtitle: S.aiSottotitolo),
+          tabs,
+          const SizedBox(height: 12),
+          const Text(S.aiLocaleCosaFa, style: TextStyle(fontSize: 13, color: Palette.text2)),
+          const SizedBox(height: 12),
+          const _LocalModelsCard(),
+        ]),
+      );
+    }
     return SafeArea(
       bottom: false,
-      child: ListView(padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + GlassInsets.of(context)), children: [
-        Row(children: [
-          Expanded(child: Text(S.aiIconTheme, style: Theme.of(context).textTheme.titleLarge)),
-          GlassIconButton(onPressed: _import, size: 46, tooltip: S.importaIcona, icon: Icons.add_photo_alternate_outlined),
-        ]),
+      child: ListView(padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + GlassInsets.of(context)), children: [
+        LargeHeader(
+          S.aiIconTheme,
+          subtitle: S.aiSottotitolo,
+          trailing: items.isEmpty ? null : GlassIconButton(onPressed: _import, size: 44, tooltip: S.importaIcona, icon: Icons.add_rounded),
+        ),
+        tabs,
+        const SizedBox(height: 8),
         banner,
         const SizedBox(height: 8),
         if (items.isNotEmpty)
@@ -346,8 +400,6 @@ class _AiScreenState extends State<AiScreen> with AutomaticKeepAliveClientMixin 
         SizedBox(height: 420, child: preview),
         const SizedBox(height: 12),
         SizedBox(height: 560, child: controls),
-        const SizedBox(height: 18),
-        const _LocalModelsCard(),
       ]),
     );
   }

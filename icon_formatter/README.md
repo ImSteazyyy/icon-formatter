@@ -1,134 +1,160 @@
 # Icon Formatter
 
-Windows and Android app for composing, styling and cleaning up launcher icons.
+App per Windows e Android che compone, stilizza e ripulisce le icone dei launcher.
 
-## Architecture
+## La 1.3.0 in breve
 
-| Layer | Path | Role |
+- **Pack.**
+  - Elenca tutte le app con icona nel launcher, comprese quelle di sistema, e mostra quante ne rileva Android.
+  - Stati: Abbinata, Da verificare, Dubbia, Icona mancante, Verificata, Esclusa.
+  - Tenendo premuta un'app si apre un menu contestuale in vetro. "Modifica icona" importa un PNG, JPG o WEBP, lo elabora, mostra Prima/Dopo e poi conferma, annulla o ripristina.
+  - "Apri un pack" riapre il pack installato o un APK/ZIP creato su un altro telefono. Un pack firmato su un altro telefono viene sostituito solo dopo conferma, e la numerazione delle versioni continua.
+  - "Condividi APK" condivide l'APK del pack.
+- **Interfaccia.**
+  - Un'azione principale per schermata e menu pop-up in vetro stile iOS 26.
+  - Il progresso galleggia sotto il titolo e si toglie con uno swipe laterale; gli avvisi compaiono in alto.
+  - Si passa da una sezione all'altra con uno swipe.
+  - Le superfici piene dentro le liste che scorrono mantengono lo scorrimento fluido.
+- **Prestazioni.**
+  - Firme visive dell'abbinamento in cache e griglia caricata solo dove serve.
+  - Sui telefoni Rust usa 4 thread, e durante le elaborazioni gli aggiornamenti dell'interfaccia sono diradati.
+  - Le schermate ferme non disegnano frame.
+
+## Architettura
+
+| Livello | Percorso | Ruolo |
 |---|---|---|
-| Rust core | `native/icon_core` | Segmentation/glyph isolation, squircle, "Nothing Translucent" render, composition, calibration, parallel batch (rayon) with cancellation, pack I/O (folder/ZIP, `appfilter.xml`), Android icon pack export. Pure Rust, testable with `cargo test`. |
-| FFI bridge | `rust/` (crate `icon_bridge`) | `flutter_rust_bridge` 2.13: DTOs, async functions on worker threads, `Stream` for batch progress, opaque `CancelToken`. |
-| Flutter UI | `lib/` | Windows (sidebar, drag-and-drop, native dialogs) and Android (bottom nav / rail, edge-to-edge, SAF, Share Sheet). |
-| Android native | `android/app/src/main/kotlin/.../MainActivity.kt` | Installed Apps Scanner (PackageManager, adaptive icons), Storage Access Framework (folder picker, writing/reading trees). |
+| Core Rust | `native/icon_core` | Segmentazione e isolamento del glifo, squircle, render "Nothing Translucent", composizione, calibrazione, batch in parallelo (rayon) annullabile, lettura/scrittura dei pack (cartella/ZIP, `appfilter.xml`), esportazione di icon pack Android. Rust puro, testabile con `cargo test`. |
+| Ponte FFI | `rust/` (crate `icon_bridge`) | `flutter_rust_bridge` 2.13: DTO, funzioni asincrone sui thread di lavoro, `Stream` per l'avanzamento dei batch, `CancelToken` opaco. |
+| Interfaccia Flutter | `lib/` | Windows (barra laterale, trascinamento, finestre native) e Android (barra in basso / rail, edge-to-edge, SAF, condivisione). |
+| Android nativo | `android/app/src/main/kotlin/.../MainActivity.kt` | Lettura delle app installate (PackageManager, icone adattive), Storage Access Framework (scelta cartelle, lettura e scrittura). |
 
-Images cross the FFI as file paths whenever possible (batches read and write directly in Rust). PNG bytes are used only for previews and for icons coming from Android.
+Quando possibile le immagini attraversano l'FFI come percorsi di file (i batch leggono e scrivono direttamente in Rust). I byte PNG si usano solo per le anteprime e per le icone che arrivano da Android.
 
-## Pipelines
+## Pipeline
 
-- **Original Composition**: glyph isolated and composed on the selected base icon, using that base's calibration.
-- **Lucent (Nothing OS 5.0)** — `native/icon_core/src/lucent.rs`, port of the method of [Nothing IconGen](https://github.com/linuxct/nothing-icongen) (AGPL-3.0, commit `02c915f`):
-  - frosted plate `container_frosted_backdrop` (`#66000000` dark / `#66FFFFFF` light);
-  - optional luminance → ink conversion (`PortableMonochrome`);
-  - optional `PackIconEncoder` compensation for Nothing Launcher (source → shadows → source, round-trip tested).
+- **Composizione originale**: il glifo isolato viene composto sull'icona base scelta, con la calibrazione di quella base.
+- **Lucent (Nothing OS 5.0)**: `native/icon_core/src/lucent.rs`, porting del metodo di [Nothing IconGen](https://github.com/linuxct/nothing-icongen) (AGPL-3.0, commit `02c915f`):
+  - piatto smerigliato `container_frosted_backdrop` (`#66000000` scuro / `#66FFFFFF` chiaro);
+  - conversione facoltativa luminanza → inchiostro (`PortableMonochrome`);
+  - compensazione facoltativa `PackIconEncoder` per Nothing Launcher (sorgente → ombre → sorgente, verificata con test di andata e ritorno).
 
-  The glyph keeps its own colours. The plate is the reference squircle (circle and source silhouette available), and content is clipped to it. "Icon inside the icon" (themed icons with a dark tile) is unwrapped by region growing, and the content reaches the plate edge.
-- **Custom Presets**: Liquid Glass, Nothing Translucent, Minimal, Dark Flat, Custom, plus user presets (editable and persisted).
-- **AI Icon Theme**: external provider (OpenAI Images, Google Gemini, OpenAI-compatible endpoint). The key lives in the system secure storage. Without a key, nothing is generated or simulated.
-- **Pack Cleanup**: opens a folder/ZIP, keeps relative paths and file names, copies `appfilter.xml` and the other metadata, flags drawables that are missing or ambiguous.
-- **Installed Apps** (Android only): launcher activity list through `<queries>` MAIN/LAUNCHER, with no `QUERY_ALL_PACKAGES` and no root. Exports an icon pack as res/assets + `appfilter.xml`.
+  Il glifo mantiene i suoi colori. Il piatto è lo squircle di riferimento (disponibili anche cerchio e sagoma della sorgente) e il contenuto viene ritagliato su di esso. L'"icona dentro l'icona" (icone a tema con piastrella scura) viene aperta con una crescita per regioni, e il contenuto arriva al bordo del piatto. Un simbolo scuro o grigio su un disco colorato prende il colore del disco.
+- **Preset personalizzati**: Liquid Glass, Nothing Translucent, Minimale, Scuro piatto, Personalizzato e i preset dell'utente (modificabili e salvati).
+- **Tema icone AI**: fornitore esterno (OpenAI Images, Google Gemini, endpoint compatibile OpenAI). La chiave sta nell'archivio sicuro di sistema. Senza chiave non viene generato né simulato nulla.
+- **Pulizia pack**: apre una cartella o uno ZIP, mantiene percorsi e nomi dei file, copia `appfilter.xml` e gli altri metadati e segnala i drawable mancanti o ambigui.
+- **App installate** (solo Android): elenco delle activity del launcher tramite `<queries>` MAIN/LAUNCHER, senza `QUERY_ALL_PACKAGES` e senza root. Esporta un icon pack come res/assets + `appfilter.xml`.
 
-## UI
+## Interfaccia
 
-- **Liquid glass**: [`liquid_glass_widgets`](https://github.com/sdegenaar/liquid_glass_widgets) 1.16 (refraction, chromatic aberration, specular light).
-  - On Android the navigation is a floating `GlassTabBar.bottom` with a dark lens; the action bars float above it and content scrolls underneath.
-  - One `GlassConfig` (Impostazioni › Vetro) drives every glass surface (`LiquidGlass` with a `GlassRole`: panel, button, nav, lens), the bottom bar, dialogs (`showAppDialog` blurs the screen behind) and the theme (dialogs, sheets, menus), live.
-  - Each surface can switch to a solid anthracite one.
-  - Quality levels: Più veloce = `minimal`, Bilanciato = `standard`, Qualità = `premium`. Refraction and aberration are complete only in Qualità.
+- **Liquid glass**: [`liquid_glass_widgets`](https://github.com/sdegenaar/liquid_glass_widgets) 1.16 (rifrazione, aberrazione cromatica, luce speculare).
+  - Su Android la navigazione è una `GlassTabBar.bottom` flottante con lente scura; le barre d'azione galleggiano sopra e il contenuto scorre sotto.
+  - Un solo `GlassConfig` (Impostazioni › Vetro) guida in tempo reale tutte le superfici in vetro (`LiquidGlass` con un `GlassRole`: panel, button, nav, lens), la barra in basso, le finestre (`showAppDialog` sfoca lo schermo dietro) e il tema (finestre, fogli, menu).
+  - Ogni superficie può diventare antracite piena.
+  - Livelli di qualità: Più veloce = `minimal`, Bilanciato = `standard`, Qualità = `premium`. Rifrazione e aberrazione sono complete solo in Qualità.
+  - Le celle delle griglie lunghe e le card delle pagine che scorrono sono superfici piene: un pannello in vetro ricattura e sfoca lo sfondo a ogni movimento.
+  - Menu pop-up in vetro (`widgets/glass_menu.dart`) che si aprono dal controllo toccato.
 - **Layout**:
-  - Impostazioni is a grid home with nested pages (`SettingsList` + `SettingsCard`).
-  - Shared kit in `widgets/common.dart`: `IconChip`, `LargeHeader`, `SettingSwitch`, `ChoiceRows`, `StepCard`.
-- **Windows**: custom title bar (`window_manager` 0.5, native caption hidden).
-- **Accent**: default pink #BA4CD4 (sampled from the Windows Start icon), with presets, hex entry and HSL sliders.
+  - Impostazioni è una home a griglia con pagine annidate (`SettingsList` + `SettingsCard`).
+  - Componenti condivisi in `widgets/common.dart`: `IconChip`, `LargeHeader`, `SettingSwitch`, `ChoiceRows`, `StepCard`, `Tile`; avvisi in `widgets/toasts.dart`.
+- **Windows**: barra del titolo personalizzata (`window_manager` 0.5, barra nativa nascosta).
+- **Accento**: rosa predefinito #BA4CD4 (preso dall'icona Start di Windows), con preset, codice esadecimale e cursori HSL.
 
-## Background removal
+## Rimozione dello sfondo
 
-Engines (Settings › Elaborazione):
-- **Local Rust (default)**: deterministic segmentation, offline, free.
-- **Local AI**: optional U²-Net-p model (4.6 MB, Apache-2.0, downloaded from the rembg releases), run with `tract` (pure Rust, CPU, no native runtime).
-  - Measured at about 0.8 s per icon (i5-13500H), roughly 350 MB of RAM in use.
-  - The model is loaded once and reused.
-  - Removal is skipped when the background is already transparent.
-  - Mask preview with thresholds; uncertain results are flagged.
-  - ISNet General (170 MB, 1024 px input) is offered on Windows only: ~7.5 s per icon on the same PC, too slow for a phone.
-  - Silueta took about 89 s per icon with `tract`, so it is not offered. No GPU path with `tract`.
+Motori (Impostazioni › Elaborazione):
+- **Locale Rust (predefinito)**: segmentazione deterministica, offline, gratuita.
+- **AI locale**: modello facoltativo U²-Net-p (4,6 MB, Apache-2.0, scaricato dalle release di rembg), eseguito con `tract` (Rust puro, CPU, nessun runtime nativo).
+  - Circa 0,8 s per icona (i5-13500H), circa 350 MB di RAM durante l'uso.
+  - Il modello si carica una volta e resta in memoria.
+  - La rimozione viene saltata se lo sfondo è già trasparente.
+  - Anteprima della maschera con soglie; i risultati incerti vengono segnalati.
+  - ISNet General (170 MB, ingresso 1024 px) è disponibile solo su Windows: circa 7,5 s per icona sullo stesso PC, troppo lento per un telefono.
+  - Silueta richiedeva circa 89 s per icona con `tract` e non è proposto. `tract` non usa la GPU.
 
-Option: Option: **remove.bg** (Settings › Processing), with the API key in secure storage, a test that shows the remaining credits, and one call per image cached for the session. In a batch, the calls run first (3 in parallel, cancellable), then Rust composites the cutout without re-segmenting it.
+Opzione: **remove.bg** (Impostazioni › Elaborazione), con la chiave API nell'archivio sicuro, un test che mostra i crediti rimasti e una chiamata per immagine messa in cache per la sessione. In un batch le chiamate partono prima (3 in parallelo, annullabili), poi Rust compone il ritaglio senza segmentarlo di nuovo.
 
-## Glyph isolation
+## Isolamento del glifo
 
-Deterministic, no ML model: flood fill from the edges using border colour clusters (OKLab + alpha), "plate" detection (rounded/semi-transparent backgrounds), optional hole removal, and premultiplied un-mixing of anti-aliased edges. Glyph parts with colours similar to the background survive whenever they are separated by an edge. Uncertain cases are flagged (yellow) for manual correction.
+Deterministico, senza modelli di machine learning: riempimento dai bordi con cluster dei colori di bordo (OKLab + alpha), rilevamento del "piatto" (sfondi arrotondati o semitrasparenti) giudicato con una tolleranza stretta, rimozione facoltativa dei buchi e separazione premoltiplicata dei bordi anti-alias. Le parti del glifo con colori simili allo sfondo restano se sono separate da un bordo. Se lo sfondo è già trasparente, anche con "Rimuovi sempre lo sfondo" la rimozione viene saltata. I casi incerti vengono segnalati (giallo) per la correzione manuale.
 
-ONNX Runtime (U²-Net/BiRefNet type models) was evaluated and left out. It adds 20–40 MB of native runtime per ABI plus 40–170 MB of model, while being trained on photos and not on flat logos. On the reference icons the deterministic segmentation isolates all 26 glyphs; 2 (`apk toolbox 2`, `tiktok plugin`) are flagged for manual review because of large internal areas matching the background colour.
+ONNX Runtime (modelli tipo U²-Net/BiRefNet) è stato valutato e scartato: aggiunge 20–40 MB di runtime nativo per ABI più 40–170 MB di modello, ed è addestrato su foto e non su loghi piatti. Sulle icone di riferimento la segmentazione deterministica isola tutti i 26 glifi; 2 (`apk toolbox 2`, `tiktok plugin`) vengono segnalati per una verifica manuale per via di ampie zone interne del colore dello sfondo.
 
-## Reference icons
+## Icone di riferimento
 
-The 26 icons in `D:\Icon Formatter` (192 px, squircle 0.93 × exponent 4.25, semi-transparent black plate α 105→176) are the test material: `native/icon_core/tests/reference.rs`. The "Reference Translucent" base (`assets/bases/`) is the empty icon provided by the user; its calibration (glyph 66.9 %, centre 0.500/0.500, 26/26 samples) was measured with the same algorithm the app uses.
+Le 26 icone in `D:\Icon Formatter` (192 px, squircle 0,93 × esponente 4,25, piatto nero semitrasparente α 105→176) sono il materiale di test: `native/icon_core/tests/reference.rs`. La base "Reference Translucent" (`assets/bases/`) è l'icona vuota fornita dall'utente; la sua calibrazione (glifo 66,9 %, centro 0,500/0,500, 26/26 campioni) è stata misurata con lo stesso algoritmo dell'app.
+
+Banco di regressione: `cargo run --release --example regress -- OUT in*.png` rende ogni icona due volte con la pipeline dell'app, verifica che il risultato sia deterministico e stampa un hash per confrontare le versioni.
 
 ## Benchmark (i5-13500H, `cargo run --release --example bench`)
 
-| Output | Threads | Throughput | Per icon |
+| Uscita | Thread | Velocità | Per icona |
 |---|---|---|---|
-| 512 px | 1 | 13.9 icons/s | 71.9 ms |
-| 512 px | all | 124.8 icons/s | 8.0 ms |
-| 192 px | all | 303.3 icons/s | 3.3 ms |
+| 512 px | 1 | 13,9 icone/s | 71,9 ms |
+| 512 px | tutti | 124,8 icone/s | 8,0 ms |
+| 192 px | tutti | 303,3 icone/s | 3,3 ms |
 
-208 icons (26 references × 8): decode, isolation, resize, composition, PNG encode and write.
+208 icone (26 di riferimento × 8): decodifica, isolamento, ridimensionamento, composizione, codifica PNG e scrittura.
+
+Abbinamento (`cargo run --release --example bench_match -- 250 …`): 250 + 250 icone in 0,11 s, 0,02 s quando viene ripetuto (firme in cache); la 1.2.0 impiegava 1,41 s ogni volta.
 
 ## Icon Pack Builder
 
-Originals come from installed apps, a folder, a ZIP or an APK (binary `appfilter.xml` decoded by `axml.rs`, highest density kept).
+Su Android gli originali sono tutte le app con icona nel launcher, comprese quelle di sistema: le icone vengono messe in cache su disco e rigenerate solo quando un'app si aggiorna. Si possono aggiungere originali da cartella, ZIP o APK (`appfilter.xml` binario decodificato da `axml.rs`, tenuta la densità più alta).
 
-Generated icons are produced with the Studio or imported. Matching (`matching.rs`) scores package, app name, file name and visual similarity (glyph silhouette IoU + hue histogram). It is one-to-one and greedy, and ambiguous visual matches are flagged.
+Le icone nuove si generano con lo Studio o si importano. L'abbinamento (`matching.rs`) valuta package, nome dell'app, nome del file e somiglianza visiva (IoU della sagoma del glifo + istogramma delle tinte). È uno-a-uno e greedy, con indice per nome e package; le firme visive sono calcolate su una copia a 160 px e tenute in cache. Le corrispondenze per nome con disegno diverso sono "Da verificare", quelle deboli o solo visive "Dubbie".
 
-Manual corrections are stored in `state.json` (`packCorrections`).
+Le correzioni manuali sono salvate in `state.json` (`packCorrections`); elenchi, icone modificate a mano e pack aperti in `pack_builder.json`.
 
-Export: folder or ZIP (`res/drawable-nodpi`, `appfilter.xml`, `mapping.json`). On Windows, **Crea APK** fills `assets/iconpack_template.zip` (source in `iconpack_template/`, rebuild with `python tool/make_template_zip.py`) and runs Gradle with the local Android SDK and JDK. The result is an installable icon pack with its own icon browser, signed with the local debug key.
+Esportazione: cartella o ZIP (`res/drawable-nodpi`, `appfilter.xml`, `mapping.json`). Su Windows **Crea APK** riempie `assets/iconpack_template.zip` (sorgente in `iconpack_template/`, si ricostruisce con `python tool/make_template_zip.py`) ed esegue Gradle con Android SDK e JDK locali: il risultato è un icon pack installabile con il proprio visualizzatore di icone, firmato con la chiave di debug locale. Su Android **Condividi APK** crea e firma l'APK sul telefono e lo passa al foglio di condivisione.
 
-### On the phone, with Shizuku (`DevicePack.kt`)
+### Sul telefono, con Shizuku (`DevicePack.kt`)
 
-**Install and apply.** The pack is the separate app `com.iconformatter.pack.device`. It is built on the phone from `assets/iconpack_base.apk`, which `tool/make_base_apk.py` creates with 2000 empty drawable slots:
-- the slots get the PNGs;
-- binary `appfilter.xml` and `drawable.xml` are written (an AXML writer validated with `aapt2 dump xmltree`), together with `mapping.json` and `pack.json`;
-- `versionCode` / `versionName` are patched in the manifest (1.0, 1.1, …);
-- the APK is signed with apksig (Android Keystore key).
+**Installa e applica.** Il pack è l'app separata `com.iconformatter.pack.device`. Viene costruito sul telefono a partire da `assets/iconpack_base.apk`, che `tool/make_base_apk.py` crea con 2000 slot drawable vuoti:
+- gli slot ricevono i PNG;
+- vengono scritti `appfilter.xml` e `drawable.xml` binari (writer AXML verificato con `aapt2 dump xmltree`), insieme a `mapping.json` e `pack.json`;
+- `versionCode` / `versionName` vengono modificati nel manifest (1.0, 1.1, …);
+- l'APK viene firmato con apksig (chiave nell'Android Keystore).
 
-Shizuku (shell identity) then runs `pm install -r` and IconGen's selection sequence: open `com.nothing.launcher.icon_pack_picker` behind the task, write `nothing_icon_pack` = `THEMED_ICONS_NOTHING`, then the pack package after 500 ms. The previous value is saved for "Ripristina".
+Shizuku (identità shell) esegue `pm install -r` e la sequenza di selezione di IconGen: apre `com.nothing.launcher.icon_pack_picker` dietro l'app, scrive `nothing_icon_pack` = `THEMED_ICONS_NOTHING` e dopo 500 ms il package del pack. Il valore precedente viene salvato per "Ripristina".
 
-Shizuku starts on the phone itself (Wireless debugging, Android 11+). Without it, the APK goes through the system installer and the pack is chosen by hand.
+**Apri un pack.** Riapre il pack installato (dal suo APK) o un APK/ZIP creato su un altro telefono; la versione di un APK aperto viene ricordata, così la numerazione continua. La chiave di firma resta sul telefono che ha creato il pack: un pack firmato altrove non si può aggiornare, quindi dopo una conferma esplicita viene disinstallato via Shizuku e reinstallato, poi riselezionato.
 
-**Verified on the emulator (API 35):**
-- Shizuku 13.6 is started as shell and the permission is granted in the app dialog.
-- A stub `com.nothing.launcher` (5.0) has the picker activity.
-- Results: install, update 1.1 → 1.2 → 1.3, the temporary value seen by polling, the final selector equal to the pack, `aapt2` and `apksigner` checks.
+Shizuku si avvia sul telefono stesso (Debug wireless, Android 11+). Senza Shizuku l'APK passa dall'installer di sistema e il pack si sceglie a mano.
 
-**Not verified:** how a real Nothing Launcher on Nothing OS 5.0 redraws the icons. That needs the phone.
+**Verificato sull'emulatore (API 35):**
+- Shizuku 13.6 avviato come shell, permesso concesso dalla finestra dell'app.
+- Un `com.nothing.launcher` di prova (5.0) con l'activity del selettore.
+- Risultati: installazione, aggiornamenti 1.1 → 1.2 → 1.3, il valore temporaneo visto in polling, selettore finale uguale al pack, controlli `aapt2` e `apksigner`; sostituzione dopo cambio di chiave (1.3 → 1.4, selezione ripristinata).
 
-## Android automation
+**Non verificato:** come il vero Nothing Launcher su Nothing OS 5.0 ridisegna le icone. Serve il telefono.
 
-- A persisted JobScheduler job (every 6 h, battery not low; survives reboots, subject to Doze) plus an immediate check on unlock (`USER_PRESENT`) while the process is alive.
-- `PackageManager.getChangedPackages` skips all work when nothing changed. Only changed launcher apps get their icon hashed.
-- Changes (installed, uninstalled, updated, icon changed) are listed in the Pack Builder, with a silent notification. "Rielabora" re-processes only those apps.
-- Permissions: `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS` (asked when the switch is turned on). No root, no foreground service, no `QUERY_ALL_PACKAGES`.
+## Automazione Android
 
-## Known limits
+- Un job JobScheduler persistente (ogni 6 ore, batteria non scarica; sopravvive ai riavvii, soggetto a Doze) e un controllo immediato allo sblocco (`USER_PRESENT`) finché il processo è attivo.
+- `PackageManager.getChangedPackages` evita ogni lavoro se nulla è cambiato. Solo le app del launcher cambiate vengono controllate.
+- Le modifiche (installata, disinstallata, aggiornata, icona cambiata) sono elencate nel Pack Builder, con una notifica silenziosa. "Rielabora" elabora di nuovo solo quelle app.
+- Permessi: `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS` (chiesto quando si attiva l'interruttore), `REQUEST_INSTALL_PACKAGES` (installazione senza Shizuku). Niente root, niente servizi in primo piano, niente `QUERY_ALL_PACKAGES`.
 
-- **Launcher refresh**:
-  - With Shizuku, Icon Formatter installs and selects its pack the way IconGen does. The shell identity may write the non-public `nothing_icon_pack` key, which apps with `targetSdk` ≥ 23 cannot.
-  - Shizuku must be running when the pack is applied, and after a reboot it must be started again from the Shizuku app.
-  - The icon redraw by the real Nothing Launcher could not be verified without the phone.
+## Limiti noti
 
-- **Android icon pack**:
-  - The phone build holds up to 2000 icons, and its label is fixed ("Icon Formatter Pack"); name and accent shown inside come from `pack.json`.
-  - Without root, Android does not let an app replace other apps' icons, and support depends on the launcher.
-- **Installed Apps**: only apps with a launcher activity are visible (Android 11+ package visibility policy). Apps without a readable icon are reported and skipped. "Not themed" means not yet processed by this app; the presence of a system monochrome icon (Android 13+) is detected.
-- **AI**: costs and limits shown are indicative and depend on the provider; check the official price list.
-- **Live transparency**: the "Simulated transparency" parameter lowers the alpha of the rendered PNG; it does not reproduce the launcher's live blur.
+- **Aggiornamento del launcher**:
+  - Con Shizuku, Icon Formatter installa e seleziona il pack come IconGen. L'identità shell può scrivere la chiave non pubblica `nothing_icon_pack`, cosa che le app con `targetSdk` ≥ 23 non possono fare.
+  - Shizuku deve essere attivo quando si applica il pack, e dopo un riavvio va riavviato dall'app Shizuku.
+  - Il ridisegno delle icone da parte del vero Nothing Launcher non è verificato senza il telefono.
+- **Icon pack Android**:
+  - La versione costruita sul telefono contiene fino a 2000 icone e ha un nome fisso ("Icon Formatter Pack"); nome e accento mostrati all'interno vengono da `pack.json`.
+  - Senza root Android non permette a un'app di sostituire le icone delle altre app, e il supporto dipende dal launcher.
+- **App installate**: sono visibili solo le app con un'activity nel launcher (regole di visibilità dei package da Android 11). Le app senza icona nella home e quelle del profilo di lavoro non compaiono; quelle senza icona leggibile vengono segnalate e saltate.
+- **AI**: costi e limiti indicati sono orientativi e dipendono dal fornitore; fa fede il listino ufficiale.
+- **Trasparenza dal vivo**: il parametro "Trasparenza simulata" abbassa l'alpha del PNG; non riproduce la sfocatura dal vivo del launcher.
+- **Misure di fluidità e batteria**: sono state fatte sull'emulatore (rendering software), non sul Nothing Phone (2a) Plus.
 
-## License
+## Licenza
 
-AGPL-3.0-only (see `LICENSE`). `lucent.rs` contains code derived from Nothing IconGen (© linuxct, AGPL-3.0). The U²-Net-p model (Apache-2.0) is not bundled; it is downloaded on request.
+AGPL-3.0-only (vedi `LICENSE`, testo ufficiale in inglese). `lucent.rs` contiene codice derivato da Nothing IconGen (© linuxct, AGPL-3.0). Il modello U²-Net-p (Apache-2.0) non è incluso: viene scaricato su richiesta.
 
-## Build
+## Compilazione
 
 ```bash
 cargo test --release --manifest-path native/icon_core/Cargo.toml

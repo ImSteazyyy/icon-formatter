@@ -332,6 +332,13 @@ pub fn default_lucent_settings(dark: bool) -> LucentSettings {
     }
 }
 
+/// Caps the shared Rust worker pool (phones: fewer threads, less heat and
+/// battery). Call once at start-up, before any processing.
+#[flutter_rust_bridge::frb(sync)]
+pub fn set_worker_threads(n: u32) -> bool {
+    icon_core::batch::set_global_threads(n as usize)
+}
+
 #[flutter_rust_bridge::frb(sync)]
 pub fn core_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -404,7 +411,9 @@ pub fn render_background_png(background: BackgroundSettings, size: u32) -> Resul
 /// Renders a glyph PNG (already isolated) on the given background.
 pub fn compose_glyph_png(glyph_png: Vec<u8>, settings: ProcessSettings) -> Result<Vec<u8>> {
     let size = check_size(settings.size)?;
-    let glyph = imageops::decode(&glyph_png)?;
+    // only the visible part counts for size and position (transparent
+    // margins of the PNG would make the symbol smaller and off-centre)
+    let glyph = compose::crop_to_content(&imageops::decode(&glyph_png)?);
     if let Some(lp) = lucent_of(&settings.background) {
         let bbox = (0, 0, glyph.width(), glyph.height());
         let pl: compose::Placement = (&settings.placement).into();
@@ -847,6 +856,8 @@ pub struct MatchInput {
 pub enum MatchState {
     Confident,
     Doubtful,
+    /// Name/package match but the drawing differs: to be checked.
+    Review,
     Missing,
 }
 
@@ -868,7 +879,9 @@ fn candidates(v: Vec<MatchInput>) -> Vec<matching::Candidate> {
             package: m.package,
             file: m.file,
             path: m.path,
-            image: m.png.and_then(|b| imageops::decode(&b).ok()),
+            image: None,
+            // decoded lazily, only when its signature is not cached yet
+            png: m.png,
         })
         .collect()
 }
@@ -886,6 +899,7 @@ pub fn match_icons(originals: Vec<MatchInput>, generated: Vec<MatchInput>) -> Re
             state: match m.status {
                 matching::MatchStatus::Confident => MatchState::Confident,
                 matching::MatchStatus::Doubtful => MatchState::Doubtful,
+                matching::MatchStatus::Review => MatchState::Review,
                 matching::MatchStatus::Missing => MatchState::Missing,
             },
             reason: m.reason,

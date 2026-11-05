@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -44,9 +45,10 @@ class BatchController extends ChangeNotifier {
         done = ev.done;
         total = ev.total;
         if (!ev.result.ok) errors++;
-        // throttle rebuilds for very large batches
+        // throttle rebuilds: every rebuild repaints the grid under the glass
+        // bars (blur), so on phones a few refreshes per second are enough
         final now = DateTime.now();
-        if (now.difference(lastNotify).inMilliseconds > 60 || ev.done == ev.total) {
+        if (now.difference(lastNotify).inMilliseconds > (Platform.isAndroid ? 250 : 80) || ev.done == ev.total) {
           lastNotify = now;
           notifyListeners();
         }

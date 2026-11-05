@@ -20,7 +20,20 @@ pub struct Signature {
     hue: [f32; HUE_BINS + 1],
 }
 
+/// Longest side used to compute a signature: the signature is a 16x16 grid,
+/// so segmenting the full-size icon (432..1024 px) only costs time.
+const SIG_SIDE: u32 = 160;
+
 pub fn signature(img: &RgbaImage) -> Signature {
+    let (w0, h0) = img.dimensions();
+    let small;
+    let img = if w0.max(h0) > SIG_SIDE {
+        let k = SIG_SIDE as f32 / w0.max(h0) as f32;
+        small = resize(img, ((w0 as f32 * k).round() as u32).max(1), ((h0 as f32 * k).round() as u32).max(1));
+        &small
+    } else {
+        img
+    };
     let res = isolate(img, &SegmentOptions::default());
     let g = &res.glyph;
     let (w, h) = (g.width().max(1), g.height().max(1));
@@ -121,6 +134,8 @@ pub struct Candidate {
     pub file: String,
     pub path: Option<String>,
     pub image: Option<RgbaImage>,
+    /// Encoded image (decoded only when its signature is not cached).
+    pub png: Option<Vec<u8>>,
 }
 
 /// Text score 0..1 and the reason.
@@ -160,6 +175,8 @@ pub fn text_score(o: &Candidate, g: &Candidate) -> (f32, &'static str) {
 pub enum MatchStatus {
     Confident,
     Doubtful,
+    /// Name or package match, but the drawing looks different: to be checked.
+    Review,
     Missing,
 }
 
@@ -174,14 +191,109 @@ pub struct MatchResult {
     pub reason: String,
 }
 
-fn load(c: &Candidate) -> Option<RgbaImage> {
-    c.image.clone().or_else(|| c.path.as_ref().and_then(|p| decode_file(Path::new(p)).ok()))
+fn fnv(h: &mut u64, b: &[u8]) {
+    for &x in b {
+        *h ^= x as u64;
+        *h = h.wrapping_mul(0x100_0000_01b3);
+    }
+}
+
+/// Cache key of a candidate's image: file path + size + mtime, or the
+/// bytes themselves. None for in-memory images (not cached).
+fn cache_key(c: &Candidate) -> Option<u64> {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    if let Some(b) = &c.png {
+        fnv(&mut h, b);
+        return Some(h);
+    }
+    let p = c.path.as_ref()?;
+    let m = std::fs::metadata(p).ok()?;
+    fnv(&mut h, p.as_bytes());
+    fnv(&mut h, &m.len().to_le_bytes());
+    if let Ok(t) = m.modified().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).map_err(std::io::Error::other)) {
+        fnv(&mut h, &t.as_nanos().to_le_bytes());
+    }
+    Some(h)
+}
+
+static CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u64, Option<Signature>>>> = std::sync::OnceLock::new();
+
+/// Signature of a candidate, computed once per image (path+mtime or bytes)
+/// and kept for the whole session: repeated matching is almost free.
+fn cached_signature(c: &Candidate) -> Option<Signature> {
+    let cache = CACHE.get_or_init(Default::default);
+    let key = cache_key(c);
+    if let Some(k) = key {
+        if let Some(v) = cache.lock().ok().and_then(|m| m.get(&k).cloned()) {
+            return v;
+        }
+    }
+    let img = c
+        .image
+        .clone()
+        .or_else(|| c.png.as_ref().and_then(|b| crate::imageops::decode(b).ok()))
+        .or_else(|| c.path.as_ref().and_then(|p| decode_file(Path::new(p)).ok()));
+    let sig = img.map(|i| signature(&i));
+    if let (Some(k), Ok(mut m)) = (key, cache.lock()) {
+        if m.len() > 20_000 {
+            m.clear();
+        }
+        m.insert(k, sig.clone());
+    }
+    sig
+}
+
+/// Precomputed text keys of a candidate (computed once, not per pair).
+struct Keys {
+    pkg: String,
+    pflat: String,
+    label: String,
+    file: String,
+    gfile: String,
+    tokens: HashSet<String>,
+}
+
+fn keys(c: &Candidate) -> Keys {
+    let pkg = c.package.split('/').next().unwrap_or("").to_lowercase();
+    Keys {
+        pflat: pkg.chars().filter(|c| c.is_alphanumeric()).collect(),
+        pkg,
+        label: normalize(&c.label),
+        file: normalize(&c.file),
+        gfile: normalize(&c.file),
+        tokens: tokens(&format!("{} {} {}", c.label, c.package, c.file)),
+    }
+}
+
+/// Same rules as [`text_score`], on precomputed keys.
+fn text_score_k(o: &Keys, g: &Keys) -> (f32, &'static str) {
+    if !o.pkg.is_empty() && ((!g.pkg.is_empty() && g.pkg == o.pkg) || (!g.gfile.is_empty() && g.gfile == o.pflat)) {
+        return (1.0, "package");
+    }
+    if !o.label.is_empty() && (o.label == g.label || o.label == g.gfile) {
+        return (0.95, "nome app");
+    }
+    if !o.file.is_empty() && o.file == g.gfile {
+        return (0.9, "nome file");
+    }
+    if o.tokens.is_empty() || g.tokens.is_empty() {
+        return (0.0, "");
+    }
+    let inter = o.tokens.intersection(&g.tokens).count() as f32;
+    if inter == 0.0 {
+        return (0.0, "");
+    }
+    let jac = inter / o.tokens.union(&g.tokens).count() as f32;
+    (0.45 + 0.4 * jac, "parole in comune")
 }
 
 /// One-to-one association, greedy by combined score.
 pub fn match_icons(originals: &[Candidate], generated: &[Candidate]) -> Vec<MatchResult> {
-    let os: Vec<Option<Signature>> = originals.par_iter().map(|c| load(c).map(|i| signature(&i))).collect();
-    let gs: Vec<Option<Signature>> = generated.par_iter().map(|c| load(c).map(|i| signature(&i))).collect();
+    // signatures (cached) and text keys, computed once per icon
+    let os: Vec<Option<Signature>> = originals.par_iter().map(cached_signature).collect();
+    let gs: Vec<Option<Signature>> = generated.par_iter().map(cached_signature).collect();
+    let ok: Vec<Keys> = originals.par_iter().map(keys).collect();
+    let gk: Vec<Keys> = generated.par_iter().map(keys).collect();
     struct Pair {
         o: usize,
         g: usize,
@@ -195,8 +307,10 @@ pub fn match_icons(originals: &[Candidate], generated: &[Candidate]) -> Vec<Matc
         .flat_map_iter(|o| {
             let os = &os;
             let gs = &gs;
+            let ok = &ok;
+            let gk = &gk;
             (0..generated.len()).filter_map(move |g| {
-                let (text, reason) = text_score(&originals[o], &generated[g]);
+                let (text, reason) = text_score_k(&ok[o], &gk[g]);
                 let visual = match (&os[o], &gs[g]) {
                     (Some(a), Some(b)) => similarity(a, b),
                     _ => 0.0,
@@ -231,7 +345,7 @@ pub fn match_icons(originals: &[Candidate], generated: &[Candidate]) -> Vec<Matc
         let status = if p.text >= 0.9 && p.visual >= 0.35 {
             MatchStatus::Confident
         } else if p.text >= 0.9 {
-            MatchStatus::Doubtful // name matches but the drawing looks different
+            MatchStatus::Review // name matches but the drawing looks different
         } else if p.text == 0.0 && p.visual >= 0.82 && margin >= 0.04 {
             MatchStatus::Confident
         } else {
@@ -292,7 +406,7 @@ mod tests {
     }
 
     fn cand(id: &str, label: &str, pkg: &str, file: &str, img: RgbaImage) -> Candidate {
-        Candidate { id: id.into(), label: label.into(), package: pkg.into(), file: file.into(), path: None, image: Some(img) }
+        Candidate { id: id.into(), label: label.into(), package: pkg.into(), file: file.into(), path: None, image: Some(img), png: None }
     }
 
     #[test]

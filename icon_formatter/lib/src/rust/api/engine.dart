@@ -24,6 +24,11 @@ TranslucentSettings defaultTranslucentSettings() =>
 LucentSettings defaultLucentSettings({required bool dark}) =>
     RustLib.instance.api.crateApiEngineDefaultLucentSettings(dark: dark);
 
+/// Caps the shared Rust worker pool (phones: fewer threads, less heat and
+/// battery). Call once at start-up, before any processing.
+bool setWorkerThreads({required int n}) =>
+    RustLib.instance.api.crateApiEngineSetWorkerThreads(n: n);
+
 String coreVersion() => RustLib.instance.api.crateApiEngineCoreVersion();
 
 /// Composes one icon from a file and returns PNG bytes (preview / single export).
@@ -736,7 +741,14 @@ class MatchOutput {
           reason == other.reason;
 }
 
-enum MatchState { confident, doubtful, missing }
+enum MatchState {
+  confident,
+  doubtful,
+
+  /// Name/package match but the drawing differs: to be checked.
+  review,
+  missing,
+}
 
 class PackImage {
   final String rel;

@@ -9,6 +9,8 @@ import 'app/shell.dart';
 import 'app/state.dart';
 import 'app/storage.dart';
 import 'app/theme.dart';
+import 'widgets/toasts.dart';
+import 'src/rust/api/engine.dart';
 import 'src/rust/frb_generated.dart';
 import 'l10n/strings.dart';
 
@@ -18,6 +20,9 @@ Future<void> main() async {
   await RustLib.init();
   await AppPaths.init();
   await AppState.I.load();
+  // phones: 4 Rust workers by default (Nothing Phone (2a) Plus: 2 big + 6
+  // little cores; all 8 at full load mostly adds heat and battery drain)
+  if (Platform.isAndroid) setWorkerThreads(n: AppState.I.threads > 0 ? AppState.I.threads : 4);
   if (Platform.isWindows) {
     await windowManager.ensureInitialized();
     const options = WindowOptions(
@@ -62,6 +67,8 @@ class IconFormatterApp extends StatelessWidget {
         title: S.iconFormatter,
         debugShowCheckedModeBanner: false,
         theme: buildTheme(AppState.I.appearance, AppState.I.glass),
+        // notices live at the top, above dialogs and sheets
+        builder: (context, child) => ToastHost(child: child ?? const SizedBox()),
         home: const Shell(),
       ),
     );

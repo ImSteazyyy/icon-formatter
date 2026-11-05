@@ -138,7 +138,9 @@ class WorkspaceController extends ChangeNotifier {
     return s;
   }
 
-  void addPaths(List<PackImage> imgs) {
+  /// [placeOnly]: ready-made PNGs, not cut out nor recoloured; they are
+  /// only cropped to their content, centred and sized on the icon background.
+  void addPaths(List<PackImage> imgs, {bool placeOnly = false}) {
     for (final im in imgs) {
       final stem = p.basenameWithoutExtension(im.rel);
       items.add(WorkItem(
@@ -146,7 +148,9 @@ class WorkspaceController extends ChangeNotifier {
         name: uniqueStem(stem),
         rel: im.rel,
         path: im.abs,
-      ));
+      )
+        ..segOverride = placeOnly ? SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false) : null
+        ..strategyOverride = placeOnly ? LucentStrategy.asIs : null);
     }
     selectedId ??= items.isEmpty ? null : items.first.id;
     notifyListeners();

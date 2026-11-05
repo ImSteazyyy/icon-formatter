@@ -149,7 +149,7 @@ pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaIma
     // plate colour: mode on a ring just inside the plate edge
     let (cx, cy) = ((x0 + x1) as f32 / 2.0, (y0 + y1) as f32 / 2.0);
     let r = w.min(h) as f32 / 2.0;
-    let mut bins: std::collections::HashMap<(i32, i32, i32), (u32, f32, f32, f32)> = Default::default();
+    let mut ring: Vec<crate::color::Lab> = Vec::new();
     for k in 0..720 {
         let t = k as f32 / 720.0 * std::f32::consts::TAU;
         for rr in [0.86f32, 0.90] {
@@ -158,21 +158,23 @@ pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaIma
             if raw[i * 4 + 3] < 200 {
                 continue;
             }
-            let c = lab[i];
-            let e = bins.entry(((c.l * 30.0) as i32, (c.a * 30.0) as i32, (c.b * 30.0) as i32)).or_insert((0, 0.0, 0.0, 0.0));
-            e.0 += 1;
-            e.1 += c.l;
-            e.2 += c.a;
-            e.3 += c.b;
+            ring.push(lab[i]);
         }
     }
-    let total: u32 = bins.values().map(|v| v.0).sum();
-    let (n, sl, sa, sb) = bins.values().max_by_key(|v| v.0).copied()?;
-    // the ring must be one flat colour, and a saturated one
-    if (n as f32) < 0.6 * total as f32 {
+    if ring.len() < 64 {
         return None;
     }
-    let plate = (sl / n as f32, sa / n as f32, sb / n as f32);
+    // plate colour = per-channel median of the ring (robust to the symbol
+    // crossing it and to soft gradients / sheens on the plate)
+    let plate = lab_median(&ring);
+    // the ring must be (mostly) one colour, and a saturated one
+    let near = ring
+        .iter()
+        .filter(|c| ((c.l - plate.0).powi(2) + (c.a - plate.1).powi(2) + (c.b - plate.2).powi(2)).sqrt() < 0.07)
+        .count();
+    if (near as f32) < 0.6 * ring.len() as f32 {
+        return None;
+    }
     if plate.1.hypot(plate.2) < 0.07 {
         return None;
     }
@@ -210,11 +212,11 @@ pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaIma
     if !(0.03..0.75).contains(&frac) {
         return None;
     }
-    // automatic only for a dark neutral symbol (it would vanish on the dark
-    // frosted plate); white symbols on coloured plates stay white. `force`
-    // (per-app choice) recolours whatever sits on the plate.
+    // automatic only for a dark or grey neutral symbol (it would turn into a
+    // grey smudge on the dark frosted plate); white symbols on coloured plates
+    // stay white. `force` (per-app choice) recolours whatever sits on the plate.
     let mean_l = l_sum / cnt.max(1) as f32;
-    if !force && (chroma_sum / cnt.max(1) as f32 > 0.06 || mean_l > 0.5 || mean_l > plate.0 - 0.2) {
+    if !force && (chroma_sum / cnt.max(1) as f32 > 0.06 || mean_l > 0.80) {
         return None;
     }
     // plate colour in sRGB: median of the ring pixels close to the mode
@@ -222,7 +224,7 @@ pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaIma
     for y in y0..y1 {
         for x in x0..x1 {
             let i = (y * fw + x) as usize;
-            if raw[i * 4 + 3] > 200 && dist(&lab[i]) < 0.03 {
+            if raw[i * 4 + 3] > 200 && dist(&lab[i]) < 0.05 {
                 rs.push([raw[i * 4], raw[i * 4 + 1], raw[i * 4 + 2]]);
             }
         }
@@ -249,6 +251,89 @@ pub fn recolor_on_colored_plate(img: &RgbaImage, force: bool) -> Option<(RgbaIma
     let gb = crate::imageops::alpha_bbox(&out, 32)?;
     let crop = image::imageops::crop_imm(&out, gb.0, gb.1, gb.2 - gb.0, gb.3 - gb.1).to_image();
     Some((crop, gb, (x0, y0, x1, y1)))
+}
+
+/// Per-channel median of OKLab samples.
+fn lab_median(v: &[crate::color::Lab]) -> (f32, f32, f32) {
+    let med = |f: &dyn Fn(&crate::color::Lab) -> f32| {
+        let mut c: Vec<f32> = v.iter().map(f).collect();
+        c.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        c[c.len() / 2]
+    };
+    (med(&|c| c.l), med(&|c| c.a), med(&|c| c.b))
+}
+
+/// A tile with a neutral background (e.g. a coloured disc on a dark rounded
+/// square): the background connected to the tile border is made transparent,
+/// enclosed regions of the same colour (a dark symbol on the disc) are kept.
+/// None when the border colour is not neutral or almost nothing is removed.
+pub fn strip_border_background(img: &RgbaImage) -> Option<RgbaImage> {
+    let (w, h) = img.dimensions();
+    if w < 16 || h < 16 {
+        return None;
+    }
+    let lut = crate::color::linear_lut();
+    let lab = crate::color::rgba_to_oklab(img.as_raw(), &lut);
+    let raw = img.as_raw();
+    let band = ((w.min(h) as f32) * 0.08).round().max(2.0) as u32;
+    let inset = ((w.min(h) as f32) * 0.06).round() as u32;
+    // background colour: median along the ring 6% inside the edge
+    let mut ring = Vec::new();
+    for y in inset..h - inset {
+        for x in inset..w - inset {
+            let on = x == inset || y == inset || x + 1 == w - inset || y + 1 == h - inset;
+            let i = (y * w + x) as usize;
+            if on && raw[i * 4 + 3] > 200 {
+                ring.push(lab[i]);
+            }
+        }
+    }
+    if ring.len() < 16 {
+        return None;
+    }
+    let bg = lab_median(&ring);
+    if bg.1.hypot(bg.2) > 0.04 {
+        return None;
+    }
+    let dist = |c: &crate::color::Lab| ((c.l - bg.0).powi(2) + (c.a - bg.1).powi(2) + (c.b - bg.2).powi(2)).sqrt();
+    let n = (w * h) as usize;
+    let mut gone = vec![false; n];
+    let mut q = std::collections::VecDeque::new();
+    for y in 0..h {
+        for x in 0..w {
+            let near_edge = x < band || y < band || x >= w - band || y >= h - band;
+            let i = (y * w + x) as usize;
+            if near_edge && (raw[i * 4 + 3] < 128 || dist(&lab[i]) < 0.06) {
+                gone[i] = true;
+                q.push_back(i);
+            }
+        }
+    }
+    while let Some(i) = q.pop_front() {
+        let (x, y) = ((i as u32) % w, (i as u32) / w);
+        for (dx, dy) in [(-1i32, 0i32), (1, 0), (0, -1), (0, 1)] {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= w as i32 || ny >= h as i32 {
+                continue;
+            }
+            let j = (ny as u32 * w + nx as u32) as usize;
+            if !gone[j] && raw[j * 4 + 3] > 0 && dist(&lab[j]) < 0.06 {
+                gone[j] = true;
+                q.push_back(j);
+            }
+        }
+    }
+    let removed = (0..n).filter(|&i| gone[i] && raw[i * 4 + 3] > 127).count();
+    if removed < n / 20 {
+        return None;
+    }
+    let mut out = img.clone();
+    for (i, p) in out.pixels_mut().enumerate() {
+        if gone[i] {
+            p[3] = 0;
+        }
+    }
+    Some(out)
 }
 
 /// "Icon inside the icon": when the glyph is a filled tile, its own
@@ -576,6 +661,39 @@ mod tests {
         // a white symbol is left white in automatic mode, recoloured when forced
         assert!(recolor_on_colored_plate(&disc_with_bar([255, 255, 255]), false).is_none());
         assert!(recolor_on_colored_plate(&disc_with_bar([255, 255, 255]), true).is_some());
+    }
+
+    #[test]
+    fn mid_grey_symbol_and_soft_sheen_are_recoloured() {
+        // a mid-grey symbol (an Android robot style) on a disc with a sheen
+        let mut img = disc_with_bar([104, 104, 104]);
+        for (y, row) in img.enumerate_rows_mut() {
+            for (_, _, p) in row {
+                if p[3] > 0 && p[2] < 60 {
+                    let k = 1.0 + 0.12 * (0.5 - y as f32 / 100.0);
+                    for c in 0..2 {
+                        p[c] = (p[c] as f32 * k).min(255.0) as u8;
+                    }
+                }
+            }
+        }
+        let (g, _, _) = recolor_on_colored_plate(&img, false).expect("recoloured");
+        let c = g.get_pixel(3, g.height() / 2);
+        assert!(c[0] > 200 && c[2] < 80, "{:?}", c);
+    }
+
+    #[test]
+    fn coloured_disc_on_a_dark_tile_is_found() {
+        // dark tile, yellow disc, dark bar on the disc
+        let d = disc_with_bar([40, 40, 46]);
+        let (w, h) = d.dimensions();
+        let mut tile = RgbaImage::from_pixel(w + 40, h + 40, Rgba([30, 30, 30, 255]));
+        image::imageops::overlay(&mut tile, &d, 20, 20);
+        assert!(recolor_on_colored_plate(&tile, false).is_none());
+        let stripped = strip_border_background(&tile).expect("background stripped");
+        // the dark bar enclosed by the disc is kept
+        assert!(stripped.get_pixel(w / 2 + 20 - 15, h / 2 + 20)[3] > 200);
+        assert!(recolor_on_colored_plate(&stripped, false).is_some());
     }
 
     #[test]

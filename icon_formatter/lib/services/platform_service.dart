@@ -44,6 +44,27 @@ class PlatformService {
     return (r ?? []).map(InstalledApp.fromMap).toList();
   }
 
+  /// Pack catalogue: every launcher app (system ones included) with its full
+  /// icon cached as a PNG file in [dir] (paths, no bytes over the channel).
+  /// Returns the apps (with `icon` path) and the number of visible launcher
+  /// activities reported by Android.
+  static Future<(List<(InstalledApp, String?)>, int)> appCatalog(String dir, {int size = 432}) async {
+    final r = await _ch.invokeMapMethod<String, Object?>('appCatalog', {'dir': dir, 'size': size});
+    final list = ((r?['apps'] as List?) ?? []).cast<Map>();
+    return ([for (final m in list) (InstalledApp.fromMap(m), m['icon'] as String?)], (r?['visible'] as num?)?.toInt() ?? list.length);
+  }
+
+  /// APK of the installed Icon Formatter pack on this phone (or null).
+  static Future<String?> devicePackSource() => _ch.invokeMethod<String>('devicePackSource');
+
+  /// Package/version of a pack APK file; a pack of this app makes the next
+  /// build continue its version numbering.
+  static Future<Map<String, dynamic>> devicePackArchiveInfo(String path) async =>
+      (await _ch.invokeMapMethod<String, dynamic>('devicePackArchiveInfo', {'path': path})) ?? {};
+
+  /// Removes the installed pack through Shizuku (only after the user agreed).
+  static Future<void> devicePackUninstall() => _ch.invokeMethod('devicePackUninstall');
+
   /// PNG icons for apps. When [glyphOnly] is true and the icon is adaptive
   /// with a transparent foreground, only the foreground layer is rendered.
   /// Missing icons come back as null.

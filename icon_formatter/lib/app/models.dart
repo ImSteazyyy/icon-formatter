@@ -312,16 +312,17 @@ enum GlassQualityLevel { fast, balanced, quality }
 /// Liquid glass material (liquid_glass_widgets) used by bars, panels and lens.
 /// One instance (AppState.I.glass) drives every glass surface of the app.
 class GlassConfig {
-  double blur = 8;
-  double thickness = 28;
+  // defaults = the look chosen by the user on the Nothing Phone (2a) Plus
+  double blur = 22.6;
+  double thickness = 0;
   double chromatic = 0.012;
-  double lightIntensity = 0.55;
-  double lightAngle = 135;
-  double refractiveIndex = 1.2;
-  double saturation = 1.45;
-  double frost = 0.2;
+  double lightIntensity = 0;
+  double lightAngle = 74;
+  double refractiveIndex = 1.0;
+  double saturation = 2.5;
+  double frost = 0.61;
   double tint = 0.08;
-  double rimLight = 0.3;
+  double rimLight = 0;
   double lensDarkness = 0.32;
 
   /// Render tier: fast (blur only, no shader), balanced (light shader),
@@ -346,7 +347,7 @@ class GlassConfig {
   double textShadow = 0.6;
 
   /// Glossy specular rim like the reference icons (brightest facing the light).
-  bool gloss = true;
+  bool gloss = false;
   double glossIntensity = 0.6;
   double textShadowBlur = 6;
 

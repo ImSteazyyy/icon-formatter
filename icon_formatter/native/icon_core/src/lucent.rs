@@ -494,6 +494,22 @@ pub fn simulate_launcher(png: &RgbaImage) -> RgbaImage {
     out
 }
 
+/// Gamma lift (v^0.35) of neutral greys. It fades out with chroma (16..40)
+/// instead of a hard cut: on soft gradients (a grey lens turning into a pastel
+/// highlight) a hard threshold lifted every other pixel (dotted pattern).
+fn lift_neutral(layer: &mut RgbaImage) {
+    let lut: Vec<u8> = (0..256).map(|v| ((v as f32 / 255.0).powf(0.35) * 255.0).round() as u8).collect();
+    for px in layer.pixels_mut() {
+        let mx = px[0].max(px[1]).max(px[2]);
+        let mn = px[0].min(px[1]).min(px[2]);
+        let w = 1.0 - smoothstep(16.0, 40.0, (mx - mn) as f32);
+        if w > 0.0 {
+            let mix = |v: u8| (v as f32 + (lut[v as usize] as f32 - v as f32) * w).round().clamp(0.0, 255.0) as u8;
+            *px = Rgba([mix(px[0]), mix(px[1]), mix(px[2]), px[3]]);
+        }
+    }
+}
+
 /// Renders a Lucent icon at `size` from the source icon and its isolated glyph
 /// (`glyph_bbox` in source coordinates, as returned by `segment::isolate`).
 pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u32), size: u32, p: &LucentParams) -> LucentOutput {
@@ -520,9 +536,14 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         _ => None,
     };
     // dark symbol on a coloured disc/tile: the symbol takes the plate colour
+    // (also when the coloured disc sits on a dark/neutral tile: the tile's
+    // background is stripped and the disc becomes the plate)
+    let on_tile = || crate::compose::strip_border_background(&src_tile);
     let recolored = match st {
         G::Auto if src_unwrap.is_none() => crate::compose::recolor_on_colored_plate(src, false),
-        G::PlateColor => crate::compose::recolor_on_colored_plate(src, true),
+        G::Auto => on_tile().and_then(|c| crate::compose::recolor_on_colored_plate(&c, false)),
+        G::PlateColor => crate::compose::recolor_on_colored_plate(src, true)
+            .or_else(|| on_tile().and_then(|c| crate::compose::recolor_on_colored_plate(&c, true))),
         _ => None,
     };
     if recolored.is_some() {
@@ -571,17 +592,10 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     let mut layer = glyph.clone();
     let dark_plate = (p.backdrop[0] as u32 + p.backdrop[1] as u32 + p.backdrop[2] as u32) < 384;
     if p.lift_greys && dark_plate && !p.monochrome {
-        // neutral greys get a gamma lift (v^0.6): dark details (roads, keys)
+        // neutral greys get a gamma lift (v^0.35): dark details (roads, keys)
         // become visible on the dark frosted plate while the tonal steps
         // between greys (e.g. a figure on a grey disc) are kept
-        let lut: Vec<u8> = (0..256).map(|v| ((v as f32 / 255.0).powf(0.35) * 255.0).round() as u8).collect();
-        for px in layer.pixels_mut() {
-            let mx = px[0].max(px[1]).max(px[2]);
-            let mn = px[0].min(px[1]).min(px[2]);
-            if mx - mn < 24 {
-                *px = Rgba([lut[px[0] as usize], lut[px[1] as usize], lut[px[2] as usize], px[3]]);
-            }
-        }
+        lift_neutral(&mut layer);
     }
     let mostly_light = {
         let opaque: Vec<_> = layer.pixels().filter(|q| q[3] > 127).collect();
@@ -794,6 +808,24 @@ mod tests {
         assert!(!complex);
         assert_eq!(m[0], 255);
         assert_eq!(m[99], 45);
+    }
+
+    #[test]
+    fn grey_lift_is_continuous_on_gradients() {
+        // grey turning into a pastel red one step at a time: neighbouring
+        // pixels must stay close after the lift (no dotted pattern)
+        let mut g = RgbaImage::new(64, 1);
+        for x in 0..64u32 {
+            g.put_pixel(x, 0, Rgba([110 + x as u8, 110, 110, 255]));
+        }
+        lift_neutral(&mut g);
+        for x in 1..64u32 {
+            let (a, b) = (g.get_pixel(x - 1, 0), g.get_pixel(x, 0));
+            let d = (0..3).map(|k| (a[k] as i32 - b[k] as i32).abs()).max().unwrap();
+            assert!(d <= 6, "jump {} at {}", d, x);
+        }
+        // pure neutral grey is lifted
+        assert!(g.get_pixel(0, 0)[1] > 150);
     }
 
     #[test]

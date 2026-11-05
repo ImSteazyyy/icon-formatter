@@ -15,7 +15,7 @@ import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
 import '../l10n/strings.dart';
 
-const appVersion = '1.2.0';
+const appVersion = '1.3.0';
 
 enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
 
@@ -111,7 +111,7 @@ class _SettingsHome extends StatelessWidget {
           final cols = box.maxWidth >= 1100 ? 4 : (box.maxWidth >= 720 ? 3 : 2);
           return CustomScrollView(slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               sliver: SliverList.list(children: [
                 const LargeHeader(S.impostazioni),
                 const _ProfileCard(),
@@ -119,7 +119,7 @@ class _SettingsHome extends StatelessWidget {
               ]),
             ),
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + GlassInsets.of(context)),
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + GlassInsets.of(context)),
               sliver: SliverGrid.builder(
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: cols,
@@ -224,7 +224,7 @@ class _CatPage extends StatelessWidget {
       type: MaterialType.transparency,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
           child: LargeHeader(
             cat.label,
             onBack: () => Navigator.of(context).maybePop(),
@@ -254,7 +254,7 @@ class _Page extends StatelessWidget {
         SettingsCat.appearance => _AppearancePage(),
         SettingsCat.glass => SettingsList(header: const GlassPreview(), children: glassControls(context)),
         SettingsCat.processing => _ProcessingPage(),
-        SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
+        SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
         SettingsCat.ai => _AiPage(),
         SettingsCat.pack => _PackPage(),
         SettingsCat.export => _ExportPage(),
@@ -423,6 +423,25 @@ class _AiPageState extends State<_AiPage> {
     final ai = st.ai;
     final info = aiProviders[ai.provider]!;
     return SettingsList(children: [
+      // the online AI needs an API key; the local AI does not
+      Text(S.aiOnlineSpiega, style: const TextStyle(fontSize: 12.5, color: Palette.text2)),
+      const SizedBox(height: 6),
+      const SectionTitle(S.aiModelliLocali),
+      const Text(S.aiLocaleSpiega, style: TextStyle(fontSize: 12, color: Palette.text2)),
+      ListenableBuilder(
+        listenable: st,
+        builder: (context, _) => SettingSwitch(
+          title: S.aiUsaLocale,
+          subtitle: st.modelReady(st.localAi.model) ? S.aiUsaLocaleSub : S.aiModelloMancante,
+          value: st.bgProvider == BgProvider.localAi,
+          onChanged: st.modelReady(st.localAi.model) || st.bgProvider == BgProvider.localAi
+              ? (v) => st.update(() => st.bgProvider = v ? BgProvider.localAi : BgProvider.local)
+              : null,
+        ),
+      ),
+      const LocalAiBox(),
+      const SizedBox(height: 10),
+      const SectionTitle(S.aiOnlineTitolo),
       const SectionTitle(S.provider),
       DropdownButtonFormField<AiProviderKind>(
         key: ValueKey(ai.provider),
@@ -740,12 +759,17 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
   Widget build(BuildContext context) {
     final st = AppState.I;
     return ListenableBuilder(listenable: st, builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      DropdownButtonFormField<BgProvider>(
-        key: ValueKey(st.bgProvider),
-        initialValue: st.bgProvider,
-        decoration: const InputDecoration(labelText: S.providerRimozioneSfondo),
-        items: [for (final b in BgProvider.values) DropdownMenuItem(value: b, child: Text(bgProviderLabel(b)))],
-        onChanged: (v) => st.update(() => st.bgProvider = v!),
+      const Text(S.providerRimozioneSfondo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.text)),
+      const SizedBox(height: 4),
+      // every option visible with what it means (no hidden dropdown)
+      ChoiceRows<BgProvider>(
+        options: const [
+          (BgProvider.local, S.scontornoClassico),
+          (BgProvider.localAi, S.scontornoAiLocale),
+          (BgProvider.removeBg, S.scontornoRemoveBg),
+        ],
+        value: st.bgProvider,
+        onChanged: (v) => st.update(() => st.bgProvider = v),
       ),
       if (st.bgProvider == BgProvider.localAi) const LocalAiBox(),
       if (st.bgProvider == BgProvider.removeBg) ...[

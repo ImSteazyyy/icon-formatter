@@ -39,7 +39,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   final Set<String> selected = {};
   final Set<String> missingIcons = {};
   String query = '';
-  bool hideSystem = true;
+  bool hideSystem = false;
   bool onlyUnprocessed = false;
   bool loading = true;
   String? error;
@@ -279,62 +279,90 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       child: Stack(children: [
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Row(children: [
-            Expanded(child: Text(S.appInstallate, style: Theme.of(context).textTheme.titleLarge)),
-            GlassIconButton(tooltip: S.ricarica, size: 46, onPressed: loading ? null : _load, icon: Icons.refresh_rounded),
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              tooltip: S.esportaIconPack,
-              child: const GlassIconButton(size: 46, onPressed: null, icon: Icons.ios_share_rounded),
-              onSelected: (k) => _exportPack(kind: k),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'zip', child: Text(S.iconPackZipAppfilterXml)),
-                PopupMenuItem(value: 'folder', child: Text(S.iconPackCartella)),
-                PopupMenuItem(value: 'png', child: Text(S.soloPngIndividuali)),
-                PopupMenuItem(value: 'share', child: Text(S.condividiZip)),
-              ],
-            ),
-          ]),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: LargeHeader(
+            S.leTueApp,
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              GlassIconButton(
+                tooltip: S.regolazioni,
+                size: 44,
+                icon: Icons.tune,
+                label: S.stile,
+                onPressed: () => showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  showDragHandle: true,
+                  // the style (what the apps become) first, then its adjustments
+                  builder: (ctx) => StatefulBuilder(
+                    builder: (ctx, setS) => SizedBox(
+                      height: MediaQuery.of(ctx).size.height * 0.80,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                        const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 4), child: Text(S.stileTitolo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: ChoiceRows<AppPipeline>(
+                            options: const [
+                              (AppPipeline.translucent, S.nothingTranslucent),
+                              (AppPipeline.original, S.originalComposition),
+                              (AppPipeline.preset, S.customPreset),
+                              (AppPipeline.ai, S.aiIconTheme),
+                            ],
+                            value: pipeline,
+                            onChanged: (v) {
+                              setState(() => pipeline = v);
+                              setS(() {});
+                            },
+                          ),
+                        ),
+                        if (pipeline != AppPipeline.ai) Expanded(child: AdjustPanel(c: c, showModes: false, onOpenBases: widget.onOpenBases)),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
+        // progress / completion floats over the list right under the title
+        // (nothing moves); a sideways swipe removes it
+        Expanded(
+          child: Stack(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: TextField(
             decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: S.cercaNomeOPackage),
             onChanged: (v) => setState(() => query = v),
           ),
         ),
-        SizedBox(
-          height: 48,
-          child: ListView(scrollDirection: Axis.horizontal, clipBehavior: Clip.none, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
-            FilterChip(label: const Text(S.escludiAppSistema), selected: hideSystem, onSelected: (v) => setState(() => hideSystem = v)),
-            const SizedBox(width: 8),
-            FilterChip(label: const Text(S.soloNonElaborate), selected: onlyUnprocessed, onSelected: (v) => setState(() => onlyUnprocessed = v)),
-            const SizedBox(width: 8),
-            ActionChip(label: const Text(S.selezionaTutte), onPressed: () => setState(() => selected.addAll(list.map((a) => a.key)))),
-            const SizedBox(width: 8),
-            ActionChip(label: const Text(S.deseleziona), onPressed: () => setState(() => selected.removeAll(list.map((a) => a.key)))),
+        // filters fit on screen (nothing hidden off the edge)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          // two equal toggles, edge to edge
+          child: Row(children: [
+            Expanded(child: _Toggle(label: S.mostraAppSistema, on: !hideSystem, onTap: () => setState(() => hideSystem = !hideSystem))),
+            const SizedBox(width: 10),
+            Expanded(child: _Toggle(label: S.soloNonElaborate, on: onlyUnprocessed, onTap: () => setState(() => onlyUnprocessed = !onlyUnprocessed))),
           ]),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(children: [
             Tooltip(
               message: S.toccaSelezionareTieniPremutoAnteprima,
               child: Text(S.appSelezionate(list.length, selected.length), style: const TextStyle(fontSize: 12, color: Palette.text2)),
             ),
-            const Spacer(),
-            DropdownButton<AppPipeline>(
-              value: pipeline,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(value: AppPipeline.original, child: Text(S.originalComposition)),
-                DropdownMenuItem(value: AppPipeline.translucent, child: Text(S.nothingTranslucent)),
-                DropdownMenuItem(value: AppPipeline.preset, child: Text(S.customPreset)),
-                DropdownMenuItem(value: AppPipeline.ai, child: Text(S.aiIconTheme)),
-              ],
-              onChanged: (v) => setState(() => pipeline = v!),
+            TextButton(
+              key: const ValueKey('apps-select-all'),
+              onPressed: list.isEmpty
+                  ? null
+                  : () => setState(() {
+                        final all = list.every((a) => selected.contains(a.key));
+                        all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
+                      }),
+              child: Text(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? S.deseleziona : S.selezionaTutte),
             ),
+
           ]),
         ),
         Expanded(
@@ -344,13 +372,16 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(S.impossibileLeggereApp(error), style: const TextStyle(color: Palette.danger))))
                   : ListenableBuilder(
                       listenable: c,
-                      builder: (context, _) => GridView.builder(
-                        padding: EdgeInsets.fromLTRB(12, 8, 12, under + 160),
+                      builder: (context, _) {
+                        // one lookup table per build (not a scan per cell)
+                        final byId = {for (final x in c.items) x.id: x};
+                        return GridView.builder(
+                        padding: EdgeInsets.fromLTRB(20, 8, 20, under + 160),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 100, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 0.72),
                         itemCount: list.length,
                         itemBuilder: (context, i) {
                           final a = list[i];
-                          final it = c.items.where((x) => x.id == a.key).firstOrNull;
+                          final it = byId[a.key];
                           final out = it?.outputPath;
                           final res = it?.result;
                           final sel = selected.contains(a.key);
@@ -388,16 +419,12 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                             ),
                           );
                         },
-                      ),
+                      );
+                      },
                     ),
         ),
-      ]),
-      // floating liquid-glass action bar (content scrolls underneath)
-      Positioned(
-        left: 12,
-        right: 12,
-        bottom: under - 4, // the nav box includes 12dp of top padding
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            ]),
+            Positioned(left: 0, right: 0, top: 0, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child:
           ListenableBuilder(
             listenable: c.batch,
             builder: (context, _) {
@@ -416,38 +443,72 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                 onDismiss: b.dismissProgress,
               );
             },
-          ),
-          const SizedBox(height: 6),
-          LiquidGlass(
-            radius: 32,
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-            child: Row(children: [
-              GlassIconButton(
-                tooltip: S.regolazioni,
-                onPressed: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (ctx) => SizedBox(height: MediaQuery.of(ctx).size.height * 0.78, child: AdjustPanel(c: c, showModes: false, onOpenBases: widget.onOpenBases)),
-                ),
-                icon: Icons.tune,
+          ))),
+          ]),
+        ),
+      ]),
+      // floating liquid-glass action bar (content scrolls underneath)
+      Positioned(
+        left: 12,
+        right: 12,
+        bottom: under - 4, // the nav box includes 12dp of top padding
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // one start button; exports in "Altro" (tap or drag the bar up)
+          ActionBar(
+            primary: ListenableBuilder(
+              listenable: c.batch,
+              builder: (context, _) => FilledButton.icon(
+                key: const ValueKey('apps-start'),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                onPressed: c.batch.running || aiRunning || selected.isEmpty ? null : _process,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length), style: const TextStyle(fontSize: 16)),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: c.batch,
-                  builder: (context, _) => FilledButton.icon(
-                    style: FilledButton.styleFrom(shape: const StadiumBorder()),
-                    onPressed: c.batch.running || aiRunning || selected.isEmpty ? null : _process,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text(S.elaboraApp(selected.length)),
-                  ),
-                ),
-              ),
-            ]),
+            ),
+            more: [
+              MoreAction(Icons.refresh_rounded, S.ricarica, S.ricaricaSub, loading ? null : _load),
+              MoreAction(Icons.folder_zip_outlined, S.iconPackZipAppfilterXml, S.esportaZipSub, () => _exportPack(kind: 'zip')),
+              MoreAction(Icons.drive_folder_upload_outlined, S.iconPackCartella, S.esportaCartellaSub, () => _exportPack(kind: 'folder')),
+              MoreAction(Icons.image_outlined, S.soloPngIndividuali, S.esportaCartellaSub, () => _exportPack(kind: 'png')),
+              MoreAction(Icons.share_outlined, S.condividiZip, S.condividiSub, () => _exportPack(kind: 'share')),
+            ],
           ),
         ]),
       ),
       ]),
+    );
+  }
+}
+
+
+/// Full-width on/off pill (filters of the apps list).
+class _Toggle extends StatelessWidget {
+  const _Toggle({required this.label, required this.on, required this.onTap});
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Material(
+      color: on ? accent.withValues(alpha: 0.18) : Colors.transparent,
+      shape: StadiumBorder(side: BorderSide(color: on ? accent.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.14))),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          height: 44,
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: on ? Icon(Icons.check_rounded, key: const ValueKey(1), size: 18, color: accent) : const SizedBox(key: ValueKey(0), width: 0),
+            ),
+            if (on) const SizedBox(width: 6),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Palette.text : Palette.text2))),
+          ]),
+        ),
+      ),
     );
   }
 }

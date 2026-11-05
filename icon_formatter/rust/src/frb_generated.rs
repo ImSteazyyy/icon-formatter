@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2136046261;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 975776295;
 
 // Section: executor
 
@@ -967,6 +967,36 @@ fn wire__crate__api__engine__sanitize_drawable_name_impl(
         },
     )
 }
+fn wire__crate__api__engine__set_worker_threads_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_worker_threads",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_n = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::engine::set_worker_threads(api_n))?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__engine__thumbnail_png_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1669,7 +1699,8 @@ impl SseDecode for crate::api::engine::MatchState {
         return match inner {
             0 => crate::api::engine::MatchState::Confident,
             1 => crate::api::engine::MatchState::Doubtful,
-            2 => crate::api::engine::MatchState::Missing,
+            2 => crate::api::engine::MatchState::Review,
+            3 => crate::api::engine::MatchState::Missing,
             _ => unreachable!("Invalid variant for MatchState: {}", inner),
         };
     }
@@ -1956,10 +1987,10 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
         24 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1985,6 +2016,7 @@ fn pde_ffi_dispatcher_sync_impl(
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
         25 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2432,7 +2464,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::MatchState {
         match self {
             Self::Confident => 0.into_dart(),
             Self::Doubtful => 1.into_dart(),
-            Self::Missing => 2.into_dart(),
+            Self::Review => 2.into_dart(),
+            Self::Missing => 3.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -3061,7 +3094,8 @@ impl SseEncode for crate::api::engine::MatchState {
             match self {
                 crate::api::engine::MatchState::Confident => 0,
                 crate::api::engine::MatchState::Doubtful => 1,
-                crate::api::engine::MatchState::Missing => 2,
+                crate::api::engine::MatchState::Review => 2,
+                crate::api::engine::MatchState::Missing => 3,
                 _ => {
                     unimplemented!("");
                 }

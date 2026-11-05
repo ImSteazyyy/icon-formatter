@@ -56,6 +56,9 @@ class _ShellState extends State<Shell> {
   late final List<_Dest> dests = _dests;
   late final List<Widget> pages;
 
+  /// Android: sections side by side, reachable with a horizontal swipe.
+  final _pager = PageController();
+
   @override
   void initState() {
     super.initState();
@@ -63,13 +66,13 @@ class _ShellState extends State<Shell> {
       // opened from the "icon pack da aggiornare" notification
       PlatformService.takeLaunchAction().then((a) {
         final i = dests.indexWhere((d) => d.id == a);
-        if (a != null && i >= 0 && mounted) setState(() => index = i);
+        if (a != null && i >= 0 && mounted) _select(i);
       });
     }
     pages = [
       for (final d in dests)
         switch (d.id) {
-          'studio' => StudioScreen(onOpenBases: _openBases, onOpenPack: () => _go('builder')),
+          'studio' => StudioScreen(onOpenBases: _openBases, onOpenPack: () => _go('builder'), onOpenApps: Platform.isAndroid ? () => _go('apps') : null),
           'ai' => AiScreen(onOpenSettings: () => _openSettings(SettingsCat.ai)),
           'pack' => PackScreen(onOpenBases: _openBases),
           'builder' => const PackBuilderScreen(),
@@ -80,7 +83,37 @@ class _ShellState extends State<Shell> {
     ];
   }
 
-  void _go(String id) => setState(() => index = dests.indexWhere((d) => d.id == id));
+  @override
+  void dispose() {
+    _pager.dispose();
+    super.dispose();
+  }
+
+  void _go(String id) => _select(dests.indexWhere((d) => d.id == id));
+
+  /// Selects a section from the bar (or code); the pager follows. Adjacent
+  /// sections slide, farther ones jump (no intermediate page is built).
+  void _select(int i) {
+    if (i < 0) return;
+    final from = index;
+    setState(() => index = i);
+    if (!_pager.hasClients) return;
+    if ((i - from).abs() == 1 && AppState.I.appearance.animations) {
+      _pager.animateToPage(i, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+    } else {
+      _pager.jumpToPage(i);
+    }
+  }
+
+  /// Swipeable sections; each one is kept alive (no reload when coming back).
+  Widget _pagerView() => PageView(
+        controller: _pager,
+        physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
+        onPageChanged: (i) {
+          if (i != index) setState(() => index = i);
+        },
+        children: [for (final p in pages) _KeepAlive(child: p)],
+      );
 
   void _openBases() {
     if (dests.any((d) => d.id == 'bases')) {
@@ -100,6 +133,7 @@ class _ShellState extends State<Shell> {
     final w = MediaQuery.of(context).size.width;
     final stack = IndexedStack(index: index, children: pages);
     if (Platform.isAndroid && w < 840) {
+      final stack = _pagerView();
       // Floating liquid-glass navigation: content scrolls underneath it.
       const navH = 64.0;
       // real height of the floating bar (measured after layout)
@@ -139,7 +173,7 @@ class _ShellState extends State<Shell> {
                 horizontalPadding: 12,
                 verticalPadding: 12,
                 selectedIndex: index,
-                onTabSelected: (i) => setState(() => index = i),
+                onTabSelected: _select,
                 settings: navGlassSettings(),
                 quality: appGlassQuality,
                 // dark grey lens tinted with a desaturated pink-lilac accent
@@ -173,6 +207,7 @@ class _ShellState extends State<Shell> {
       );
     }
     if (Platform.isAndroid) {
+      final stack = _pagerView();
       return Scaffold(
         body: Backdrop(
           child: SafeArea(
@@ -181,7 +216,7 @@ class _ShellState extends State<Shell> {
                 backgroundColor: Colors.transparent,
                 selectedIndex: index,
                 labelType: NavigationRailLabelType.all,
-                onDestinationSelected: (i) => setState(() => index = i),
+                onDestinationSelected: _select,
                 destinations: [for (final d in dests) NavigationRailDestination(icon: Icon(d.icon), label: Text(d.label))],
               ),
               Expanded(child: stack),
@@ -275,5 +310,24 @@ class _SideItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _KeepAlive extends StatefulWidget {
+  const _KeepAlive({required this.child});
+  final Widget child;
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

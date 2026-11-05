@@ -55,14 +55,17 @@ void main() {
   test('liquid glass settings persistence and reset', () {
     final g = GlassConfig()
       ..blur = 21
-      ..gloss = false
+      ..gloss = true
       ..textShadow = 0.2;
     final h = GlassConfig()..load(g.toJson());
     expect(h.blur, 21);
-    expect(h.gloss, false);
+    expect(h.gloss, true);
     expect(h.textShadow, 0.2);
     h.reset();
-    expect(h.blur, GlassConfig().blur);
-    expect(h.gloss, true);
+    // defaults = the look chosen on the phone (blur 22.6, frost 61, no gloss)
+    expect(h.blur, 22.6);
+    expect(h.frost, 0.61);
+    expect(h.saturation, 2.5);
+    expect(h.gloss, false);
   });
 }
