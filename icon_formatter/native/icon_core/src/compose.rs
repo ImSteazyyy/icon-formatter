@@ -160,7 +160,8 @@ pub fn unwrap_tile(glyph: &RgbaImage) -> Option<(RgbaImage, (u32, u32, u32, u32)
     for y in rim..h.saturating_sub(rim) {
         for x in rim..w.saturating_sub(rim) {
             let i = (y * w + x) as usize;
-            if dist(&lab[i], bg) < 0.05 {
+            // seeds: background colour, or anything darker and neutral (seams, shadows)
+            if dist(&lab[i], bg) < 0.05 || (lab[i].l <= bg.0 + 0.02 && lab[i].a.hypot(lab[i].b) < 0.06) {
                 bgm[i] = true;
                 queue.push_back(i);
             }

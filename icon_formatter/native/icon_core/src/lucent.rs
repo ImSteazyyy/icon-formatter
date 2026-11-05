@@ -505,7 +505,7 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         // neutral greys get a gamma lift (v^0.6): dark details (roads, keys)
         // become visible on the dark frosted plate while the tonal steps
         // between greys (e.g. a figure on a grey disc) are kept
-        let lut: Vec<u8> = (0..256).map(|v| ((v as f32 / 255.0).powf(0.6) * 255.0).round() as u8).collect();
+        let lut: Vec<u8> = (0..256).map(|v| ((v as f32 / 255.0).powf(0.45) * 255.0).round() as u8).collect();
         for px in layer.pixels_mut() {
             let mx = px[0].max(px[1]).max(px[2]);
             let mn = px[0].min(px[1]).min(px[2]);
