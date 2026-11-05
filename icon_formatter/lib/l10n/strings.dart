@@ -134,7 +134,7 @@ class S {
   static const annullato = 'Annullato';
   static const regolazioni = 'Regolazioni';
   static String elaboraApp(Object? a) => 'Elabora $a app';
-  static const iconPackZip = 'Icon pack ZIP';
+  static const iconPackZip = 'Icon pack (ZIP o APK)';
   static String impossibileAprirePack(Object? a) => 'Impossibile aprire il pack: $a';
   static const nessunRisultatoVerificare = 'Nessun risultato da verificare';
   static String esportazioneNonRiuscita(Object? a) => 'Esportazione non riuscita: $a';
@@ -324,7 +324,7 @@ class S {
   static const salvaPng = 'Salva PNG';
   static const pngSalvato = 'PNG salvato';
   static const importaIconePngJpgWebp = 'Importa icone (PNG, JPG, WEBP o ZIP)';
-  static const importaZip = 'Importa ZIP';
+  static const importaZip = 'Importa ZIP o APK';
   static const importaCartellaIcone = 'Importa cartella di icone';
   static const prima = 'Prima';
   static const dopo = 'Dopo';
@@ -420,4 +420,5 @@ class S {
   static String aiAffidabile(Object? c) => 'Maschera affidabile · confidenza $c%';
   static const aiCorrezioneInfo = 'Sotto la soglia bassa il pixel diventa trasparente, sopra quella alta resta pieno; in mezzo la transizione è graduale.';
   static const aiAnteprimaMascheraSelezionata = "Maschera AI dell'icona selezionata";
+  static const zipOApk = 'ZIP o APK';
 }

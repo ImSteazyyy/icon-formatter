@@ -40,6 +40,37 @@ pub struct PackScan {
     pub notes: Vec<String>,
 }
 
+/// Density rank of an Android resource folder (higher = sharper).
+fn density_rank(rel: &str) -> u32 {
+    let dir = rel.rsplit('/').nth(1).unwrap_or("");
+    for (k, r) in [("xxxhdpi", 7), ("xxhdpi", 6), ("xhdpi", 5), ("hdpi", 4), ("mdpi", 3), ("ldpi", 2), ("nodpi", 8), ("anydpi", 1)] {
+        if dir.contains(k) {
+            return r;
+        }
+    }
+    0
+}
+
+/// Keeps one image per drawable name: the highest density (APK resources).
+fn dedupe_densities(images: Vec<PackEntry>) -> Vec<PackEntry> {
+    let mut best: std::collections::BTreeMap<String, PackEntry> = Default::default();
+    for e in images {
+        let rel = e.rel.to_lowercase();
+        if !(rel.starts_with("res/drawable") || rel.starts_with("res/mipmap") || rel.starts_with("assets/")) {
+            continue;
+        }
+        let k = drawable_name(&e.rel);
+        let keep = match best.get(&k) {
+            Some(b) => density_rank(&e.rel) > density_rank(&b.rel),
+            None => true,
+        };
+        if keep {
+            best.insert(k, e);
+        }
+    }
+    best.into_values().collect()
+}
+
 pub fn is_image(p: &Path) -> bool {
     p.extension()
         .and_then(|e| e.to_str())
@@ -174,6 +205,7 @@ pub fn open_pack(input: &Path, work_dir: &Path) -> Result<PackScan> {
     let mut images = Vec::new();
     let mut others = Vec::new();
     let mut appfilter = None;
+    let mut binary_appfilter: Option<PathBuf> = None;
     for e in WalkDir::new(&root).sort_by_file_name() {
         let e = e.map_err(|e| CoreError::Io(std::io::Error::other(e.to_string())))?;
         if !e.file_type().is_file() {
@@ -196,14 +228,30 @@ pub fn open_pack(input: &Path, work_dir: &Path) -> Result<PackScan> {
                 let text_ok = fs::read(e.path()).map(|b| b.starts_with(b"<") || b.starts_with(b"\xef\xbb\xbf<")).unwrap_or(false);
                 if text_ok && appfilter.is_none() {
                     appfilter = Some(e.path().to_path_buf());
-                } else if !text_ok {
-                    notes.push(format!("{rel}: binary (compiled) XML, not editable; skipped for mapping"));
+                } else if !text_ok && binary_appfilter.is_none() {
+                    binary_appfilter = Some(e.path().to_path_buf());
                 }
             }
             others.push(entry);
         }
     }
     let mut entries = Vec::new();
+    if appfilter.is_none() {
+        if let Some(b) = &binary_appfilter {
+            // compiled res/xml/appfilter.xml of an APK
+            match crate::axml::appfilter_entries(&fs::read(b)?) {
+                Some(v) if !v.is_empty() => {
+                    notes.push(format!("appfilter.xml binario letto ({} voci)", v.len()));
+                    entries = v;
+                }
+                _ => notes.push("appfilter.xml binario non leggibile".into()),
+            }
+        }
+    }
+    // APKs carry one copy per density: keep the highest one per drawable
+    if input.extension().map(|e| e.eq_ignore_ascii_case("apk")).unwrap_or(false) {
+        images = dedupe_densities(images);
+    }
     if let Some(p) = &appfilter {
         let txt = fs::read_to_string(p)?;
         match parse_appfilter(txt.trim_start_matches('\u{feff}')) {

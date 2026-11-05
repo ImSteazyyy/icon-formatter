@@ -243,7 +243,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       Wrap(spacing: 8, runSpacing: 8, children: [
         OutlinedButton.icon(onPressed: () => _add(ImportService.pickFiles), icon: const Icon(Icons.image_outlined), label: const Text(S.file)),
         OutlinedButton.icon(onPressed: () => _add(ImportService.pickFolderImages), icon: const Icon(Icons.folder_open_outlined), label: const Text(S.cartella)),
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickZip), icon: const Icon(Icons.folder_zip_outlined), label: const Text('ZIP')),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickZip), icon: const Icon(Icons.folder_zip_outlined), label: const Text(S.zipOApk)),
         if (samples.isNotEmpty) TextButton(onPressed: () => setState(() => samples = []), child: const Text(S.svuota)),
       ]),
       const SizedBox(height: 12),

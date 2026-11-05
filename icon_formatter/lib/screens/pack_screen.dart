@@ -47,7 +47,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
   Future<void> _open({required bool zip}) async {
     String? input;
     if (zip) {
-      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: S.iconPackZip);
+      final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'apk'], dialogTitle: S.iconPackZip);
       input = r?.files.single.path;
     } else {
       input = await ImportService.pickFolder();

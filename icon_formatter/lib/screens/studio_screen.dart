@@ -77,7 +77,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     final toolbar = [
       ToolButton(icon: Icons.add_photo_alternate_outlined, label: S.file, onTap: () => _import(ImportService.pickFiles)),
       ToolButton(icon: Icons.folder_open_outlined, label: S.cartella, onTap: () => _import(ImportService.pickFolderImages)),
-      ToolButton(icon: Icons.folder_zip_outlined, label: 'ZIP', onTap: () => _import(ImportService.pickZip)),
+      ToolButton(icon: Icons.folder_zip_outlined, label: S.zipOApk, onTap: () => _import(ImportService.pickZip)),
       ToolButton(
         icon: Icons.clear_all,
         label: S.svuota,

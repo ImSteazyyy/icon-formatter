@@ -5,6 +5,7 @@
 //! `cargo test` without Flutter.
 
 pub mod ai;
+pub mod axml;
 pub mod batch;
 pub mod calibrate;
 pub mod color;

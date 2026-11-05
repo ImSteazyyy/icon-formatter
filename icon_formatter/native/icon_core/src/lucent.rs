@@ -514,6 +514,24 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
             }
         }
     }
+    let mostly_light = {
+        let opaque: Vec<_> = layer.pixels().filter(|q| q[3] > 127).collect();
+        let light = opaque.iter().filter(|q| q[0].min(q[1]).min(q[2]) > 150).count();
+        !opaque.is_empty() && light as f32 > 0.5 * opaque.len() as f32
+    };
+    if p.lift_greys && !dark_plate && !p.monochrome && mostly_light {
+        // light plate: light neutral greys (a white glyph) are scaled down so
+        // they stay readable on the light frosted plate; ratios are kept
+        for px in layer.pixels_mut() {
+            let mx = px[0].max(px[1]).max(px[2]);
+            let mn = px[0].min(px[1]).min(px[2]);
+            if mx - mn < 24 && mx > 90 {
+                let w = ((mx as f32 - 90.0) / 60.0).clamp(0.0, 1.0);
+                let k = 1.0 - 0.42 * w;
+                *px = Rgba([(px[0] as f32 * k) as u8, (px[1] as f32 * k) as u8, (px[2] as f32 * k) as u8, px[3]]);
+            }
+        }
+    }
     if p.monochrome && glyph.width() > 0 && glyph.height() > 0 {
         let (mut mask, complex) = monochrome_mask(glyph);
         let ink_dark = 0.2126 * p.ink[0] as f32 + 0.7152 * p.ink[1] as f32 + 0.0722 * p.ink[2] as f32 <= 128.0;

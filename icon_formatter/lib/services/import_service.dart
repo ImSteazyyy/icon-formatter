@@ -16,7 +16,7 @@ class ImportService {
     final r = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: [...exts, 'zip'],
+      allowedExtensions: [...exts, 'zip', 'apk'],
       dialogTitle: S.importaIconePngJpgWebp,
     );
     if (r == null) return [];
@@ -25,7 +25,7 @@ class ImportService {
   }
 
   static Future<List<PackImage>> pickZip() async {
-    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip'], dialogTitle: S.importaZip);
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'apk'], dialogTitle: S.importaZip);
     final path = r?.files.single.path;
     if (path == null) return [];
     return expand([path]);

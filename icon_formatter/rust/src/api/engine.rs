@@ -729,7 +729,7 @@ pub fn collect_images(inputs: Vec<String>, work_dir: String) -> Result<Vec<PackI
             continue;
         }
         let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        if p.is_dir() || ext == "zip" {
+        if p.is_dir() || ext == "zip" || ext == "apk" {
             let scan = pack::open_pack(p, &Path::new(&work_dir).join(format!("import_{k}")))?;
             for i in scan.images {
                 out.push(PackImage {
