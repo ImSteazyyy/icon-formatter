@@ -80,8 +80,12 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
     const margin = 16.0;
     final width = (size.width - 2 * margin).clamp(0.0, 300.0);
     final a = widget.anchor;
-    // low controls open the menu upwards, high ones downwards
-    final above = a.center.dy > size.height * 0.55;
+    // the menu opens on the side with more room and never leaves the screen:
+    // it is as tall as that room allows, longer lists scroll inside it
+    final below = size.height - mq.padding.bottom - a.bottom - 8 - margin;
+    final over = a.top - mq.padding.top - 8 - margin;
+    final above = over > below;
+    final room = (above ? over : below).clamp(120.0, size.height * 0.6);
     final left = (a.center.dx - width / 2).clamp(margin, size.width - margin - width);
     final accent = Theme.of(context).colorScheme.primary;
     final origin = Alignment(((a.center.dx - left) / width) * 2 - 1, above ? 1 : -1);
@@ -126,7 +130,7 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
         live: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: size.height * 0.6),
+          constraints: BoxConstraints(maxHeight: room - 8),
           child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: rows)),
         ),
       ),

@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 975776295;
+  int get rustContentHash => -808499180;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -130,6 +130,11 @@ abstract class RustLibApi extends BaseApi {
     required String root,
     required String outDir,
     String? zipPath,
+  });
+
+  Future<List<CalendarIconInfo>> crateApiEngineFindCalendarIcons({
+    required String input,
+    required String workDir,
   });
 
   Future<Uint32List> crateApiEngineImageDimensions({required String path});
@@ -655,6 +660,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<List<CalendarIconInfo>> crateApiEngineFindCalendarIcons({
+    required String input,
+    required String workDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(input, serializer);
+          sse_encode_String(workDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_calendar_icon_info,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiEngineFindCalendarIconsConstMeta,
+        argValues: [input, workDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineFindCalendarIconsConstMeta =>
+      const TaskConstMeta(
+        debugName: "find_calendar_icons",
+        argNames: ["input", "workDir"],
+      );
+
+  @override
   Future<Uint32List> crateApiEngineImageDimensions({required String path}) {
     return handler.executeNormal(
       NormalTask(
@@ -664,7 +704,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 17,
             port: port_,
           );
         },
@@ -696,7 +736,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -725,7 +765,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 19,
             port: port_,
           );
         },
@@ -757,7 +797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -791,7 +831,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 21,
             port: port_,
           );
         },
@@ -825,7 +865,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -859,7 +899,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -893,7 +933,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -938,7 +978,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 24,
+              funcId: 25,
               port: port_,
             );
           },
@@ -967,7 +1007,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -993,7 +1033,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(n, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,
@@ -1023,7 +1063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1057,7 +1097,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1091,7 +1131,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1125,7 +1165,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1350,6 +1390,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CalendarIconInfo dco_decode_calendar_icon_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return CalendarIconInfo(
+      component: dco_decode_String(arr[0]),
+      package: dco_decode_String(arr[1]),
+      activity: dco_decode_String(arr[2]),
+      prefix: dco_decode_String(arr[3]),
+      day: dco_decode_u_32(arr[4]),
+      path: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
   CalibrationOutput dco_decode_calibration_output(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1402,13 +1458,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   IconPackApp dco_decode_icon_pack_app(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return IconPackApp(
       label: dco_decode_String(arr[0]),
       package: dco_decode_String(arr[1]),
       activity: dco_decode_String(arr[2]),
       png: dco_decode_String(arr[3]),
+      calendarDay: dco_decode_u_32(arr[4]),
     );
   }
 
@@ -1461,6 +1518,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<BatchItem> dco_decode_list_batch_item(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_batch_item).toList();
+  }
+
+  @protected
+  List<CalendarIconInfo> dco_decode_list_calendar_icon_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_calendar_icon_info).toList();
   }
 
   @protected
@@ -1999,6 +2062,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  CalendarIconInfo sse_decode_calendar_icon_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_component = sse_decode_String(deserializer);
+    var var_package = sse_decode_String(deserializer);
+    var var_activity = sse_decode_String(deserializer);
+    var var_prefix = sse_decode_String(deserializer);
+    var var_day = sse_decode_u_32(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    return CalendarIconInfo(
+      component: var_component,
+      package: var_package,
+      activity: var_activity,
+      prefix: var_prefix,
+      day: var_day,
+      path: var_path,
+    );
+  }
+
+  @protected
   CalibrationOutput sse_decode_calibration_output(
     SseDeserializer deserializer,
   ) {
@@ -2069,11 +2151,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_package = sse_decode_String(deserializer);
     var var_activity = sse_decode_String(deserializer);
     var var_png = sse_decode_String(deserializer);
+    var var_calendarDay = sse_decode_u_32(deserializer);
     return IconPackApp(
       label: var_label,
       package: var_package,
       activity: var_activity,
       png: var_png,
+      calendarDay: var_calendarDay,
     );
   }
 
@@ -2151,6 +2235,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <BatchItem>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_batch_item(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CalendarIconInfo> sse_decode_list_calendar_icon_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CalendarIconInfo>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_calendar_icon_info(deserializer));
     }
     return ans_;
   }
@@ -2790,6 +2888,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_calendar_icon_info(
+    CalendarIconInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.component, serializer);
+    sse_encode_String(self.package, serializer);
+    sse_encode_String(self.activity, serializer);
+    sse_encode_String(self.prefix, serializer);
+    sse_encode_u_32(self.day, serializer);
+    sse_encode_String(self.path, serializer);
+  }
+
+  @protected
   void sse_encode_calibration_output(
     CalibrationOutput self,
     SseSerializer serializer,
@@ -2841,6 +2953,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.package, serializer);
     sse_encode_String(self.activity, serializer);
     sse_encode_String(self.png, serializer);
+    sse_encode_u_32(self.calendarDay, serializer);
   }
 
   @protected
@@ -2899,6 +3012,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_batch_item(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_calendar_icon_info(
+    List<CalendarIconInfo> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_calendar_icon_info(item, serializer);
     }
   }
 

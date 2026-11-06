@@ -95,6 +95,174 @@ pub fn reaches_edges(src: &RgbaImage, bbox: (u32, u32, u32, u32)) -> bool {
 
 /// The image cropped to its visible box (alpha > 16), or a copy when it has
 /// no transparent margin.
+/// Full-screen (already frosted) icons: the dark tinted glow around thin
+/// coloured strips glued to an edge (Contacts' tabs) is replaced by the
+/// plate around it; the strip itself stays. Every full-screen icon then has
+/// a uniform plate. Returns the image and whether anything changed.
+pub fn flatten_edge_color(img: &RgbaImage) -> (RgbaImage, bool) {
+    let (w, h) = img.dimensions();
+    let (wu, hu) = (w as usize, h as usize);
+    let s = w.min(h) as f32;
+    if s < 16.0 {
+        return (img.clone(), false);
+    }
+    let sat = |p: &Rgba<u8>| {
+        let mx = p[0].max(p[1]).max(p[2]) as f32;
+        let mn = p[0].min(p[1]).min(p[2]) as f32;
+        (mx - mn) / 255.0
+    };
+    let edge_d = |x: usize, y: usize| x.min(y).min(wu - 1 - x).min(hu - 1 - y) as f32;
+    // the plate: colour and alpha of the neutral, fairly opaque pixels
+    let mut neutral: Vec<[u8; 4]> = img.pixels().filter(|p| p[3] > 90 && sat(p) < 0.06).map(|p| p.0).collect();
+    if neutral.len() < 32 {
+        return (img.clone(), false);
+    }
+    neutral.sort_by_key(|c| c[0] as u32 + c[1] as u32 + c[2] as u32);
+    let plate = neutral[neutral.len() / 2];
+    let mut alphas: Vec<u8> = neutral.iter().map(|c| c[3]).collect();
+    alphas.sort_unstable();
+    let plate_a = alphas[alphas.len() / 2];
+    // coloured pixels (glow included) and their connected pieces
+    let mask: Vec<bool> = img.pixels().map(|p| p[3] > 16 && sat(p) > 0.06).collect();
+    let mut label = vec![0u32; wu * hu];
+    let mut hit = vec![false; wu * hu];
+    let mut keep = vec![false; wu * hu];
+    let mut next = 0u32;
+    for start in 0..wu * hu {
+        if !mask[start] || label[start] != 0 {
+            continue;
+        }
+        next += 1;
+        let mut stack = vec![start];
+        let mut members = Vec::new();
+        label[start] = next;
+        let (mut dmin, mut dmax) = (f32::MAX, 0f32);
+        let (mut x0, mut y0, mut x1, mut y1) = (wu, hu, 0usize, 0usize);
+        while let Some(i) = stack.pop() {
+            let (x, y) = (i % wu, i / wu);
+            let d = edge_d(x, y);
+            dmin = dmin.min(d);
+            dmax = dmax.max(d);
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x + 1);
+            y1 = y1.max(y + 1);
+            members.push(i);
+            let nb = [(x > 0).then(|| i - 1), (x + 1 < wu).then(|| i + 1), (y > 0).then(|| i - wu), (y + 1 < hu).then(|| i + wu)];
+            for j in nb.into_iter().flatten() {
+                if mask[j] && label[j] == 0 {
+                    label[j] = next;
+                    stack.push(j);
+                }
+            }
+        }
+        // a strip: glued to the edge, running along most of one side, thin
+        // across it (Contacts' tabs); limbs or logos that touch the edge are
+        // not strips and stay as they are
+        let (bw, bh) = ((x1 - x0) as f32, (y1 - y0) as f32);
+        let long = bw.max(bh) >= 0.6 * s;
+        let thin = bw.min(bh) <= 0.30 * s;
+        let n = members.len() as f32;
+        if dmin <= 0.04 * s && dmax <= 0.30 * s && long && thin && n >= 0.002 * s * s && n <= 0.25 * s * s {
+            for i in members {
+                // the strip itself (bright, saturated: the coloured tabs)
+                // stays; only its dark tinted glow goes
+                let q = &img.as_raw()[i * 4..i * 4 + 4];
+                let mx = q[0].max(q[1]).max(q[2]);
+                let solid = mx >= 150 && sat(&Rgba([q[0], q[1], q[2], q[3]])) >= 0.40;
+                if solid {
+                    keep[i] = true;
+                } else {
+                    hit[i] = true;
+                }
+            }
+        }
+    }
+    if !hit.iter().any(|&b| b) {
+        return (img.clone(), false);
+    }
+    // 2 px wider, so no stair-stepped coloured fringe is left behind
+    for _ in 0..2 {
+        let prev = hit.clone();
+        for i in 0..wu * hu {
+            if prev[i] {
+                continue;
+            }
+            let (x, y) = (i % wu, i / wu);
+            let near = (x > 0 && prev[i - 1]) || (x + 1 < wu && prev[i + 1]) || (y > 0 && prev[i - wu]) || (y + 1 < hu && prev[i + wu]);
+            if near && !keep[i] && img.as_raw()[i * 4 + 3] > 16 {
+                hit[i] = true;
+            }
+        }
+    }
+    // filled layer by layer from the plate next to it (onion peeling), so
+    // the plate's own shading continues through the strip: no patch, no
+    // smear; the outer anti-aliased edge keeps its own lower alpha
+    let mut out = img.clone();
+    // filled from the plate only, never from the strip's own colours
+    // the plate as seen near the edges (the inner artwork, e.g. a light
+    // avatar disc, must not bleed into the fill)
+    let mut ring: Vec<[u8; 4]> = (0..wu * hu)
+        .filter(|&i| !hit[i] && !keep[i] && edge_d(i % wu, i / wu) <= 0.08 * s && img.as_raw()[i * 4 + 3] > 90)
+        .map(|i| {
+            let q = &img.as_raw()[i * 4..i * 4 + 4];
+            [q[0], q[1], q[2], q[3]]
+        })
+        .filter(|c| sat(&Rgba(*c)) < 0.06)
+        .collect();
+    if ring.len() < 8 {
+        ring = vec![plate];
+    }
+    ring.sort_by_key(|c| c[0] as u32 + c[1] as u32 + c[2] as u32);
+    let base = ring[ring.len() / 2];
+    let lum = |c: &[u8]| (c[0] as i32 + c[1] as i32 + c[2] as i32) / 3;
+    let bl = lum(&base);
+    let mut known: Vec<bool> = (0..wu * hu)
+        .map(|i| {
+            let q = &img.as_raw()[i * 4..i * 4 + 4];
+            !hit[i] && !keep[i] && q[3] > 16 && sat(&Rgba([q[0], q[1], q[2], q[3]])) < 0.06 && (lum(q) - bl).abs() <= 28
+        })
+        .collect();
+    let mut left: Vec<usize> = (0..wu * hu).filter(|&i| hit[i]).collect();
+    let _ = plate_a;
+    while !left.is_empty() {
+        let mut fill: Vec<(usize, [f32; 4])> = Vec::new();
+        for &i in &left {
+            let (x, y) = (i % wu, i / wu);
+            let mut acc = [0f32; 4];
+            let mut n = 0f32;
+            for j in [(x > 0).then(|| i - 1), (x + 1 < wu).then(|| i + 1), (y > 0).then(|| i - wu), (y + 1 < hu).then(|| i + wu)].into_iter().flatten() {
+                if known[j] {
+                    let q = out.as_raw();
+                    for c in 0..4 {
+                        acc[c] += q[j * 4 + c] as f32;
+                    }
+                    n += 1.0;
+                }
+            }
+            if n > 0.0 {
+                fill.push((i, [acc[0] / n, acc[1] / n, acc[2] / n, acc[3] / n]));
+            }
+        }
+        if fill.is_empty() {
+            // pockets the plate cannot reach: its typical colour
+            for &i in &left {
+                let a0 = img.as_raw()[i * 4 + 3];
+                out.put_pixel((i % wu) as u32, (i / wu) as u32, Rgba([base[0], base[1], base[2], a0.min(base[3])]));
+            }
+            break;
+        }
+        for (i, c) in &fill {
+            let a0 = img.as_raw()[i * 4 + 3] as f32;
+            let px = out.get_pixel_mut((i % wu) as u32, (i / wu) as u32);
+            *px = Rgba([c[0].round() as u8, c[1].round() as u8, c[2].round() as u8, c[3].min(a0).round() as u8]);
+            known[*i] = true;
+        }
+        left.retain(|i| !known[*i]);
+    }
+    (out, true)
+}
+
 pub fn crop_to_content(img: &RgbaImage) -> RgbaImage {
     match crate::imageops::alpha_bbox(img, 16) {
         Some((x0, y0, x1, y1)) if (x1 - x0, y1 - y0) != img.dimensions() && x1 > x0 + 8 && y1 > y0 + 8 => {

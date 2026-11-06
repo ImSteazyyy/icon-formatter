@@ -102,6 +102,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TranslucentSettings dco_decode_box_autoadd_translucent_settings(dynamic raw);
 
   @protected
+  CalendarIconInfo dco_decode_calendar_icon_info(dynamic raw);
+
+  @protected
   CalibrationOutput dco_decode_calibration_output(dynamic raw);
 
   @protected
@@ -130,6 +133,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<BatchItem> dco_decode_list_batch_item(dynamic raw);
+
+  @protected
+  List<CalendarIconInfo> dco_decode_list_calendar_icon_info(dynamic raw);
 
   @protected
   List<CalibrationSample> dco_decode_list_calibration_sample(dynamic raw);
@@ -316,6 +322,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  CalendarIconInfo sse_decode_calendar_icon_info(SseDeserializer deserializer);
+
+  @protected
   CalibrationOutput sse_decode_calibration_output(SseDeserializer deserializer);
 
   @protected
@@ -346,6 +355,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<BatchItem> sse_decode_list_batch_item(SseDeserializer deserializer);
+
+  @protected
+  List<CalendarIconInfo> sse_decode_list_calendar_icon_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<CalibrationSample> sse_decode_list_calibration_sample(
@@ -559,6 +573,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_calendar_icon_info(
+    CalendarIconInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_calibration_output(
     CalibrationOutput self,
     SseSerializer serializer,
@@ -600,6 +620,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_batch_item(
     List<BatchItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_calendar_icon_info(
+    List<CalendarIconInfo> self,
     SseSerializer serializer,
   );
 

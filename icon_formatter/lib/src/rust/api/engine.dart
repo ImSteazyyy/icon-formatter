@@ -142,6 +142,16 @@ Future<List<PackImage>> collectImages({
   workDir: workDir,
 );
 
+/// Studio › "Calendario da un icon pack": only the calendar icons of a pack
+/// (APK, ZIP or folder), every day it has, highest density.
+Future<List<CalendarIconInfo>> findCalendarIcons({
+  required String input,
+  required String workDir,
+}) => RustLib.instance.api.crateApiEngineFindCalendarIcons(
+  input: input,
+  workDir: workDir,
+);
+
 Future<IconPackResult> buildIconPack({
   required List<IconPackApp> apps,
   required String outDir,
@@ -375,6 +385,46 @@ class BatchProgress {
           total == other.total;
 }
 
+/// One day of a dynamic calendar icon found in an icon pack.
+class CalendarIconInfo {
+  final String component;
+  final String package;
+  final String activity;
+  final String prefix;
+  final int day;
+  final String path;
+
+  const CalendarIconInfo({
+    required this.component,
+    required this.package,
+    required this.activity,
+    required this.prefix,
+    required this.day,
+    required this.path,
+  });
+
+  @override
+  int get hashCode =>
+      component.hashCode ^
+      package.hashCode ^
+      activity.hashCode ^
+      prefix.hashCode ^
+      day.hashCode ^
+      path.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CalendarIconInfo &&
+          runtimeType == other.runtimeType &&
+          component == other.component &&
+          package == other.package &&
+          activity == other.activity &&
+          prefix == other.prefix &&
+          day == other.day &&
+          path == other.path;
+}
+
 class CalibrationOutput {
   final PlacementSettings placement;
   final double maxSideMad;
@@ -483,16 +533,24 @@ class IconPackApp {
   final String activity;
   final String png;
 
+  /// 1..31: one day of a dynamic calendar icon, 0 for a normal icon.
+  final int calendarDay;
+
   const IconPackApp({
     required this.label,
     required this.package,
     required this.activity,
     required this.png,
+    this.calendarDay = 0,
   });
 
   @override
   int get hashCode =>
-      label.hashCode ^ package.hashCode ^ activity.hashCode ^ png.hashCode;
+      label.hashCode ^
+      package.hashCode ^
+      activity.hashCode ^
+      png.hashCode ^
+      calendarDay.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -502,7 +560,8 @@ class IconPackApp {
           label == other.label &&
           package == other.package &&
           activity == other.activity &&
-          png == other.png;
+          png == other.png &&
+          calendarDay == other.calendarDay;
 }
 
 class IconPackResult {
@@ -657,7 +716,20 @@ enum LucentShape {
 }
 
 /// Per-app choice in "Rigenera" (Automatica / Colore del piatto / Bordo pieno / Normale).
-enum LucentStrategy { auto, plateColor, fullBleed, asIs }
+enum LucentStrategy {
+  auto,
+  plateColor,
+  fullBleed,
+  asIs,
+
+  /// Like Auto, plus: the dark tinted glow around coloured strips on the
+  /// edge of a full-screen icon (Contacts' tabs) takes the plate colour.
+  cleanEdge,
+
+  /// The whole icon (a page: calendar, finished tile) covers the plate edge
+  /// to edge, clipped by the shape; nothing removed, colours untouched.
+  tile,
+}
 
 class MatchInput {
   final String id;

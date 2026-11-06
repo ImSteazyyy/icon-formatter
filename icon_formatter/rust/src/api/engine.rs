@@ -92,6 +92,12 @@ pub enum LucentStrategy {
     PlateColor,
     FullBleed,
     AsIs,
+    /// Like Auto, plus: the dark tinted glow around coloured strips on the
+    /// edge of a full-screen icon (Contacts' tabs) takes the plate colour.
+    CleanEdge,
+    /// The whole icon (a page: calendar, finished tile) covers the plate edge
+    /// to edge, clipped by the shape; nothing removed, colours untouched.
+    Tile,
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +134,8 @@ impl From<&LucentSettings> for lucent::LucentParams {
                 LucentStrategy::PlateColor => lucent::GlyphStrategy::PlateColor,
                 LucentStrategy::FullBleed => lucent::GlyphStrategy::FullBleed,
                 LucentStrategy::AsIs => lucent::GlyphStrategy::AsIs,
+                LucentStrategy::CleanEdge => lucent::GlyphStrategy::CleanEdge,
+                LucentStrategy::Tile => lucent::GlyphStrategy::Tile,
             },
         }
     }
@@ -772,11 +780,34 @@ pub fn collect_images(inputs: Vec<String>, work_dir: String) -> Result<Vec<PackI
 
 // ---------------------------------------------------------------- android icon pack
 
+#[flutter_rust_bridge::frb]
 pub struct IconPackApp {
     pub label: String,
     pub package: String,
     pub activity: String,
     pub png: String,
+    /// 1..31: one day of a dynamic calendar icon, 0 for a normal icon.
+    #[frb(default = 0)]
+    pub calendar_day: u32,
+}
+
+/// One day of a dynamic calendar icon found in an icon pack.
+pub struct CalendarIconInfo {
+    pub component: String,
+    pub package: String,
+    pub activity: String,
+    pub prefix: String,
+    pub day: u32,
+    pub path: String,
+}
+
+/// Studio › "Calendario da un icon pack": only the calendar icons of a pack
+/// (APK, ZIP or folder), every day it has, highest density.
+pub fn find_calendar_icons(input: String, work_dir: String) -> Result<Vec<CalendarIconInfo>> {
+    let v = icon_core::calendar::find_calendar_icons(Path::new(&input), Path::new(&work_dir))?;
+    Ok(v.into_iter()
+        .map(|c| CalendarIconInfo { component: c.component, package: c.package, activity: c.activity, prefix: c.prefix, day: c.day, path: c.path.to_string_lossy().to_string() })
+        .collect())
 }
 
 pub struct IconPackResult {
@@ -789,7 +820,7 @@ pub struct IconPackResult {
 pub fn build_icon_pack(apps: Vec<IconPackApp>, out_dir: String, pack_name: String, zip_path: Option<String>) -> Result<IconPackResult> {
     let entries: Vec<iconpack::IconPackEntry> = apps
         .into_iter()
-        .map(|a| iconpack::IconPackEntry { label: a.label, package: a.package, activity: a.activity, png: PathBuf::from(a.png) })
+        .map(|a| iconpack::IconPackEntry { label: a.label, package: a.package, activity: a.activity, png: PathBuf::from(a.png), calendar_day: a.calendar_day })
         .collect();
     let r = iconpack::build(&entries, Path::new(&out_dir), &pack_name, zip_path.as_deref().map(Path::new))?;
     Ok(IconPackResult { out_dir: r.out_dir, zip: r.zip, icons: r.icons, notes: r.notes })

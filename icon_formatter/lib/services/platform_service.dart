@@ -65,16 +65,28 @@ class PlatformService {
   /// Removes the installed pack through Shizuku (only after the user agreed).
   static Future<void> devicePackUninstall() => _ch.invokeMethod('devicePackUninstall');
 
+  /// Removes what Android keeps of our uninstalled pack (Shizuku). True when nothing is left.
+  static Future<bool> devicePackCleanup() async => (await _ch.invokeMethod<bool>('devicePackCleanup')) ?? false;
+
   /// PNG icons for apps. When [glyphOnly] is true and the icon is adaptive
   /// with a transparent foreground, only the foreground layer is rendered.
   /// Missing icons come back as null.
-  static Future<List<Uint8List?>> getIcons(List<InstalledApp> apps, {int size = 432, bool glyphOnly = true}) async {
+  static Future<List<Uint8List?>> getIcons(List<InstalledApp> apps, {int size = 432, bool glyphOnly = true, bool activePack = false}) async {
     final r = await _ch.invokeListMethod<Object?>('getIcons', {
       'items': apps.map((a) => {'package': a.package, 'activity': a.activity}).toList(),
       'size': size,
       'glyphOnly': glyphOnly,
+      // display: the icon of the pack the launcher uses (stock when none)
+      'activePack': activePack,
     });
     return (r ?? []).map((e) => e is Uint8List ? e : null).toList();
+  }
+
+  /// The icon pack the launcher uses now ({package, label}), or null when
+  /// the launcher shows stock icons or does not tell (non-Nothing launchers).
+  static Future<Map<String, dynamic>?> activeIconPack() async {
+    final r = await _ch.invokeMapMethod<String, dynamic>('activeIconPack');
+    return r;
   }
 
   /// Storage Access Framework: lets the user pick a folder. Returns a tree URI.

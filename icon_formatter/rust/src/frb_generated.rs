@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 975776295;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -808499180;
 
 // Section: executor
 
@@ -574,6 +574,43 @@ fn wire__crate__api__engine__finalize_pack_impl(
                     (move || {
                         let output_ok =
                             crate::api::engine::finalize_pack(api_root, api_out_dir, api_zip_path)?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__engine__find_calendar_icons_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "find_calendar_icons",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_input = <String>::sse_decode(&mut deserializer);
+            let api_work_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::engine::find_calendar_icons(api_input, api_work_dir)?;
                         std::result::Result::Ok(output_ok)
                     })(),
                 )
@@ -1336,6 +1373,26 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::engine::CalendarIconInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_component = <String>::sse_decode(deserializer);
+        let mut var_package = <String>::sse_decode(deserializer);
+        let mut var_activity = <String>::sse_decode(deserializer);
+        let mut var_prefix = <String>::sse_decode(deserializer);
+        let mut var_day = <u32>::sse_decode(deserializer);
+        let mut var_path = <String>::sse_decode(deserializer);
+        return crate::api::engine::CalendarIconInfo {
+            component: var_component,
+            package: var_package,
+            activity: var_activity,
+            prefix: var_prefix,
+            day: var_day,
+            path: var_path,
+        };
+    }
+}
+
 impl SseDecode for crate::api::engine::CalibrationOutput {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1408,11 +1465,13 @@ impl SseDecode for crate::api::engine::IconPackApp {
         let mut var_package = <String>::sse_decode(deserializer);
         let mut var_activity = <String>::sse_decode(deserializer);
         let mut var_png = <String>::sse_decode(deserializer);
+        let mut var_calendarDay = <u32>::sse_decode(deserializer);
         return crate::api::engine::IconPackApp {
             label: var_label,
             package: var_package,
             activity: var_activity,
             png: var_png,
+            calendar_day: var_calendarDay,
         };
     }
 }
@@ -1492,6 +1551,20 @@ impl SseDecode for Vec<crate::api::engine::BatchItem> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::engine::BatchItem>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::engine::CalendarIconInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::engine::CalendarIconInfo>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -1645,6 +1718,8 @@ impl SseDecode for crate::api::engine::LucentStrategy {
             1 => crate::api::engine::LucentStrategy::PlateColor,
             2 => crate::api::engine::LucentStrategy::FullBleed,
             3 => crate::api::engine::LucentStrategy::AsIs,
+            4 => crate::api::engine::LucentStrategy::CleanEdge,
+            5 => crate::api::engine::LucentStrategy::Tile,
             _ => unreachable!("Invalid variant for LucentStrategy: {}", inner),
         };
     }
@@ -1976,21 +2051,22 @@ fn pde_ffi_dispatcher_primary_impl(
         8 => wire__crate__api__engine__collect_images_impl(port, ptr, rust_vec_len, data_len),
         9 => wire__crate__api__engine__compose_glyph_png_impl(port, ptr, rust_vec_len, data_len),
         15 => wire__crate__api__engine__finalize_pack_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
-        23 => {
+        16 => wire__crate__api__engine__find_calendar_icons_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
+        24 => {
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
-        24 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2015,8 +2091,8 @@ fn pde_ffi_dispatcher_sync_impl(
         14 => {
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
-        25 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2205,6 +2281,31 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::BatchProgress>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::CalendarIconInfo {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.component.into_into_dart().into_dart(),
+            self.package.into_into_dart().into_dart(),
+            self.activity.into_into_dart().into_dart(),
+            self.prefix.into_into_dart().into_dart(),
+            self.day.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::CalendarIconInfo
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::CalendarIconInfo>
+    for crate::api::engine::CalendarIconInfo
+{
+    fn into_into_dart(self) -> crate::api::engine::CalendarIconInfo {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::engine::CalibrationOutput {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2267,6 +2368,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::IconPackApp {
             self.package.into_into_dart().into_dart(),
             self.activity.into_into_dart().into_dart(),
             self.png.into_into_dart().into_dart(),
+            self.calendar_day.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2392,6 +2494,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentStrategy {
             Self::PlateColor => 1.into_dart(),
             Self::FullBleed => 2.into_dart(),
             Self::AsIs => 3.into_dart(),
+            Self::CleanEdge => 4.into_dart(),
+            Self::Tile => 5.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -2823,6 +2927,18 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::api::engine::CalendarIconInfo {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.component, serializer);
+        <String>::sse_encode(self.package, serializer);
+        <String>::sse_encode(self.activity, serializer);
+        <String>::sse_encode(self.prefix, serializer);
+        <u32>::sse_encode(self.day, serializer);
+        <String>::sse_encode(self.path, serializer);
+    }
+}
+
 impl SseEncode for crate::api::engine::CalibrationOutput {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2873,6 +2989,7 @@ impl SseEncode for crate::api::engine::IconPackApp {
         <String>::sse_encode(self.package, serializer);
         <String>::sse_encode(self.activity, serializer);
         <String>::sse_encode(self.png, serializer);
+        <u32>::sse_encode(self.calendar_day, serializer);
     }
 }
 
@@ -2927,6 +3044,16 @@ impl SseEncode for Vec<crate::api::engine::BatchItem> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::engine::BatchItem>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::engine::CalendarIconInfo> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::engine::CalendarIconInfo>::sse_encode(item, serializer);
         }
     }
 }
@@ -3053,6 +3180,8 @@ impl SseEncode for crate::api::engine::LucentStrategy {
                 crate::api::engine::LucentStrategy::PlateColor => 1,
                 crate::api::engine::LucentStrategy::FullBleed => 2,
                 crate::api::engine::LucentStrategy::AsIs => 3,
+                crate::api::engine::LucentStrategy::CleanEdge => 4,
+                crate::api::engine::LucentStrategy::Tile => 5,
                 _ => {
                     unimplemented!("");
                 }

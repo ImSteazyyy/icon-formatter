@@ -242,7 +242,16 @@ fn flood(
                 continue;
             }
             let dm = nearest(lab, alpha, j, models);
-            if dm <= strict || (dm <= drift && dist_px(lab, alpha, i, j) <= step) {
+            // drift follows shading (lightness) of a background, never into
+            // another hue: a light colour next to white (Google's yellow)
+            // is reached through the soft edge in small steps otherwise
+            let same_hue = || {
+                models.iter().any(|m| {
+                    let (da, db) = (lab[j].a - m.lab.a, lab[j].b - m.lab.b);
+                    (da * da + db * db).sqrt() <= strict
+                })
+            };
+            if dm <= strict || (dm <= drift && dist_px(lab, alpha, i, j) <= step && same_hue()) {
                 bg[j] = true;
                 q.push_back(j);
             }
@@ -380,6 +389,26 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
         for i in 0..n {
             if !before[i] && d[i] < band {
                 bg[i] = true;
+            }
+        }
+        // what is left of the rim lighting just past the band (a thin light
+        // line along the top of frosted icons): pieces that never get deeper
+        // than twice the band into the plate are rim, not symbol
+        {
+            let fgm: Vec<bool> = bg.iter().map(|b| !b).collect();
+            let (labels, sizes) = components(&fgm, w, h);
+            let mut deepest = vec![0f32; sizes.len()];
+            for i in 0..n {
+                let l = labels[i] as usize;
+                if l != 0 {
+                    deepest[l] = deepest[l].max(d[i]);
+                }
+            }
+            for i in 0..n {
+                let l = labels[i] as usize;
+                if l != 0 && deepest[l] < band * 2.2 {
+                    bg[i] = true;
+                }
             }
         }
         // safety net: a "plate" that took almost everything was the logo
@@ -601,6 +630,32 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
 mod tests {
     use super::*;
     use image::Rgba;
+
+    /// Frosted icons light the top edge of their plate: that light line is
+    /// rim, never part of the symbol (no white bar on top of the result).
+    #[test]
+    fn plate_top_highlight_is_not_glyph() {
+        let n = 192u32;
+        let shape = crate::squircle::Shape { size_ratio: 0.93, exponent: 4.25 };
+        let mask = crate::squircle::mask(n, &shape);
+        let mut img = RgbaImage::new(n, n);
+        let top = (0..n).find(|&y| mask[(y * n + n / 2) as usize] > 0).unwrap();
+        for y in 0..n {
+            for x in 0..n {
+                let a = mask[(y * n + x) as usize];
+                if a == 0 {
+                    continue;
+                }
+                // dark plate, a light band fading out over the first 9 rows
+                let t = y.saturating_sub(top);
+                let l = if t < 9 { 170 - t * 18 } else { 14 };
+                img.put_pixel(x, y, Rgba([l as u8, l as u8, l as u8, (a as u32 * 150 / 255) as u8]));
+            }
+        }
+        disc(&mut img, 96.0, 104.0, 40.0, [240, 70, 70, 255]);
+        let r = isolate(&img, &SegmentOptions::default());
+        assert!(r.bbox.1 >= 60, "glyph starts at y={} (rim kept): {:?}", r.bbox.1, r.notes);
+    }
 
     fn disc(img: &mut RgbaImage, cx: f32, cy: f32, r: f32, c: [u8; 4]) {
         for y in 0..img.height() {

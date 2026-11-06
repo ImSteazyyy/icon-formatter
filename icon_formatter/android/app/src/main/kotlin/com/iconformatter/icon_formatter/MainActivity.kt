@@ -122,7 +122,10 @@ class MainActivity : FlutterActivity() {
                 "shizukuRequest" -> result.success(DevicePack.requestShizukuIfNeeded(force = true))
                 "openShizuku" -> result.success(DevicePack.openShizuku(this))
                 "devicePackInfo" -> background(result) {
-                    mapOf(
+                    // state first: it may reset the launcher selection when the
+                    // pack was removed, and the selector below must show that
+                    val state = DevicePack.state(applicationContext)
+                    state + mapOf(
                         "shizuku" to DevicePack.shizukuState(applicationContext),
                         "launcher" to DevicePack.launcherInstalled(applicationContext),
                         "installed" to (DevicePack.installedVersion(applicationContext) != null),
@@ -131,6 +134,11 @@ class MainActivity : FlutterActivity() {
                         "selector" to try { DevicePack.currentSelector() } catch (_: Exception) { null },
                     )
                 }
+                "activeIconPack" -> background(result) {
+                    ActivePack.invalidate()
+                    ActivePack.current(applicationContext)?.let { mapOf("package" to it, "label" to ActivePack.label(applicationContext, it)) }
+                }
+                "devicePackCleanup" -> background(result) { DevicePack.cleanupResidual(applicationContext) }
                 "devicePackBuild" -> background(result) {
                     val built = DevicePack.build(
                         applicationContext,
@@ -267,11 +275,15 @@ class MainActivity : FlutterActivity() {
         val items = call.argument<List<Map<String, String>>>("items") ?: emptyList()
         val size = (call.argument<Int>("size") ?: 432).coerceIn(48, 1024)
         val glyphOnly = call.argument<Boolean>("glyphOnly") ?: true
+        // display only: the icon the launcher shows, from its active pack
+        val pack = if (call.argument<Boolean>("activePack") == true) ActivePack.current(applicationContext) else null
         val pm = packageManager
         return items.map { m ->
             try {
                 val pkg = m["package"]!!
                 val act = m["activity"] ?: ""
+                pack?.let { ActivePack.drawable(applicationContext, it, pkg, act) }?.let { return@map png(draw(it, size)) }
+                // apps the pack does not cover: the stock icon, as the launcher does
                 val d: Drawable = if (act.isNotEmpty()) pm.getActivityIcon(ComponentName(pkg, act)) else pm.getApplicationIcon(pkg)
                 png(renderIcon(d, size, glyphOnly))
             } catch (e: Exception) {

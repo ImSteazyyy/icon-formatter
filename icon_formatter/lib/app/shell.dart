@@ -108,6 +108,10 @@ class _ShellState extends State<Shell> {
   /// Swipeable sections; each one is kept alive (no reload when coming back).
   Widget _pagerView() => PageView(
         controller: _pager,
+        // pages may draw under the status bar ("Le tue app" scrolls up under
+        // it instead of being cut at the safe area); sideways the neighbours
+        // are off screen anyway
+        clipBehavior: Clip.none,
         physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
         onPageChanged: (i) {
           if (i != index) setState(() => index = i);

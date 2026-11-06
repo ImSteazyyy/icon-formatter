@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../app/models.dart' show copySegment;
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../services/batch_controller.dart';
@@ -12,16 +13,7 @@ import '../src/rust/api/engine.dart';
 
 /// One icon in a workspace.
 class WorkItem {
-  WorkItem({
-    required this.id,
-    required this.name,
-    required this.rel,
-    this.path,
-    this.bytes,
-    this.label,
-    this.package,
-    this.activity,
-  });
+  WorkItem({required this.id, required this.name, required this.rel, this.path, this.bytes, this.label, this.package, this.activity});
 
   final String id;
 
@@ -44,6 +36,9 @@ class WorkItem {
 
   /// Per-app symbol mode (Rigenera › Modalità); null = Automatica.
   LucentStrategy? strategyOverride;
+
+  /// 1..31: one day of a dynamic calendar icon taken from an icon pack.
+  int? calendarDay;
   ItemResult? result;
 
   String? get outputPath => result?.ok == true ? result!.output : null;
@@ -52,8 +47,7 @@ class WorkItem {
 
 /// Shared processing state: items, selection, mode, preview, batch.
 class WorkspaceController extends ChangeNotifier {
-  WorkspaceController({required this.tag, StudioMode mode = StudioMode.translucent, this.packSettings = false, this.outputRelFor})
-      : _mode = mode {
+  WorkspaceController({required this.tag, StudioMode mode = StudioMode.translucent, this.packSettings = false, this.outputRelFor}) : _mode = mode {
     if (packSettings) {
       _mode = AppState.I.packMode;
       presetId = AppState.I.packPresetId;
@@ -143,14 +137,30 @@ class WorkspaceController extends ChangeNotifier {
   void addPaths(List<PackImage> imgs, {bool placeOnly = false}) {
     for (final im in imgs) {
       final stem = p.basenameWithoutExtension(im.rel);
-      items.add(WorkItem(
-        id: 'i${DateTime.now().microsecondsSinceEpoch}_${items.length}',
-        name: uniqueStem(stem),
-        rel: im.rel,
-        path: im.abs,
-      )
-        ..segOverride = placeOnly ? SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false) : null
-        ..strategyOverride = placeOnly ? LucentStrategy.asIs : null);
+      items.add(
+        WorkItem(id: 'i${DateTime.now().microsecondsSinceEpoch}_${items.length}', name: uniqueStem(stem), rel: im.rel, path: im.abs)
+          ..segOverride = placeOnly ? SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false) : null
+          ..strategyOverride = placeOnly ? LucentStrategy.asIs : null,
+      );
+    }
+    selectedId ??= items.isEmpty ? null : items.first.id;
+    notifyListeners();
+    schedulePreview(immediate: true);
+  }
+
+  /// Studio › "Calendario da un icon pack": every day of the pack's calendar
+  /// icons, tagged with app and day; they are processed like any icon.
+  void addCalendar(List<CalendarIconInfo> days) {
+    for (final d in days) {
+      final stem = '${d.package.replaceAll('.', '_')}_calendario_${d.day}';
+      items.add(
+        WorkItem(id: 'c${DateTime.now().microsecondsSinceEpoch}_${items.length}', name: uniqueStem(stem), rel: p.basename(d.path), path: d.path, label: 'Calendario ${d.day}', package: d.package, activity: d.activity)
+          ..calendarDay = d.day
+          // pack icons are already cut out: the whole page (number included)
+          // is the artwork, it is only trimmed and placed on the plate
+          ..segOverride = SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false)
+          ..strategyOverride = LucentStrategy.tile,
+      );
     }
     selectedId ??= items.isEmpty ? null : items.first.id;
     notifyListeners();
@@ -222,12 +232,7 @@ class WorkspaceController extends ChangeNotifier {
         ),
       );
     }
-    return ProcessSettings(
-      size: s.size,
-      background: bg,
-      placement: it.placementOverride ?? s.placement,
-      segment: it.segOverride ?? s.segment,
-    );
+    return ProcessSettings(size: s.size, background: bg, placement: it.placementOverride ?? s.placement, segment: it.segOverride ?? s.segment);
   }
 
   /// Current effective placement for the editor (item override or global).
@@ -278,6 +283,18 @@ class WorkspaceController extends ChangeNotifier {
   /// Rigenera › Modalità: forces how the symbol is taken for one icon.
   void setStrategy(WorkItem it, LucentStrategy? st) {
     it.strategyOverride = st == LucentStrategy.auto ? null : st;
+    notifyListeners();
+    process(only: [it]);
+    schedulePreview(immediate: true);
+  }
+
+  /// White areas closed inside the symbol (Calendar's page, a clock face):
+  /// by default they count as background and are removed; per icon they can
+  /// be kept (only the "sfondo racchiuso" switch of this icon changes).
+  bool keepsInnerWhite(WorkItem it) => !(it.segOverride ?? settings.segment).removeHoles;
+
+  void setKeepInnerWhite(WorkItem it, bool keep) {
+    it.segOverride = copySegment(it.segOverride ?? settings.segment, removeHoles: !keep);
     notifyListeners();
     process(only: [it]);
     schedulePreview(immediate: true);
@@ -365,6 +382,7 @@ class WorkspaceController extends ChangeNotifier {
           notifyListeners();
         }
       }
+
       await Future.wait([worker(), worker(), worker()]);
       batch.external(phase: 'remove.bg', done: done, total: list.length, errors: errors, running: false);
       if (batch.cancelRequested) return;
@@ -373,22 +391,35 @@ class WorkspaceController extends ChangeNotifier {
     for (final it in list) {
       if (cloud && !cutouts.containsKey(it.id)) continue;
       final out = p.joinAll([outputDir!, ...(outputRelFor?.call(it) ?? '${it.name}.png').split('/')]);
-      batchItems.add(BatchItem(
-        id: it.id,
-        name: it.name,
-        path: cloud ? cutouts[it.id] : it.path,
-        bytes: !cloud && it.path == null ? it.bytes : null,
-        output: out,
-        segment: it.segOverride,
-        placement: it.placementOverride,
-        skipIsolation: cloud,
-      ));
+      batchItems.add(
+        BatchItem(
+          id: it.id,
+          name: it.name,
+          path: cloud ? cutouts[it.id] : it.path,
+          bytes: !cloud && it.path == null ? it.bytes : null,
+          output: out,
+          segment: it.segOverride,
+          placement: it.placementOverride,
+          skipIsolation: cloud,
+        ),
+      );
     }
-    if (batchItems.isNotEmpty) await batch.run(batchItems, s);
+    if (batchItems.isEmpty) return;
+    // the per-icon symbol mode (Rigenera › Modalità, calendar pages) lives
+    // in the background settings: one run per mode, the plain ones first
+    final byMode = <LucentStrategy?, List<BatchItem>>{};
+    final itemById = {for (final it in list) it.id: it};
+    for (final b in batchItems) {
+      byMode.putIfAbsent(itemById[b.id]?.strategyOverride, () => []).add(b);
+    }
+    for (final e in byMode.entries) {
+      if (batch.cancelRequested) break;
+      final first = itemById[e.value.first.id]!;
+      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment));
+    }
   }
 
-  SegmentSettings _keepAlpha(SegmentSettings s) =>
-      SegmentSettings(mode: SegMode.keepAlpha, tolerance: s.tolerance, removeHoles: s.removeHoles, refineEdges: s.refineEdges);
+  SegmentSettings _keepAlpha(SegmentSettings s) => SegmentSettings(mode: SegMode.keepAlpha, tolerance: s.tolerance, removeHoles: s.removeHoles, refineEdges: s.refineEdges);
 
   /// Processed items whose output is still on disk (sync I/O per item: for
   /// actions such as export, not for build methods).
@@ -396,6 +427,21 @@ class WorkspaceController extends ChangeNotifier {
 
   /// How many items have an output, without touching the disk: safe to call
   /// on every rebuild (a batch rebuilds the screen several times a second).
+  /// Studio search: file name, app name or path contains [query].
+  String query = '';
+
+  void setQuery(String q) {
+    if (q == query) return;
+    query = q;
+    notifyListeners();
+  }
+
+  List<WorkItem> get visibleItems {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items.where((i) => i.name.toLowerCase().contains(q) || (i.label?.toLowerCase().contains(q) ?? false) || (i.path?.toLowerCase().contains(q) ?? false)).toList();
+  }
+
   int get processedCount => items.where((i) => !i.excluded && i.outputPath != null).length;
 
   List<WorkItem> get ambiguous => items.where((i) => i.result?.ambiguous == true && i.result?.ok == true).toList();

@@ -132,16 +132,37 @@ object DevicePack {
             val slotEntries = zip.entries().asSequence().map { it.name }
                 .filter { it.startsWith("res/") && it.substringAfterLast('/').startsWith("slot_") && it.endsWith(".png") }
                 .associateBy { it.substringAfterLast('/').removeSuffix(".png") }
-            check(pngs.size <= slotEntries.size) {
-                "Il pack ha ${pngs.size} icone, il massimo sul telefono è ${slotEntries.size}"
+            // dynamic calendar icons (<calendar prefix>): drawables named
+            // prefix + day go into the calNN_1..calNN_31 slots of the base APK,
+            // the prefix becomes calNN_ (the launcher picks today's day)
+            val calRegex = Regex("^(calendar_.+_)([0-9]{1,2})$")
+            val (calPngs, plainPngs) = pngs.partition { calRegex.matches(it.name.removeSuffix(".png")) }
+            val calEntries = zip.entries().asSequence().map { it.name }
+                .filter { it.startsWith("res/") && it.substringAfterLast('/').startsWith("cal") && it.endsWith(".png") }
+                .associateBy { it.substringAfterLast('/').removeSuffix(".png") }
+            check(plainPngs.size <= slotEntries.size) {
+                "Il pack ha ${plainPngs.size} icone, il massimo sul telefono è ${slotEntries.size}"
             }
             // drawable name -> slot name
             val rename = HashMap<String, String>()
             val fileFor = HashMap<String, File>()
-            pngs.forEachIndexed { i, f ->
+            plainPngs.forEachIndexed { i, f ->
                 val slot = "slot_%04d".format(i)
                 rename[f.name.removeSuffix(".png")] = slot
                 fileFor[slotEntries[slot] ?: error("slot $slot mancante")] = f
+            }
+            val groups = LinkedHashMap<String, String>()
+            for (f in calPngs) {
+                val m = calRegex.matchEntire(f.name.removeSuffix(".png")) ?: continue
+                val prefix = m.groupValues[1]
+                val day = m.groupValues[2].toInt()
+                val group = groups.getOrPut(prefix) { "cal%02d_".format(groups.size) }
+                val slot = "$group$day"
+                // base APK without calendar slots, or too many calendars: skip
+                val entry = calEntries[slot] ?: continue
+                rename[prefix] = group
+                rename[f.name.removeSuffix(".png")] = slot
+                fileFor[entry] = f
             }
             val appfilter = File(dir, "res/xml/appfilter.xml").takeIf { it.exists() }?.let { compileXml(it.readText(), rename) }
             val drawableXml = File(dir, "res/xml/drawable.xml").takeIf { it.exists() }?.let { compileXml(it.readText(), rename) }
@@ -192,7 +213,7 @@ object DevicePack {
             sign(unsigned, signed)
             unsigned.delete()
             base.delete()
-            return Built(signed, pngs.size, vName)
+            return Built(signed, plainPngs.size, vName)
         }
     }
 
@@ -204,8 +225,99 @@ object DevicePack {
     fun nextVersion(context: Context): Pair<Int, String> {
         val installed = installedVersionCode(context) ?: 0
         val known = prefs(context).getInt("minVersion", 0)
-        val code = maxOf(1, maxOf(installed, known) + 1)
+        // a pack removed with "keep data", or still installed for another
+        // user (Private Space, Dual Apps, work profile), keeps its version:
+        // Android refuses anything older (INSTALL_FAILED_VERSION_DOWNGRADE)
+        val residual = residualVersionCode(context) ?: 0
+        val code = maxOf(1, maxOf(maxOf(installed, known), residual) + 1)
         return code to versionName(code)
+    }
+
+    /**
+     * Highest versionCode Android still remembers for [PACKAGE] although it is
+     * not installed for this user: kept data (`pm uninstall -k`, DELETE_KEEP_DATA)
+     * is visible with MATCH_UNINSTALLED_PACKAGES; other users only through
+     * Shizuku's `dumpsys package`. Null when there is nothing left.
+     */
+    fun residualVersionCode(context: Context): Int? {
+        var best: Int? = null
+        try {
+            @Suppress("DEPRECATION")
+            val pi = context.packageManager.getPackageInfo(PACKAGE, PackageManager.MATCH_UNINSTALLED_PACKAGES)
+            @Suppress("DEPRECATION")
+            best = pi.versionCode
+        } catch (_: Exception) {
+        }
+        if (canShell()) {
+            try {
+                val (_, out) = shell("dumpsys package $PACKAGE")
+                Regex("versionCode=(\\d+)").findAll(out).mapNotNull { it.groupValues[1].toIntOrNull() }.maxOrNull()?.let {
+                    best = maxOf(best ?: 0, it)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return best
+    }
+
+    private fun canShell(): Boolean = try {
+        Shizuku.pingBinder() && !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+    } catch (_: Exception) {
+        false
+    }
+
+    /**
+     * installed: the pack is installed for this user.
+     * residual: removed here, but Android keeps its data or another user has it.
+     * absent: nothing left.
+     * `removed` is true once, the first time the pack is found missing after
+     * it was installed: the launcher selection that pointed to it is reset.
+     */
+    fun state(context: Context): Map<String, Any?> {
+        val p = prefs(context)
+        val installed = installedVersionCode(context) != null
+        val residual = if (installed) null else residualVersionCode(context)
+        residual?.let { rememberVersion(context, it) }
+        val was = p.getBoolean("wasInstalled", false)
+        var removed = false
+        var selectorReset = false
+        if (installed != was) p.edit().putBoolean("wasInstalled", installed).apply()
+        if (was && !installed) {
+            removed = true
+            // Nothing Launcher would keep pointing at a pack that is gone
+            if (canShell()) {
+                try {
+                    if (currentSelector() == PACKAGE) {
+                        restore(context)
+                        selectorReset = true
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return mapOf(
+            "state" to when {
+                installed -> "installed"
+                residual != null -> "residual"
+                else -> "absent"
+            },
+            "residualVersion" to residual?.let { versionName(it) },
+            "removed" to removed,
+            "selectorReset" to selectorReset,
+        )
+    }
+
+    /**
+     * Removes what is left of OUR pack only ([PACKAGE]): kept data and the
+     * copies of other users. Needs Shizuku; the version is remembered first.
+     */
+    fun cleanupResidual(context: Context): Boolean {
+        check(installedVersionCode(context) == null) { "Il pack è installato: nessun residuo da pulire" }
+        residualVersionCode(context)?.let { rememberVersion(context, it) }
+        val (code, out) = shell("pm uninstall $PACKAGE")
+        // "Unknown package" = nothing left: also fine
+        check(code == 0 || out.contains("Unknown package") || out.contains("not installed")) { "pm uninstall: $out" }
+        return residualVersionCode(context) == null
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences("device_pack", Context.MODE_PRIVATE)
@@ -356,9 +468,9 @@ object DevicePack {
     }
 
     private fun renameText(xml: String, rename: Map<String, String>): String =
-        Regex("drawable=\"([^\"]*)\"").replace(xml) { m ->
-            val v = m.groupValues[1]
-            "drawable=\"${rename[v] ?: v}\""
+        Regex("(drawable|prefix)=\"([^\"]*)\"").replace(xml) { m ->
+            val v = m.groupValues[2]
+            "${m.groupValues[1]}=\"${rename[v] ?: v}\""
         }
 
     private fun signingKey(): Pair<PrivateKey, X509Certificate> {
@@ -502,6 +614,12 @@ object DevicePack {
         if (out.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE") || out.contains("signatures do not match")) {
             throw IllegalStateException("SIGNATURE_MISMATCH")
         }
+        // an older pack number than one Android still remembers (kept data,
+        // another user): remember it, the app rebuilds with the next number
+        if (out.contains("INSTALL_FAILED_VERSION_DOWNGRADE")) {
+            Regex("current (\\d+)").find(out)?.groupValues?.get(1)?.toIntOrNull()?.let { rememberVersion(context, it) }
+            throw IllegalStateException("VERSION_RETRY")
+        }
         check(code == 0 && out.contains("Success")) { "pm install: $out" }
         val after = installedVersion(context)
         check(after != null && after != before) { "Il pacchetto non risulta aggiornato dopo l'installazione" }
@@ -606,6 +724,21 @@ class InstallResultReceiver : BroadcastReceiver() {
                 @Suppress("DEPRECATION")
                 val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            PackageInstaller.STATUS_SUCCESS -> {}
+            else -> {
+                // Android still has a newer number of our pack (kept data, or
+                // another user it cannot show us without Shizuku): adopt it,
+                // so the next build goes above it instead of failing again
+                val msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""
+                if (msg.contains("VERSION_DOWNGRADE") || msg.contains("older than current")) {
+                    Regex("current (\\d+)").find(msg)?.groupValues?.get(1)?.toIntOrNull()?.let { DevicePack.rememberVersion(context, it) }
+                    android.widget.Toast.makeText(
+                        context,
+                        "Sul telefono c'è una versione del pack più recente: numerazione aggiornata, premi di nuovo Installa.",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                }
             }
         }
     }

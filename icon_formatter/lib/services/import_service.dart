@@ -24,6 +24,15 @@ class ImportService {
     return expand(paths);
   }
 
+  /// An icon pack (APK or ZIP): only its dynamic calendar icons (all days).
+  static Future<List<CalendarIconInfo>> pickCalendarPack() async {
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'apk'], dialogTitle: S.calendarioDaPack);
+    final path = r?.files.single.path;
+    if (path == null) return [];
+    final work = await AppPaths.I.workDir('calendar_${DateTime.now().millisecondsSinceEpoch}');
+    return findCalendarIcons(input: path, workDir: work);
+  }
+
   static Future<List<PackImage>> pickZip() async {
     final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['zip', 'apk'], dialogTitle: S.importaZip);
     final path = r?.files.single.path;

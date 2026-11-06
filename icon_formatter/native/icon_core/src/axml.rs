@@ -52,6 +52,18 @@ fn string_pool(b: &[u8], start: usize) -> Option<Vec<String>> {
 
 /// `<item component=".." drawable=".."/>` entries of a binary appfilter.xml.
 pub fn appfilter_entries(b: &[u8]) -> Option<Vec<AppfilterEntry>> {
+    elements(b, "item", "drawable")
+}
+
+/// `<calendar component=".." prefix=".."/>` entries (dynamic calendar icons:
+/// the launcher shows drawable `prefix` + day of the month, 1..31).
+pub fn calendar_entries(b: &[u8]) -> Option<Vec<AppfilterEntry>> {
+    elements(b, "calendar", "prefix")
+}
+
+/// Elements `tag` with a `component` and a `value_attr` attribute; the value
+/// goes in `drawable`.
+fn elements(b: &[u8], tag: &str, value_attr: &str) -> Option<Vec<AppfilterEntry>> {
     if u16le(b, 0)? != 0x0003 {
         return None;
     }
@@ -73,7 +85,7 @@ pub fn appfilter_entries(b: &[u8]) -> Option<Vec<AppfilterEntry>> {
                 let attr_start = u16le(b, ext + 8)? as usize;
                 let attr_size = u16le(b, ext + 10)? as usize;
                 let attr_count = u16le(b, ext + 12)? as usize;
-                if strings.get(name).map(|s| s.as_str()) == Some("item") {
+                if strings.get(name).map(|s| s.as_str()) == Some(tag) {
                     let (mut comp, mut draw) = (None, None);
                     for k in 0..attr_count {
                         let a = ext + attr_start + k * attr_size;
@@ -90,7 +102,7 @@ pub fn appfilter_entries(b: &[u8]) -> Option<Vec<AppfilterEntry>> {
                         };
                         match strings.get(an).map(|s| s.as_str()) {
                             Some("component") => comp = val,
-                            Some("drawable") => draw = val,
+                            Some(v) if v == value_attr => draw = val,
                             _ => {}
                         }
                     }

@@ -1,5 +1,42 @@
 # Novità
 
+## 1.3.2 — 2026-11-06
+
+### Icone
+- **Barra bianca in alto (Fit, Samsung Health e simili):** il riflesso chiaro sul bordo superiore delle icone sorgente veniva preso come parte del simbolo. Ora resta fuori, e il simbolo torna centrato.
+- **Forma "Originale":** le icone a schermo intero (NoMoreBackground, Maps, Gboard) non diventano più rotonde. Tengono il contorno della sorgente.
+- **Google:** il giallo della "G" non viene più tolto insieme allo sfondo bianco. La rimozione dello sfondo segue le sfumature di luminosità, non i colori diversi.
+- **Bordi scalettati:** sulle icone senza anti-aliasing il bordo viene ammorbidito di un pixel, solo sulla trasparenza: niente aloni né sbavature.
+- **Opzione "Mantieni il bianco interno"** per la singola icona (Studio e Pack). Calendar e simili tengono la pagina bianca.
+- **La modalità scelta per la singola icona ora vale anche per "Elabora tutte"**; prima la applicava solo l'anteprima.
+- **Modalità "Bordo pieno senza alone"** per la singola icona. Toglie l'alone scuro attorno alle strisce colorate sul bordo (es. Contatti); di default le icone restano come prima.
+
+### Calendario dinamico
+- **Studio › Aggiungi › "Calendario da un icon pack":** da un icon pack (APK o ZIP) prende solo le icone calendario (`<calendar>` nell'appfilter, un'icona per giorno del mese). Le scontorna come le altre e le manda al Pack.
+- Il pack generato contiene tutti i giorni e la voce `<calendar>`: il launcher mostra da solo l'icona del giorno. Mese e anno restano quelli disegnati nelle icone del pack.
+- Le icone calendario vengono elaborate in modalità **"Pagina intera"**: la pagina arriva fino al bordo del piatto, con il bianco e i colori originali. La stessa modalità si può scegliere per qualsiasi icona.
+
+### Pack
+- **Pack disinstallato:** l'app se ne accorge e, se il launcher lo usava ancora, torna alle icone di prima. Mostra i dati rimasti in Android (disinstallazione con "mantieni dati", altri utenti) e li può pulire con Shizuku.
+- **Niente più INSTALL_FAILED_VERSION_DOWNGRADE:** la nuova versione del pack parte sempre sopra quella che Android ricorda. Se l'installazione lo rifiuta comunque, l'app riprova da sola con il numero giusto.
+- **Le icone di Studio hanno la priorità** su quelle già nel Pack, anche dopo "Genera con lo Studio". Le corrispondenze si trovano per componente, package o nome file; una tua modifica manuale successiva resta.
+- **Filtri a icona compatti**, con nome e numero del filtro attivo sotto. La frase "Tieni premuto" è centrata.
+- **Dettaglio e "Scegli icona" non escono più dallo schermo**, anche con la tastiera aperta.
+
+### Le tue app
+- **Icone del pack in uso nel launcher** (letto da Nothing Launcher); per le app che il pack non copre, l'icona originale.
+- **Ricerca e filtri scorrono con la lista**, che sale sotto la barra di stato con una sfumatura.
+
+### Studio
+- **Anteprima Prima/Dopo compatta** accanto a nome e dettagli: la lista ha molto più spazio.
+- **Ricerca per nome file.**
+- **Scacchiera più chiara** in modalità scura, per vedere i bordi delle icone trasparenti.
+- **Barra "Elabora tutte / Altro" più bassa.**
+- **I menu in vetro non escono più dallo schermo:** scorrono se sono lunghi.
+
+### Windows
+- Tutte le modifiche sopra valgono anche per Windows. Shizuku, il pack sul telefono e l'icon pack del launcher restano solo su Android.
+
 ## 1.3.1 — 2026-11-05
 
 ### Fluidità e batteria (misurate sul Nothing Phone (2a) Plus)

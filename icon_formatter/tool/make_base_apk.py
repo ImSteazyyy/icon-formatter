@@ -15,6 +15,7 @@ import tempfile
 import zipfile
 
 SLOTS = 2000
+CAL_GROUPS = 12
 PACK_ID = 'com.iconformatter.pack.device'
 PACK_NAME = 'Icon Formatter Pack'
 # 1x1 transparent PNG
@@ -39,6 +40,12 @@ os.makedirs(os.path.join(main, 'assets'), exist_ok=True)
 for i in range(SLOTS):
     with open(os.path.join(drw, 'slot_%04d.png' % i), 'wb') as f:
         f.write(PNG)
+# dynamic calendar icons: CAL_GROUPS apps x 31 days (calNN_1 .. calNN_31);
+# appfilter's <calendar prefix="calNN_"/> makes the launcher pick today's day
+for g in range(CAL_GROUPS):
+    for d in range(1, 32):
+        with open(os.path.join(drw, 'cal%02d_%d.png' % (g, d)), 'wb') as f:
+            f.write(PNG)
 for n in ('appfilter.xml', 'drawable.xml'):
     with open(os.path.join(xml, n), 'w', encoding='utf-8') as f:
         f.write(PLACEHOLDER_XML)

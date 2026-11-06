@@ -95,6 +95,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
           activity: it.activity ?? '',
           file: '${it.name}.png',
           path: it.outputPath,
+          calendarDay: it.calendarDay ?? 0,
         ),
     ]);
     if (!mounted) return;
@@ -114,6 +115,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       const GlassMenuItem(value: 'folder', label: S.importaCartella, subtitle: S.importaCartellaSub, icon: Icons.folder_open_outlined),
       const GlassMenuItem(value: 'zip', label: S.importaZipApk, subtitle: S.importaZipSub, icon: Icons.folder_zip_outlined),
       const GlassMenuItem(value: 'ready', label: S.importaPronti, subtitle: S.importaProntiSub, icon: Icons.crop_free_rounded),
+      const GlassMenuItem(value: 'calendar', label: S.calendarioDaPack, subtitle: S.calendarioDaPackSub, icon: Icons.calendar_month_outlined),
       if (Platform.isAndroid && widget.onOpenApps != null)
         const GlassMenuItem(value: 'apps', label: S.usaAppDelTelefono, subtitle: S.usaAppDelTelefonoSub, icon: Icons.apps_rounded),
     ]);
@@ -126,6 +128,20 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         await _import(ImportService.pickZip);
       case 'ready':
         await _import(ImportService.pickFiles, placeOnly: true);
+      case 'calendar':
+        try {
+          final days = await ImportService.pickCalendarPack();
+          if (!mounted) return;
+          if (days.isEmpty) {
+            showMsg(context, S.calendarioNessuno, error: true);
+            return;
+          }
+          c.addCalendar(days);
+          final apps = days.map((d) => d.package).toSet().length;
+          showMsg(context, S.calendarioImportato(days.length, apps));
+        } catch (e) {
+          if (mounted) showMsg(context, S.importazioneNonRiuscita(e), error: true);
+        }
       case 'apps':
         widget.onOpenApps?.call();
     }

@@ -17,3 +17,7 @@ Thumbs.db
 # rispettivi proprietari): restano sul PC, non vanno nella repo pubblica
 /*.png
 /*.webp
+
+# screenshot dei test (emulatore/telefono): possono contenere icone e marchi di terzi
+/screens_*/
+/release_*/

@@ -24,6 +24,9 @@ pub struct IconPackEntry {
     /// Fully qualified launcher activity, may be empty.
     pub activity: String,
     pub png: PathBuf,
+    /// 1..31: one day of a dynamic calendar icon (`<calendar>`), 0 otherwise.
+    #[serde(default)]
+    pub calendar_day: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -78,7 +81,30 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
     );
     let mut mapping = Vec::new();
     let mut count = 0;
-    for e in entries {
+    // dynamic calendar icons: drawables prefix1..prefix31 and one
+    // <calendar component prefix/> per app; the launcher picks today's day
+    let mut calendars: std::collections::BTreeMap<(String, String), String> = Default::default();
+    for e in entries.iter().filter(|e| e.calendar_day >= 1 && e.calendar_day <= 31 && !e.package.is_empty()) {
+        if !e.png.exists() {
+            continue;
+        }
+        let prefix = calendars
+            .entry((e.package.clone(), e.activity.clone()))
+            .or_insert_with(|| format!("calendar_{}_", sanitize_drawable(&e.package)))
+            .clone();
+        let name = format!("{prefix}{}", e.calendar_day);
+        if used.insert(name.clone()) {
+            fs::copy(&e.png, out_dir.join(format!("res/drawable-nodpi/{name}.png")))?;
+            count += 1;
+        }
+    }
+    for ((pkg, act), prefix) in &calendars {
+        let comp = if act.is_empty() { xml_escape(pkg) } else { format!("{}/{}", xml_escape(pkg), xml_escape(act)) };
+        appfilter.push_str(&format!("    <calendar component=\"ComponentInfo{{{comp}}}\" prefix=\"{prefix}\" />
+"));
+        mapping.push(serde_json::json!({ "package": pkg, "activity": act, "calendar": prefix }));
+    }
+    for e in entries.iter().filter(|e| e.calendar_day == 0) {
         if !e.png.exists() {
             notes.push(format!("{}: processed icon missing, skipped", e.package));
             continue;
@@ -165,8 +191,8 @@ mod tests {
         let png = t.path().join("x.png");
         image::RgbaImage::new(4, 4).save(&png).unwrap();
         let entries = vec![
-            IconPackEntry { label: "A".into(), package: "com.a".into(), activity: "com.a.Main".into(), png: png.clone() },
-            IconPackEntry { label: "A2".into(), package: "com.a".into(), activity: "com.a.Other".into(), png },
+            IconPackEntry { label: "A".into(), package: "com.a".into(), activity: "com.a.Main".into(), png: png.clone(), calendar_day: 0 },
+            IconPackEntry { label: "A2".into(), package: "com.a".into(), activity: "com.a.Other".into(), png, calendar_day: 0 },
         ];
         let out = t.path().join("pack");
         let r = build(&entries, &out, "Test", Some(&t.path().join("pack.zip"))).unwrap();

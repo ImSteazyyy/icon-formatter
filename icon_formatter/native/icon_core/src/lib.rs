@@ -7,6 +7,7 @@
 pub mod ai;
 pub mod axml;
 pub mod batch;
+pub mod calendar;
 pub mod calibrate;
 pub mod color;
 pub mod compose;

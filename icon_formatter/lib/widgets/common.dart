@@ -25,8 +25,7 @@ class Glass extends StatelessWidget {
   final bool live;
 
   @override
-  Widget build(BuildContext context) =>
-      LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, live: live, child: child);
+  Widget build(BuildContext context) => LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, live: live, child: child);
 }
 
 /// Solid anthracite card for cells of long scrolling grids. A glass panel
@@ -41,15 +40,15 @@ class Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1B20),
-            borderRadius: BorderRadius.circular(radius ?? AppState.I.appearance.radius),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
-      );
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1B20),
+        borderRadius: BorderRadius.circular(radius ?? AppState.I.appearance.radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Padding(padding: padding, child: child),
+    ),
+  );
 }
 
 /// Soft ambient background so the glass panels have something to frost.
@@ -63,19 +62,13 @@ class Backdrop extends StatelessWidget {
     final accent = AppState.I.appearance.accentColor;
     return DecoratedBox(
       decoration: const BoxDecoration(color: Palette.bg),
-      child: Stack(children: [
-        Positioned(
-          left: -160,
-          top: -200,
-          child: _Blob(color: accent.withValues(alpha: 0.10), size: 520),
-        ),
-        Positioned(
-          right: -220,
-          bottom: -260,
-          child: _Blob(color: Colors.white.withValues(alpha: 0.045), size: 640),
-        ),
-        Positioned.fill(child: child),
-      ]),
+      child: Stack(
+        children: [
+          Positioned(left: -160, top: -200, child: _Blob(color: accent.withValues(alpha: 0.10), size: 520)),
+          Positioned(right: -220, bottom: -260, child: _Blob(color: Colors.white.withValues(alpha: 0.045), size: 640)),
+          Positioned.fill(child: child),
+        ],
+      ),
     );
   }
 }
@@ -88,10 +81,13 @@ class _Blob extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])),
-      );
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+    ),
+  );
 }
 
 /// Checkerboard to show real alpha.
@@ -116,8 +112,10 @@ class _CheckerPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final a = Paint()..color = const Color(0xFF2A2A2D);
-    final b = Paint()..color = const Color(0xFF1E1E21);
+    // mid greys, far from the black of frosted plates: a plate at low alpha
+    // still shows its edge, while the transparency itself is untouched
+    final a = Paint()..color = const Color(0xFF55555C);
+    final b = Paint()..color = const Color(0xFF3E3E44);
     canvas.drawRect(Offset.zero & size, b);
     for (var y = 0.0; y < size.height; y += cell) {
       for (var x = 0.0; x < size.width; x += cell) {
@@ -145,22 +143,25 @@ class IconImage extends StatelessWidget {
     if (bytes == null && path == null) return const SizedBox.shrink();
     // decode at the size shown (grids show 512-1024 px icons at ~80 px):
     // far less memory and decoding work while scrolling on phones
-    return LayoutBuilder(builder: (context, box) {
-      final dpr = MediaQuery.devicePixelRatioOf(context);
-      final side = box.biggest.shortestSide;
-      final cache = side.isFinite && side > 0 ? (side * dpr).ceil().clamp(32, 2048) : null;
-      final Widget img = bytes != null
-          ? Image.memory(bytes!, fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache)
-          : Image(
-              // keyed by path + modification time: a file rewritten in place
-              // (re-processing, Rielabora) never shows the old cached pixels
-              image: ResizeImage.resizeIfNeeded(cache, null, _VersionedFileImage(File(path!))),
-              fit: fit,
-              filterQuality: FilterQuality.medium,
-              gaplessPlayback: true,
-              errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Palette.text3)));
-      return RepaintBoundary(child: img);
-    });
+    return LayoutBuilder(
+      builder: (context, box) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final side = box.biggest.shortestSide;
+        final cache = side.isFinite && side > 0 ? (side * dpr).ceil().clamp(32, 2048) : null;
+        final Widget img = bytes != null
+            ? Image.memory(bytes!, fit: fit, filterQuality: FilterQuality.medium, gaplessPlayback: true, cacheWidth: cache)
+            : Image(
+                // keyed by path + modification time: a file rewritten in place
+                // (re-processing, Rielabora) never shows the old cached pixels
+                image: ResizeImage.resizeIfNeeded(cache, null, _VersionedFileImage(File(path!))),
+                fit: fit,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => const Center(child: Icon(Icons.broken_image_outlined, color: Palette.text3)),
+              );
+        return RepaintBoundary(child: img);
+      },
+    );
   }
 }
 
@@ -192,38 +193,43 @@ class _BeforeAfterState extends State<BeforeAfter> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      final w = c.maxWidth;
-      return GestureDetector(
-        onHorizontalDragUpdate: (d) => setState(() => split = (split + d.delta.dx / w).clamp(0.0, 1.0)),
-        onTapDown: (d) => setState(() => split = (d.localPosition.dx / w).clamp(0.0, 1.0)),
-        child: MouseRegion(
-          cursor: SystemMouseCursors.resizeLeftRight,
-          child: Checkerboard(
-            enabled: widget.checker,
-            child: Stack(fit: StackFit.expand, children: [
-              widget.after,
-              ClipRect(clipper: _LeftClip(split), child: widget.before),
-              Positioned(
-                left: w * split - 1,
-                top: 0,
-                bottom: 0,
-                child: Container(width: 2, color: Colors.white.withValues(alpha: 0.7)),
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        return GestureDetector(
+          onHorizontalDragUpdate: (d) => setState(() => split = (split + d.delta.dx / w).clamp(0.0, 1.0)),
+          onTapDown: (d) => setState(() => split = (d.localPosition.dx / w).clamp(0.0, 1.0)),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeLeftRight,
+            child: Checkerboard(
+              enabled: widget.checker,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  widget.after,
+                  ClipRect(clipper: _LeftClip(split), child: widget.before),
+                  Positioned(
+                    left: w * split - 1,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(width: 2, color: Colors.white.withValues(alpha: 0.7)),
+                  ),
+                  Positioned(left: 8, top: 8, child: _tag(S.prima)),
+                  Positioned(right: 8, top: 8, child: _tag(S.dopo)),
+                ],
               ),
-              Positioned(left: 8, top: 8, child: _tag(S.prima)),
-              Positioned(right: 8, top: 8, child: _tag(S.dopo)),
-            ]),
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 
   Widget _tag(String t) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
-        child: Text(t, style: const TextStyle(fontSize: 11, color: Palette.text)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(6)),
+    child: Text(t, style: const TextStyle(fontSize: 11, color: Palette.text)),
+  );
 }
 
 class _LeftClip extends CustomClipper<Rect> {
@@ -240,18 +246,7 @@ class _LeftClip extends CustomClipper<Rect> {
 
 /// Labelled slider with value read-out.
 class SliderRow extends StatefulWidget {
-  const SliderRow({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.onChanged,
-    this.min = 0,
-    this.max = 1,
-    this.format,
-    this.onChangeEnd,
-    this.divisions,
-    this.icon,
-  });
+  const SliderRow({super.key, required this.label, required this.value, required this.onChanged, this.min = 0, this.max = 1, this.format, this.onChangeEnd, this.divisions, this.icon});
 
   /// Optional accent icon chip on the left (settings pages).
   final IconData? icon;
@@ -378,11 +373,7 @@ class _SliderRowState extends State<SliderRow> {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(
-      fontSize: 14,
-      color: _invalid ? Palette.warn : Palette.text2,
-      fontFeatures: const [ui.FontFeature.tabularFigures()],
-    );
+    final style = TextStyle(fontSize: 14, color: _invalid ? Palette.warn : Palette.text2, fontFeatures: const [ui.FontFeature.tabularFigures()]);
     final value = SizedBox(
       width: 72,
       child: _editing
@@ -416,25 +407,33 @@ class _SliderRowState extends State<SliderRow> {
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          if (widget.icon != null) ...[IconChip(icon: widget.icon!), const SizedBox(width: 12)],
-          Expanded(child: Text(widget.label, style: const TextStyle(fontSize: 15, color: Palette.text))),
-          value,
-        ]),
-        SizedBox(
-          height: 34,
-          child: Slider(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            value: widget.value.clamp(widget.min, widget.max),
-            min: widget.min,
-            max: widget.max,
-            divisions: widget.divisions,
-            onChanged: widget.onChanged,
-            onChangeEnd: widget.onChangeEnd,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              if (widget.icon != null) ...[IconChip(icon: widget.icon!), const SizedBox(width: 12)],
+              Expanded(
+                child: Text(widget.label, style: const TextStyle(fontSize: 15, color: Palette.text)),
+              ),
+              value,
+            ],
           ),
-        ),
-      ]),
+          SizedBox(
+            height: 34,
+            child: Slider(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              value: widget.value.clamp(widget.min, widget.max),
+              min: widget.min,
+              max: widget.max,
+              divisions: widget.divisions,
+              onChanged: widget.onChanged,
+              onChangeEnd: widget.onChangeEnd,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -447,12 +446,14 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 10, top: 4),
-        child: Row(children: [
-          Expanded(child: Text(text.toUpperCase(), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 11, letterSpacing: 1.1))),
-          ?trailing,
-        ]),
-      );
+    padding: const EdgeInsets.only(bottom: 10, top: 4),
+    child: Row(
+      children: [
+        Expanded(child: Text(text.toUpperCase(), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 11, letterSpacing: 1.1))),
+        ?trailing,
+      ],
+    ),
+  );
 }
 
 class StatusDot extends StatelessWidget {
@@ -462,22 +463,16 @@ class StatusDot extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) =>
-      Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
 /// Batch progress strip: done / remaining / errors + cancel.
 class ProgressStrip extends StatelessWidget {
-  const ProgressStrip({
-    super.key,
-    required this.done,
-    required this.total,
-    required this.errors,
-    required this.running,
-    this.onCancel,
-    this.label,
-    this.onDismiss,
-  });
+  const ProgressStrip({super.key, required this.done, required this.total, required this.errors, required this.running, this.onCancel, this.label, this.onDismiss});
 
   /// When finished, swiping the strip down (or tapping ×) calls this.
   final VoidCallback? onDismiss;
@@ -503,43 +498,38 @@ class ProgressStrip extends StatelessWidget {
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
       ),
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(
-              S.completateRimanentiErrori(label ?? (running ? 'Elaborazione' : 'Completato'), done, total, total - done, errors),
-              style: const TextStyle(fontSize: 12, color: Palette.text2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(S.completateRimanentiErrori(label ?? (running ? 'Elaborazione' : 'Completato'), done, total, total - done, errors), style: const TextStyle(fontSize: 12, color: Palette.text2)),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(value: v, minHeight: 4, backgroundColor: Colors.white.withValues(alpha: 0.06)),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(value: v, minHeight: 4, backgroundColor: Colors.white.withValues(alpha: 0.06)),
-            ),
-          ]),
-        ),
-        if (running && onCancel != null) ...[
-          const SizedBox(width: 12),
-          OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: const Text(S.annulla)),
-        ],
-        if (closable) ...[
-          const SizedBox(width: 8),
-          IconButton(
-            key: const ValueKey('progress-close'),
-            tooltip: S.scorriGiuPerChiudere,
-            icon: const Icon(Icons.close_rounded, size: 18, color: Palette.text2),
-            onPressed: onDismiss,
           ),
+          if (running && onCancel != null) ...[const SizedBox(width: 12), OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: const Text(S.annulla))],
+          if (closable) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              key: const ValueKey('progress-close'),
+              tooltip: S.scorriGiuPerChiudere,
+              icon: const Icon(Icons.close_rounded, size: 18, color: Palette.text2),
+              onPressed: onDismiss,
+            ),
+          ],
         ],
-      ]),
+      ),
     );
     if (!closable) return strip;
     // finished: swipe left or right to remove it (like the notices)
-    return Dismissible(
-      key: const ValueKey('progress-strip'),
-      direction: DismissDirection.horizontal,
-      onDismissed: (_) => onDismiss!(),
-      child: strip,
-    );
+    return Dismissible(key: const ValueKey('progress-strip'), direction: DismissDirection.horizontal, onDismissed: (_) => onDismiss!(), child: strip);
   }
 }
 
@@ -554,7 +544,12 @@ Future<String?> askText(BuildContext context, String title, {String initial = ''
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
-      content: TextField(controller: c, autofocus: true, decoration: InputDecoration(hintText: hint), onSubmitted: (v) => Navigator.pop(ctx, v.trim())),
+      content: TextField(
+        controller: c,
+        autofocus: true,
+        decoration: InputDecoration(hintText: hint),
+        onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.annulla)),
         FilledButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('OK')),
@@ -584,31 +579,41 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
     context: context,
     builder: (ctx) => Dialog(
       insetPadding: const EdgeInsets.all(24),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
-          child: Row(children: [
-            Expanded(child: Text(title ?? S.anteprima, style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
-            IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
-          ]),
-        ),
-        Flexible(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Checkerboard(
-                cell: 16,
-                child: InteractiveViewer(maxScale: 12, child: IconImage(bytes: bytes, path: path)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(title ?? S.anteprima, style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                ),
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+              ],
+            ),
+          ),
+          Flexible(
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Checkerboard(
+                  cell: 16,
+                  child: InteractiveViewer(
+                    maxScale: 12,
+                    child: IconImage(bytes: bytes, path: path),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        const Padding(
-          padding: EdgeInsets.all(10),
-          child: Text(S.rotellaPinchZoomTrascinaSpostare, style: TextStyle(fontSize: 11, color: Palette.text3)),
-        ),
-      ]),
+          const Padding(
+            padding: EdgeInsets.all(10),
+            child: Text(S.rotellaPinchZoomTrascinaSpostare, style: TextStyle(fontSize: 11, color: Palette.text3)),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -645,7 +650,10 @@ class ToolButton extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, box) => box.hasBoundedWidth
           ? SizedBox(width: ((box.maxWidth - 8) / 2).floorToDouble(), height: kButtonHeight, child: button)
-          : Padding(padding: const EdgeInsets.only(right: 8), child: SizedBox(height: kButtonHeight, child: button)),
+          : Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: SizedBox(height: kButtonHeight, child: button),
+            ),
     );
   }
 }
@@ -678,11 +686,18 @@ class GlassIconButton extends StatelessWidget {
               onTap: onPressed,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(icon, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text(label!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-                ]),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      label!,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -709,7 +724,6 @@ class GlassIconButton extends StatelessWidget {
     return tooltip == null ? b : Tooltip(message: tooltip!, child: b);
   }
 }
-
 
 // ---------------------------------------------------------------- design kit
 // Shared building blocks of the dark minimal UI: every screen, menu and
@@ -750,43 +764,63 @@ class LargeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titleBlock = Column(mainAxisSize: MainAxisSize.min, children: [
-      Text(title,
+    final titleBlock = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text, height: 1.15)),
-      if (subtitle != null) ...[
-        const SizedBox(height: 4),
-        Text(subtitle!, key: const ValueKey('header-subtitle'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.3)),
+          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: Palette.text, height: 1.15),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle!,
+            key: const ValueKey('header-subtitle'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: Palette.text2, height: 1.3),
+          ),
+        ],
       ],
-    ]);
+    );
     return Padding(
       // buttons under the title: the same 10 dp gap as between the rows below
       padding: EdgeInsets.fromLTRB(0, 8, 0, actions.isNotEmpty ? 10 : 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-        // title and subtitle centred; with a back button an equal empty slot
-        // on the right keeps them on the screen's centre line
-        if (onBack != null)
-          Row(children: [
-            GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: kButtonHeight, tooltip: S.indietro),
-            const SizedBox(width: 8),
-            Expanded(child: titleBlock),
-            const SizedBox(width: 8 + kButtonHeight),
-          ])
-        else
-          titleBlock,
-        if (actions.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Row(children: [
-            for (var i = 0; i < actions.length; i++) ...[
-              if (i > 0) const SizedBox(width: 10),
-              Expanded(child: SizedBox(height: kButtonHeight, child: actions[i])),
-            ],
-          ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // title and subtitle centred; with a back button an equal empty slot
+          // on the right keeps them on the screen's centre line
+          if (onBack != null)
+            Row(
+              children: [
+                GlassIconButton(key: const ValueKey('header-back'), icon: Icons.arrow_back_rounded, onPressed: onBack, size: kButtonHeight, tooltip: S.indietro),
+                const SizedBox(width: 8),
+                Expanded(child: titleBlock),
+                const SizedBox(width: 8 + kButtonHeight),
+              ],
+            )
+          else
+            titleBlock,
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                for (var i = 0; i < actions.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(height: kButtonHeight, child: actions[i]),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          if (trailing != null) ...[const SizedBox(height: 10), Center(child: trailing!)],
         ],
-        if (trailing != null) ...[const SizedBox(height: 10), Center(child: trailing!)],
-      ]),
+      ),
     );
   }
 }
@@ -858,27 +892,22 @@ class SettingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottom = 24 + GlassInsets.of(context);
-    final body = ListView(
-      padding: EdgeInsets.fromLTRB(20, header == null ? 4 : 14, 20, bottom),
-      children: sectioned(children),
-    );
+    final body = ListView(padding: EdgeInsets.fromLTRB(20, header == null ? 4 : 14, 20, bottom), children: sectioned(children));
     if (header == null) return body;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), child: header!),
-      Expanded(
-        // content fades under the sticky preview instead of being covered
-        child: ShaderMask(
-          shaderCallback: (r) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.transparent, Colors.black],
-            stops: [0, 0.035],
-          ).createShader(r),
-          blendMode: BlendMode.dstIn,
-          child: body,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 0), child: header!),
+        Expanded(
+          // content fades under the sticky preview instead of being covered
+          child: ShaderMask(
+            shaderCallback: (r) => const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black], stops: [0, 0.035]).createShader(r),
+            blendMode: BlendMode.dstIn,
+            child: body,
+          ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 }
 
@@ -899,17 +928,22 @@ class SettingSwitch extends StatelessWidget {
       onTap: onChanged == null ? null : () => onChanged!(!value),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          if (icon != null) ...[IconChip(icon: icon!), const SizedBox(width: 12)],
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontSize: 15, color: Palette.text)),
-              if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-            ]),
-          ),
-          const SizedBox(width: 8),
-          Switch(value: value, onChanged: onChanged),
-        ]),
+        child: Row(
+          children: [
+            if (icon != null) ...[IconChip(icon: icon!), const SizedBox(width: 12)],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 15, color: Palette.text)),
+                  if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(value: value, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }
@@ -926,27 +960,29 @@ class ChoiceRows<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
-    return Column(children: [
-      for (var i = 0; i < options.length; i++) ...[
-        if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-        InkWell(
-          onTap: () => onChanged(options[i].$1),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            child: Row(children: [
-              Expanded(
-                child: Text(options[i].$2,
-                    style: TextStyle(fontSize: 16, color: options[i].$1 == value ? Palette.text : Palette.text2)),
+    return Column(
+      children: [
+        for (var i = 0; i < options.length; i++) ...[
+          if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.06)),
+          InkWell(
+            onTap: () => onChanged(options[i].$1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(options[i].$2, style: TextStyle(fontSize: 16, color: options[i].$1 == value ? Palette.text : Palette.text2)),
+                  ),
+                  if (options[i].$1 == value) Icon(Icons.check_rounded, color: accent),
+                ],
               ),
-              if (options[i].$1 == value) Icon(Icons.check_rounded, color: accent),
-            ]),
+            ),
           ),
-        ),
+        ],
       ],
-    ]);
+    );
   }
 }
-
 
 /// Numbered step of a guided flow (Pack: sorgenti -> icone nuove -> applica).
 class StepCard extends StatelessWidget {
@@ -968,32 +1004,44 @@ class StepCard extends StatelessWidget {
       child: Glass(
         radius: AppState.I.appearance.radius + 6,
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: done ? accent : accent.withValues(alpha: 0.16), shape: BoxShape.circle),
-              child: done
-                  ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
-                  : step == 0
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: done ? accent : accent.withValues(alpha: 0.16), shape: BoxShape.circle),
+                  child: done
+                      ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                      : step == 0
                       ? Icon(Icons.memory_rounded, size: 18, color: accent)
-                      : Text('$step', style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
+                      : Text(
+                          '$step',
+                          style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text),
+                      ),
+                      if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
-                if (subtitle != null) Text(subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-              ]),
-            ),
-          ]),
-          if (children.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: children),
+            if (children.isNotEmpty) ...[const SizedBox(height: 10), Wrap(spacing: 8, runSpacing: 8, children: children)],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -1033,12 +1081,63 @@ class ChoicePill extends StatelessWidget {
             // centred when stretched, own width inside a Wrap
             child: Center(
               widthFactor: 1,
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                AnimatedSwitcher(duration: const Duration(milliseconds: 150), child: lead),
-                if (icon != null || on) const SizedBox(width: 6),
-                // shrinks a little instead of cutting the word
-                Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Palette.text : Palette.text2)))),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedSwitcher(duration: const Duration(milliseconds: 150), child: lead),
+                  if (icon != null || on) const SizedBox(width: 6),
+                  // shrinks a little instead of cutting the word
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: on ? Palette.text : Palette.text2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact filter: a single coloured icon in a [kButtonHeight] pill, with a
+/// tooltip and an accessible label (the visible name sits elsewhere).
+class IconFilterPill extends StatelessWidget {
+  const IconFilterPill({super.key, required this.icon, required this.color, required this.tooltip, required this.on, required this.onTap});
+
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        selected: on,
+        label: tooltip,
+        excludeSemantics: true,
+        child: Material(
+          color: on ? color.withValues(alpha: 0.20) : Colors.transparent,
+          shape: StadiumBorder(
+            side: BorderSide(color: on ? color.withValues(alpha: 0.75) : Colors.white.withValues(alpha: 0.14), width: on ? 1.5 : 1),
+          ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              height: kButtonHeight,
+              child: Center(child: Icon(icon, size: 22, color: color)),
             ),
           ),
         ),
@@ -1049,7 +1148,10 @@ class ChoicePill extends StatelessWidget {
 
 /// Search field shaped like the buttons: a [kButtonHeight] pill.
 InputDecoration pillSearchDecoration(BuildContext context, String hint) {
-  OutlineInputBorder b(Color c) => OutlineInputBorder(borderRadius: BorderRadius.circular(kButtonHeight / 2), borderSide: BorderSide(color: c));
+  OutlineInputBorder b(Color c) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(kButtonHeight / 2),
+    borderSide: BorderSide(color: c),
+  );
   return InputDecoration(
     prefixIcon: const Icon(Icons.search),
     hintText: hint,

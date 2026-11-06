@@ -83,6 +83,12 @@ pub enum GlyphStrategy {
     FullBleed,
     /// The isolated symbol as it is, no unwrap and no recolouring.
     AsIs,
+    /// Auto, and full-screen icons lose the dark glow around coloured strips
+    /// on their edge (only when the user asks for it on one icon).
+    CleanEdge,
+    /// The whole icon (a page: calendar, finished tile) covers the plate
+    /// edge to edge, clipped by the shape; nothing removed, colours kept.
+    Tile,
 }
 
 impl LucentParams {
@@ -129,6 +135,42 @@ pub fn with_placement(p: &LucentParams, pl: &crate::compose::Placement) -> Lucen
 pub struct LucentOutput {
     pub image: RgbaImage,
     pub notes: Vec<String>,
+}
+
+/// Stair-stepped outlines (sources without anti-aliasing): an opaque pixel
+/// right on a hard edge (its 3x3 holds both empty and solid pixels) gets the
+/// mean alpha of that 3x3. Only alpha, only those pixels, only downwards:
+/// the colours stay, nothing spreads outside the shape (no glow, no smear),
+/// and already anti-aliased edges (no hard step) are left as they are.
+pub fn soften_hard_edges(img: RgbaImage) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    if w < 3 || h < 3 {
+        return img;
+    }
+    let a = |x: u32, y: u32| img.get_pixel(x, y)[3];
+    let mut out = img.clone();
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let c = a(x, y);
+            if c < 230 {
+                continue;
+            }
+            let (mut lo, mut sum) = (255u8, 0u32);
+            for dy in 0..3 {
+                for dx in 0..3 {
+                    let v = a(x + dx - 1, y + dy - 1);
+                    lo = lo.min(v);
+                    sum += v as u32;
+                }
+            }
+            if lo <= 20 {
+                // half way to the 3x3 mean: a light touch, not a blur
+                let mean = sum / 9;
+                out.get_pixel_mut(x, y)[3] = ((c as u32 + mean) / 2) as u8;
+            }
+        }
+    }
+    out
 }
 
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
@@ -204,7 +246,25 @@ fn plate_mask(src: &RgbaImage, glyph: &RgbaImage, size: u32, shape: PlateShape, 
             // area: the source is a bare logo, so there is no silhouette to keep.
             let count = |img: &RgbaImage, t: u8| img.pixels().filter(|p| p[3] > t).count() as f32;
             let bare = count(glyph, 16) >= 0.8 * count(src, 16).max(1.0);
-            if coverage < 0.10 || bare {
+            // ...unless the source itself is a plate: a solid, roughly square
+            // silhouette (full-bleed tile, round icon, an icon already in the
+            // frosted style). Then the symbol is the whole icon, and its
+            // outline is still the shape the user asked to keep.
+            let plate_like = || {
+                let Some((x0, y0, x1, y1)) = crate::imageops::alpha_bbox(&fitted, 24) else { return false };
+                let (bw, bh) = ((x1 - x0) as f32, (y1 - y0) as f32);
+                let mut inside = 0.0f32;
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        inside += m[(y * size + x) as usize];
+                    }
+                }
+                let fill = inside / (bw * bh).max(1.0);
+                let aspect = bw.max(bh) / bw.min(bh).max(1.0);
+                // a disc fills 78.5% of its box, a squircle ~95%; logos far less
+                fill >= 0.74 && aspect <= 1.15 && bw * bh >= 0.35 * (size * size) as f32
+            };
+            if coverage < 0.10 || (bare && !plate_like()) {
                 notes.push(FALLBACK_NOTE.into());
                 circle(size)
             } else {
@@ -527,7 +587,8 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // the source itself may be the tile (launcher / adaptive icons are a
     // full rounded square): unwrap it directly instead of the isolated glyph
     use GlyphStrategy as G;
-    let st = p.strategy;
+    let clean_edge = p.strategy == G::CleanEdge;
+    let st = if clean_edge { G::Auto } else { p.strategy };
     // launcher icons often carry a transparent margin around the tile:
     // detect the tile on the icon cropped to its visible box
     let src_tile = crate::compose::crop_to_content(src);
@@ -579,6 +640,12 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
                 ((bx1 - bx0, by1 - by0), Some((glyph.clone(), gb)))
             }
         }
+    } else if st == G::Tile {
+        // the visible box of the source is mapped onto the plate box (cover)
+        already_styled = true;
+        let (w, h) = src_tile.dimensions();
+        notes.push("Pagina intera: estesa fino al bordo del piatto".to_string());
+        ((w, h), Some((src_tile.clone(), (0, 0, w, h))))
     } else if st == G::AsIs {
         (glyph.dimensions(), None)
     } else {
@@ -590,7 +657,13 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         if bare && crate::compose::is_tile_loose(glyph) && !crate::compose::is_tile(glyph) {
             notes.push("Icona già nello stile: riportata sulla nuova forma".to_string());
             already_styled = true;
-            (glyph.dimensions(), Some((glyph.clone(), (0, 0, glyph.width(), glyph.height()))))
+            // on request only: the glow around coloured strips along one
+            // edge (Contacts' tabs) takes the plate colour
+            let flat = if clean_edge { crate::compose::flatten_edge_color(glyph) } else { (glyph.clone(), false) };
+            if flat.1 {
+                notes.push("Alone del bordo colorato uniformato al piatto".to_string());
+            }
+            (glyph.dimensions(), Some((flat.0, (0, 0, glyph.width(), glyph.height()))))
         } else if let Some((art, bx)) = if bare { crate::compose::strip_light_disc(glyph) } else { None } {
             // round icon on a light background, artwork to the edge: the
             // background goes, the artwork keeps its place on the plate
@@ -673,9 +746,12 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         let longest = size as f32 * GLYPH_SCALE / NATIVE_BACKGROUND_SCALE;
         (size as f32 / 2.0, size as f32 / 2.0, longest / gw.max(gh))
     };
+    // a page's own rounded corners must not show the plate behind them
+    let scale = if st == G::Tile { scale * 1.04 } else { scale };
     let scale = scale * p.glyph_scale.clamp(0.2, 3.0);
     let (tw, th) = ((gw * scale).round().max(1.0) as u32, (gh * scale).round().max(1.0) as u32);
-    let scaled = resize(&layer, tw, th);
+    // jagged (non anti-aliased) outlines get a one-pixel alpha step
+    let scaled = soften_hard_edges(resize(&layer, tw, th));
     let cx = cx + p.offset_x * size as f32;
     let cy = cy + p.offset_y * size as f32;
     let ox = (cx - tw as f32 / 2.0).round() as i64;
@@ -782,6 +858,54 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A full-bleed tile (artwork to the edge, nothing to cut out): with the
+    /// "Original" shape the plate keeps the tile's square outline, it does
+    /// not fall back to a circle.
+    #[test]
+    fn original_shape_keeps_full_bleed_tile_outline() {
+        let n = 192u32;
+        let shape = squircle::Shape { size_ratio: 0.93, exponent: 4.25 };
+        let mask = squircle::mask(n, &shape);
+        let mut src = RgbaImage::new(n, n);
+        for y in 0..n {
+            for x in 0..n {
+                let a = mask[(y * n + x) as usize];
+                // stripes to the edge, like a map
+                let c = if (x + y) / 24 % 2 == 0 { [40, 120, 230] } else { [90, 90, 96] };
+                src.put_pixel(x, y, Rgba([c[0], c[1], c[2], a]));
+            }
+        }
+        let res = crate::segment::isolate(&src, &crate::segment::SegmentOptions::default());
+        let lp = LucentParams { shape: PlateShape::Original, ..LucentParams::dark() };
+        let out = render(&src, &res.glyph, res.bbox, 256, &lp);
+        // a point near the corner: inside the squircle, outside the circle
+        let k = 256.0 / n as f32;
+        let (cx, cy) = ((n as f32 * 0.115 * k) as u32, (n as f32 * 0.115 * k) as u32);
+        assert!(out.image.get_pixel(cx, cy)[3] > 40, "corner lost: {:?} notes {:?}", out.image.get_pixel(cx, cy), out.notes);
+        assert!(!out.notes.iter().any(|t| t == FALLBACK_NOTE), "fell back to the circle: {:?}", out.notes);
+    }
+
+    /// A bare logo (transparent around it) still gets the round fallback.
+    #[test]
+    fn original_shape_bare_logo_still_round() {
+        let n = 128u32;
+        let mut src = RgbaImage::new(n, n);
+        for y in 0..n {
+            for x in 0..n {
+                // a thin cross: far from a plate
+                if (x as i32 - 64).abs() < 8 || (y as i32 - 64).abs() < 8 {
+                    if x > 16 && x < 112 && y > 16 && y < 112 {
+                        src.put_pixel(x, y, Rgba([250, 60, 60, 255]));
+                    }
+                }
+            }
+        }
+        let res = crate::segment::isolate(&src, &crate::segment::SegmentOptions::default());
+        let lp = LucentParams { shape: PlateShape::Original, ..LucentParams::dark() };
+        let out = render(&src, &res.glyph, res.bbox, 128, &lp);
+        assert!(out.notes.iter().any(|t| t == FALLBACK_NOTE));
+    }
 
     fn icon() -> RgbaImage {
         // rounded square plate (blue) with a white bar glyph; transparent corners

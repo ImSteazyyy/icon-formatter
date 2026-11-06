@@ -168,6 +168,34 @@ pub fn parse_appfilter(xml: &str) -> Result<Vec<AppfilterEntry>> {
     Ok(out)
 }
 
+/// `<calendar component=".." prefix=".."/>` of a text appfilter.xml; the
+/// prefix goes in `drawable`.
+pub fn parse_calendars(xml: &str) -> Vec<AppfilterEntry> {
+    let mut r = quick_xml::Reader::from_str(xml);
+    let mut out = Vec::new();
+    loop {
+        match r.read_event() {
+            Ok(Event::Empty(e)) | Ok(Event::Start(e)) if e.name().as_ref() == b"calendar" => {
+                let (mut comp, mut prefix) = (String::new(), String::new());
+                for a in e.attributes().flatten() {
+                    let v = a.unescape_value().map(|v| v.to_string()).unwrap_or_default();
+                    match a.key.as_ref() {
+                        b"component" => comp = v,
+                        b"prefix" => prefix = v,
+                        _ => {}
+                    }
+                }
+                if !prefix.is_empty() && !comp.is_empty() {
+                    out.push(AppfilterEntry { component: comp, drawable: prefix });
+                }
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Drawable name of an icon file: file stem.
 pub fn drawable_name(rel: &str) -> String {
     let file = rel.rsplit('/').next().unwrap_or(rel);
