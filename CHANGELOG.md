@@ -1,6 +1,6 @@
 # Novità
 
-## 1.3.2 — 2026-11-06
+## 1.4.0 — 2026-11-06
 
 ### Icone
 - **Barra bianca in alto (Fit, Samsung Health e simili):** il riflesso chiaro sul bordo superiore delle icone sorgente veniva preso come parte del simbolo. Ora resta fuori, e il simbolo torna centrato.
@@ -36,6 +36,8 @@
 
 ### Windows
 - Tutte le modifiche sopra valgono anche per Windows. Shizuku, il pack sul telefono e l'icon pack del launcher restano solo su Android.
+- **Niente più finestra bianca con il vetro in "Qualità":** il vetro premium richiede Vulkan o Metal, mentre su Windows il motore grafico usa OpenGL ES. Lì "Qualità" usa il vetro standard e le impostazioni lo spiegano.
+- **Ricerca per nome file** anche nella vista larga di Studio.
 
 ## 1.3.1 — 2026-11-05
 
