@@ -408,7 +408,7 @@ class WorkspaceView extends StatelessWidget {
         final w = box.maxWidth;
         final wide = w >= 1080;
         final medium = w >= 720;
-        final grid = _grid(context, medium ? 112 : 92, search: true);
+        final grid = _grid(context, medium ? 112 : 92, search: true, jump: true);
         final progress = ListenableBuilder(
           listenable: c.batch,
           builder: (context, _) {
@@ -625,7 +625,7 @@ class WorkspaceView extends StatelessWidget {
     );
   }
 
-  Widget _grid(BuildContext context, double tile, {double bottomPad = 0, bool search = false}) {
+  Widget _grid(BuildContext context, double tile, {double bottomPad = 0, bool search = false, bool jump = false}) {
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) {
@@ -644,7 +644,7 @@ class WorkspaceView extends StatelessWidget {
           );
         }
         final list = c.visibleItems;
-        return CustomScrollView(
+        final view = CustomScrollView(
           controller: c.gridScroll,
           slivers: [
             // the search stays at the top while the icons scroll under it
@@ -671,6 +671,12 @@ class WorkspaceView extends StatelessWidget {
             ),
           ],
         );
+        if (!jump) return view;
+        // desktop layouts: top / bottom buttons in the corner of the grid
+        return Stack(children: [
+          view,
+          Positioned(right: 8, bottom: 8, child: ScrollJumpButtons(controller: c.gridScroll)),
+        ]);
       },
     );
   }
