@@ -1016,6 +1016,7 @@ List<Widget> glassControls(BuildContext context) {
     SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
     SliderRow(icon: Icons.gradient_rounded, label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
     SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, subtitle: S.profonditaSub, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
+    if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) const Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
     if (g.quality != GlassQualityLevel.quality) const Text(S.vetroNotaQualita, style: TextStyle(fontSize: 11.5, color: Palette.text3)),
     const SectionTitle(S.luce),
     SliderRow(icon: Icons.light_mode_outlined, label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -129,10 +130,15 @@ Widget withGlassShadows(Widget child) {
   );
 }
 
+/// The premium shader path needs Impeller on Vulkan/Metal: on Windows and
+/// Linux (Impeller on OpenGL ES) it leaves the window blank, so "Qualità"
+/// falls back to the standard glass there.
+bool get premiumGlassSupported => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+
 GlassQuality get appGlassQuality => switch (AppState.I.glass.quality) {
       GlassQualityLevel.fast => GlassQuality.minimal,
       GlassQualityLevel.balanced => GlassQuality.standard,
-      GlassQualityLevel.quality => GlassQuality.premium,
+      GlassQualityLevel.quality => premiumGlassSupported ? GlassQuality.premium : GlassQuality.standard,
     };
 
 /// App-wide glass surface (panels, floating bars, lens) backed by

@@ -408,7 +408,7 @@ class WorkspaceView extends StatelessWidget {
         final w = box.maxWidth;
         final wide = w >= 1080;
         final medium = w >= 720;
-        final grid = _grid(context, medium ? 112 : 92);
+        final grid = _grid(context, medium ? 112 : 92, search: true);
         final progress = ListenableBuilder(
           listenable: c.batch,
           builder: (context, _) {

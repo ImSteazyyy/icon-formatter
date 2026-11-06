@@ -559,6 +559,7 @@ class S {
   static String calendarioNelPack(int apps) => 'Calendario dinamico nel pack (${apps == 1 ? '1 app' : '$apps app'}): il launcher mostra il giorno di oggi';
   static const modoPagina = 'Pagina intera';
   static const modoPaginaDesc = "L'icona intera (es. calendario) arriva fino al bordo del piatto: niente tolto, colori invariati.";
+  static const vetroQualitaNonDisponibile = "Su questo computer la qualità massima del vetro non è supportata dal motore grafico: viene usata la Bilanciata, così l'app non si blocca.";
   static const pbTieniPremuto = "Tieni premuto su un'app per modificarne l'icona";
   static const pbPasso1Catalogo = 'App installate';
   static const pbCatalogoLettura = 'Lettura delle app installate…';
