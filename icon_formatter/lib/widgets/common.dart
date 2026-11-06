@@ -1146,6 +1146,124 @@ class IconFilterPill extends StatelessWidget {
   }
 }
 
+/// A search field that stays at the top of a [CustomScrollView] while the
+/// content scrolls under it. A dark backing keeps it readable over the icons.
+class SliverPinnedSearch extends StatelessWidget {
+  const SliverPinnedSearch({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(0, 6, 0, 6)});
+
+  final Widget child;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) => SliverPersistentHeader(pinned: true, delegate: _PinnedSearchDelegate(child, padding));
+}
+
+class _PinnedSearchDelegate extends SliverPersistentHeaderDelegate {
+  _PinnedSearchDelegate(this.child, this.padding);
+  final Widget child;
+  final EdgeInsets padding;
+
+  /// below the field: the fade of the backing
+  static const double _tail = 14;
+
+  @override
+  double get minExtent => kButtonHeight + padding.vertical + _tail;
+  @override
+  double get maxExtent => kButtonHeight + padding.vertical + _tail;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final solid = (padding.vertical + kButtonHeight) / maxExtent;
+    return DecoratedBox(
+      // always there (a fixed-height pinned header gets no scroll signal);
+      // a plain gradient, no blur: cheap at 120 Hz. Solid behind the field,
+      // then a short fade below it
+      decoration: BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: const [Color(0xFF0F0D12), Color(0xFF0F0D12), Color(0x000F0D12)], stops: [0.0, solid, 1.0]),
+      ),
+      child: Padding(padding: padding.copyWith(bottom: padding.bottom + _tail), child: Material(type: MaterialType.transparency, child: child)),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _PinnedSearchDelegate old) => old.child != child || old.padding != padding;
+}
+
+/// Two small round glass buttons: jump to the top / to the bottom of a list.
+class ScrollJumpButtons extends StatefulWidget {
+  const ScrollJumpButtons({super.key, required this.controller});
+  final ScrollController controller;
+
+  @override
+  State<ScrollJumpButtons> createState() => _ScrollJumpButtonsState();
+}
+
+class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
+  bool canUp = false, canDown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_sync);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_sync);
+    super.dispose();
+  }
+
+  void _sync() {
+    if (!mounted || !widget.controller.hasClients) return;
+    final pos = widget.controller.position;
+    final up = pos.pixels > 200;
+    final down = pos.maxScrollExtent - pos.pixels > 200;
+    if (up != canUp || down != canDown) {
+      setState(() {
+        canUp = up;
+        canDown = down;
+      });
+    }
+  }
+
+  void _go(bool top) {
+    final c = widget.controller;
+    if (!c.hasClients) return;
+    final target = top ? c.position.minScrollExtent : c.position.maxScrollExtent;
+    // long lists: jump most of the way, animate the last screen
+    final far = (target - c.position.pixels).abs() > 3000;
+    if (far) c.jumpTo(top ? target + 1200 : target - 1200);
+    c.animateTo(target, duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic);
+  }
+
+  Widget _btn(IconData icon, String tip, bool on, VoidCallback f) => AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: on ? 1 : 0.0,
+        child: IgnorePointer(
+          ignoring: !on,
+          child: Tooltip(
+            message: tip,
+            child: Material(
+              color: const Color(0xE6242329),
+              shape: CircleBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.16))),
+              elevation: 4,
+              child: InkWell(customBorder: const CircleBorder(), onTap: f, child: SizedBox(width: 40, height: 40, child: Icon(icon, size: 22, color: Palette.text))),
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      _btn(Icons.keyboard_double_arrow_up_rounded, 'Vai in cima', canUp, () => _go(true)),
+      const SizedBox(height: 8),
+      _btn(Icons.keyboard_double_arrow_down_rounded, 'Vai in fondo', canDown, () => _go(false)),
+    ]);
+  }
+}
+
 /// Search field shaped like the buttons: a [kButtonHeight] pill.
 InputDecoration pillSearchDecoration(BuildContext context, String hint) {
   OutlineInputBorder b(Color c) => OutlineInputBorder(

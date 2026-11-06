@@ -43,6 +43,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   bool onlyUnprocessed = false;
   bool loading = true;
   String? error;
+  final _scroll = ScrollController();
+  final _search = TextEditingController();
 
   /// Name of the icon pack the launcher uses (the list shows its icons).
   String? activePack;
@@ -64,6 +66,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
 
   @override
   void dispose() {
+    _scroll.dispose();
+    _search.dispose();
     c.dispose();
     super.dispose();
   }
@@ -304,6 +308,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
           // title, search and filters scroll away with the icons, so the grid
           // gets the whole screen
           CustomScrollView(
+            controller: _scroll,
             // the icons slide up under the status bar instead of being cut
             // at the safe-area edge (no offscreen mask: stays at 120 fps)
             clipBehavior: Clip.none,
@@ -367,18 +372,18 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ),
                 ),
               ),
+              // the search stays at the top while the icons scroll under it
+              SliverPinnedSearch(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+                child: TextField(controller: _search, decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
+              ),
               SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      // a pill like the buttons and filters below it
-                      child: TextField(decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
-                    ),
                     // filters fit on screen (nothing hidden off the edge)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
                       // two equal toggles, edge to edge
                       child: Row(
                         children: [
@@ -525,7 +530,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
               ),
             ),
           ),
-          // floating liquid-glass action bar (content scrolls underneath);
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) Positioned(right: 18, bottom: under + 116, child: ScrollJumpButtons(controller: _scroll)),
+      // floating liquid-glass action bar (content scrolls underneath);
           // hidden while the keyboard is open, so it never covers the filters
           if (MediaQuery.viewInsetsOf(context).bottom == 0)
             Positioned(

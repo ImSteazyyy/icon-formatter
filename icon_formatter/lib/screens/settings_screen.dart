@@ -16,7 +16,7 @@ import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
 import '../l10n/strings.dart';
 
-const appVersion = '1.4.0';
+const appVersion = '1.5.0';
 
 enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
 

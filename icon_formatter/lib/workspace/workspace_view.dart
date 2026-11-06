@@ -615,6 +615,9 @@ class WorkspaceView extends StatelessWidget {
                 ],
               ),
               if (MediaQuery.viewInsetsOf(context).bottom == 0) floating,
+              // jump to the top / bottom of the icons, above the action bar
+              if (MediaQuery.viewInsetsOf(context).bottom == 0 && c.items.isNotEmpty)
+                Positioned(right: -2, bottom: under + 74, child: ScrollJumpButtons(controller: c.gridScroll)),
             ],
           ),
         );
@@ -642,13 +645,10 @@ class WorkspaceView extends StatelessWidget {
         }
         final list = c.visibleItems;
         return CustomScrollView(
+          controller: c.gridScroll,
           slivers: [
-            // the search scrolls away with the icons
-            if (search || c.query.isNotEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-                sliver: SliverToBoxAdapter(child: StudioSearch(c: c)),
-              ),
+            // the search stays at the top while the icons scroll under it
+            if (search || c.query.isNotEmpty) SliverPinnedSearch(padding: const EdgeInsets.fromLTRB(4, 4, 4, 6), child: StudioSearch(c: c)),
             if (list.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(

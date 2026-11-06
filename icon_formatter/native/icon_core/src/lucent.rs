@@ -173,6 +173,58 @@ pub fn soften_hard_edges(img: RgbaImage) -> RgbaImage {
     out
 }
 
+/// A camera-like glyph: one big round dark area (the lens). Lifting its
+/// greys would turn the lens flat grey, so it is left as it is. Separate dark
+/// pieces (keyboard keys, roads) or a dark square background do not count.
+fn dark_lens(img: &RgbaImage) -> bool {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    let dark: Vec<bool> = img
+        .pixels()
+        .map(|q| {
+            let (mx, mn) = (q[0].max(q[1]).max(q[2]), q[0].min(q[1]).min(q[2]));
+            q[3] > 127 && mx < 80 && mx - mn < 40
+        })
+        .collect();
+    let opaque = img.pixels().filter(|q| q[3] > 127).count();
+    if opaque == 0 {
+        return false;
+    }
+    let mut seen = vec![false; w * h];
+    for start in 0..w * h {
+        if !dark[start] || seen[start] {
+            continue;
+        }
+        seen[start] = true;
+        let mut stack = vec![start];
+        let (mut n, mut x0, mut y0, mut x1, mut y1) = (0usize, w, h, 0usize, 0usize);
+        while let Some(i) = stack.pop() {
+            let (x, y) = (i % w, i / w);
+            n += 1;
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x + 1);
+            y1 = y1.max(y + 1);
+            for j in [(x > 0).then(|| i - 1), (x + 1 < w).then(|| i + 1), (y > 0).then(|| i - w), (y + 1 < h).then(|| i + w)].into_iter().flatten() {
+                if dark[j] && !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            }
+        }
+        if (n as f32) < 0.20 * opaque as f32 {
+            continue;
+        }
+        let (bw, bh) = ((x1 - x0) as f32, (y1 - y0) as f32);
+        let aspect = bw.max(bh) / bw.min(bh).max(1.0);
+        let fill = n as f32 / (bw * bh).max(1.0);
+        // a disc fills ~78% of its box; a square background ~100%
+        if aspect <= 1.2 && (0.55..=0.88).contains(&fill) {
+            return true;
+        }
+    }
+    false
+}
+
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
     let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
@@ -595,6 +647,8 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // the source is already a finished frosted icon: its tones were already
     // lifted once, a second lift turns dark outlines into speckled grey
     let mut already_styled = false;
+    // extra cover for tiles whose own corners must not show the plate behind
+    let mut cover_scale = 1.0f32;
     let src_unwrap = match st {
         G::Auto | G::FullBleed if crate::compose::is_tile(&src_tile) => crate::compose::unwrap_tile(&src_tile),
         _ => None,
@@ -641,11 +695,20 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
             }
         }
     } else if st == G::Tile {
-        // the visible box of the source is mapped onto the plate box (cover)
+        // a whole tile/page (or any finished image): kept as it is, colours
+        // untouched; a tile covers the plate edge to edge (without its own
+        // light outline), anything else keeps its proportions on the plate
         already_styled = true;
-        let (w, h) = src_tile.dimensions();
-        notes.push("Pagina intera: estesa fino al bordo del piatto".to_string());
-        ((w, h), Some((src_tile.clone(), (0, 0, w, h))))
+        if crate::compose::is_tile_loose(&src_tile) {
+            let art = crate::compose::strip_light_rim(&src_tile).unwrap_or_else(|| src_tile.clone());
+            let (w, h) = art.dimensions();
+            notes.push("Pagina intera: estesa fino al bordo del piatto".to_string());
+            cover_scale = 1.04;
+            ((w, h), Some((art, (0, 0, w, h))))
+        } else {
+            notes.push("Immagine com'è: solo posizione e dimensione".to_string());
+            (glyph.dimensions(), None)
+        }
     } else if st == G::AsIs {
         (glyph.dimensions(), None)
     } else {
@@ -663,7 +726,17 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
             if flat.1 {
                 notes.push("Alone del bordo colorato uniformato al piatto".to_string());
             }
-            (glyph.dimensions(), Some((flat.0, (0, 0, glyph.width(), glyph.height()))))
+            // its own light outline goes: the new plate draws the edge
+            let art = match crate::compose::strip_light_rim(&flat.0) {
+                Some(a) => {
+                    notes.push("Bordo luminoso dell'icona originale rimosso".to_string());
+                    cover_scale = 1.04;
+                    a
+                }
+                None => flat.0,
+            };
+            let (aw, ah) = art.dimensions();
+            ((aw, ah), Some((art, (0, 0, aw, ah))))
         } else if let Some((art, bx)) = if bare { crate::compose::strip_light_disc(glyph) } else { None } {
             // round icon on a light background, artwork to the edge: the
             // background goes, the artwork keeps its place on the plate
@@ -683,7 +756,14 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // ---- glyph layer (straight RGBA at glyph resolution)
     let mut layer = glyph.clone();
     let dark_plate = (p.backdrop[0] as u32 + p.backdrop[1] as u32 + p.backdrop[2] as u32) < 384;
-    if p.lift_greys && dark_plate && !p.monochrome && !already_styled {
+    // a large dark area (a camera lens, a dark disc) is the artwork's own
+    // look: lifting it turns it flat grey. Only small dark details (roads,
+    // keys, outlines) are lifted.
+    let mostly_dark = dark_lens(&layer);
+    if mostly_dark && p.lift_greys && dark_plate && !p.monochrome {
+        notes.push("Lente scura mantenuta (non schiarita)".to_string());
+    }
+    if p.lift_greys && dark_plate && !p.monochrome && !already_styled && !mostly_dark {
         // neutral greys get a gamma lift (v^0.35): dark details (roads, keys)
         // become visible on the dark frosted plate while the tonal steps
         // between greys (e.g. a figure on a grey disc) are kept
@@ -747,7 +827,7 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         (size as f32 / 2.0, size as f32 / 2.0, longest / gw.max(gh))
     };
     // a page's own rounded corners must not show the plate behind them
-    let scale = if st == G::Tile { scale * 1.04 } else { scale };
+    let scale = scale * cover_scale;
     let scale = scale * p.glyph_scale.clamp(0.2, 3.0);
     let (tw, th) = ((gw * scale).round().max(1.0) as u32, (gh * scale).round().max(1.0) as u32);
     // jagged (non anti-aliased) outlines get a one-pixel alpha step

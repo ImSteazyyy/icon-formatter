@@ -9,6 +9,8 @@ import 'package:path/path.dart' as p;
 
 import '../app/models.dart' show copySegment;
 import '../app/state.dart';
+import '../workspace/adjust_panel.dart';
+import '../workspace/workspace_controller.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
@@ -464,6 +466,7 @@ class PackBuilderController extends ChangeNotifier {
         }
         _set(S.pbGenerazione(done, ev.total), prog: ev.total == 0 ? null : done / ev.total, throttle: done < ev.total);
       }
+      if (only == null) await _redoCustom();
     } finally {
       _set(S.pbGenerateCaricate(generated.length), running: false);
     }
@@ -560,6 +563,25 @@ class PackBuilderController extends ChangeNotifier {
     return true;
   }
 
+  /// Hand-made icons follow the pack style too: each one is rendered again
+  /// from its own source image with its own treatment, on the current
+  /// background/plate ("Usa così com'è" icons stay untouched).
+  Future<void> _redoCustom() async {
+    for (final e in custom.entries.toList()) {
+      final src = e.value['src'];
+      final t = EditTreatment.values.where((v) => v.name == e.value['treatment']).firstOrNull;
+      final path = e.value['path'];
+      if (src == null || t == null || t == EditTreatment.raw || path == null || !File(src).existsSync()) continue;
+      try {
+        final png = await renderEdit(src, t);
+        await File(path).writeAsBytes(png, flush: true);
+        ImageStamps.bump(path);
+      } catch (_) {
+        // the previous file stays
+      }
+    }
+  }
+
   /// A hand-made icon replaces whatever the matcher chose.
   void _applyCustom(PbRow row) {
     final c = custom[row.original.key];
@@ -631,7 +653,10 @@ class PackBuilderController extends ChangeNotifier {
     final strategy = switch (t) {
       EditTreatment.plateColor => LucentStrategy.plateColor,
       EditTreatment.fullBleed => LucentStrategy.fullBleed,
-      EditTreatment.asIs || EditTreatment.placeOnly => LucentStrategy.asIs,
+      EditTreatment.asIs => LucentStrategy.asIs,
+      // the image as it is: only size and position on the plate, nothing
+      // cut out, colours untouched (a full tile covers the plate edge)
+      EditTreatment.placeOnly => LucentStrategy.tile,
       _ => LucentStrategy.auto,
     };
     var bg = s.background;
@@ -656,7 +681,12 @@ class PackBuilderController extends ChangeNotifier {
   }
 
   /// Renders a picked image for [row] (nothing is assigned yet). Returns PNG.
+  /// Source image and treatment of the last "Modifica icona" render: kept
+  /// with the hand-made icon so it follows later changes of the pack style.
+  (String, EditTreatment)? _lastEdit;
+
   Future<Uint8List> renderEdit(String source, EditTreatment t) async {
+    _lastEdit = (source, t);
     if (t == EditTreatment.raw) {
       final dest = p.join(await AppPaths.I.workDir('edit'), 'raw.png');
       await importAsPng(src: source, dest: dest);
@@ -687,7 +717,20 @@ class PackBuilderController extends ChangeNotifier {
         await File(old!['path']!).delete();
       } catch (_) {}
     }
-    custom[row.original.key] = {'path': path, 'prev': prev};
+    // the source image and treatment, to redo this icon when the pack's
+    // background/plate settings change (the user's choice stays)
+    String? src;
+    final le = _lastEdit;
+    if (le != null && File(le.$1).existsSync()) {
+      src = p.join(_customDir, '${p.basenameWithoutExtension(name)}_src${p.extension(le.$1)}');
+      await File(le.$1).copy(src);
+    }
+    if (old?['src'] != null) {
+      try {
+        await File(old!['src']!).delete();
+      } catch (_) {}
+    }
+    custom[row.original.key] = {'path': path, 'prev': prev, if (src != null) 'src': src, if (le != null) 'treatment': le.$2.name};
     final id = 'custom:${row.original.key}';
     generated.removeWhere((g) => g.id == id);
     _genById.remove(id);
@@ -884,6 +927,15 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
   final c = PackBuilderController.I;
   PbState? filter;
   String query = '';
+  final _scroll = ScrollController();
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -1005,6 +1057,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
               );
         // one scroll view, the grid is lazy (only visible cards are built)
         final page = CustomScrollView(
+          controller: _scroll,
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -1083,17 +1136,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: filter == null ? Palette.text : _color(filter!)),
                     ),
-                    const SizedBox(height: 10),
-                    TextField(decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
-                    const SizedBox(height: 8),
-                    const Text(
-                      S.pbTieniPremuto,
-                      key: ValueKey('pb-hint'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12.5, color: Palette.text2),
-                    ),
+                    const SizedBox(height: 4),
                   ],
-                  const SizedBox(height: 8),
                   if (c.rows.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40),
@@ -1108,6 +1152,19 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                 ],
               ),
             ),
+            // the search stays at the top while the cards scroll under it
+            if (c.rows.isNotEmpty) ...[
+              SliverPinnedSearch(
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+                child: TextField(controller: _search, decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
+              ),
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(20, 2, 20, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Text(S.pbTieniPremuto, key: ValueKey('pb-hint'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
+                ),
+              ),
+            ],
             if (c.rows.isNotEmpty)
               SliverPadding(
                 padding: pad,
@@ -1203,7 +1260,11 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
             ),
           ],
         );
-        return page;
+        // jump to the top / bottom, right side, above the navigation bar
+        return Stack(children: [
+          page,
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) Positioned(right: 18, bottom: GlassInsets.of(context) + 12, child: ScrollJumpButtons(controller: _scroll)),
+        ]);
       },
     );
   }
@@ -1537,6 +1598,33 @@ class IconEditPage extends StatefulWidget {
 }
 
 class _IconEditPageState extends State<IconEditPage> {
+  /// The pack's generation settings (same panel as Studio › Personalizza).
+  late final WorkspaceController _style = WorkspaceController(tag: 'edit', mode: AppState.I.packMode, packSettings: true);
+
+  @override
+  void dispose() {
+    _style.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openStyle() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => SizedBox(
+        height: MediaQuery.of(ctx).size.height * 0.80,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 4), child: Text(S.stileTitolo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text))),
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text(S.stileSpiegazioneModifica, style: TextStyle(fontSize: 13, color: Palette.text2))),
+          Expanded(child: AdjustPanel(c: _style)),
+        ]),
+      ),
+    );
+    // the new settings apply to the icon right away
+    await _render();
+  }
+
   String? source;
   EditTreatment treatment = EditTreatment.auto;
   Uint8List? result;
@@ -1642,6 +1730,7 @@ class _IconEditPageState extends State<IconEditPage> {
                 subtitle: S.pbTrattamentoSub,
                 done: result != null,
                 children: [
+                  ToolButton(key: const ValueKey('edit-style'), icon: Icons.tune, label: S.stile, onTap: working ? null : _openStyle),
                   SizedBox(
                     width: double.infinity,
                     child: ChoiceRows<EditTreatment>(

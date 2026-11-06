@@ -263,6 +263,86 @@ pub fn flatten_edge_color(img: &RgbaImage) -> (RgbaImage, bool) {
     (out, true)
 }
 
+/// Width (px) of the light rim drawn along the outline of an icon that is
+/// already a frosted tile (Contacts, NoMoreBackground): neutral bands near
+/// the edge clearly lighter than the plate further in. 0 when there is none.
+pub fn light_rim_width(img: &RgbaImage) -> u32 {
+    let (w, h) = img.dimensions();
+    let (wu, hu) = (w as usize, h as usize);
+    let n = wu * hu;
+    if w < 24 || h < 24 {
+        return 0;
+    }
+    // distance (4-neighbour steps) from the transparent outside
+    let mut d = vec![u32::MAX; n];
+    let mut q = std::collections::VecDeque::new();
+    for y in 0..hu {
+        for x in 0..wu {
+            let i = y * wu + x;
+            if img.as_raw()[i * 4 + 3] <= 24 || x == 0 || y == 0 || x == wu - 1 || y == hu - 1 {
+                d[i] = 0;
+                q.push_back(i);
+            }
+        }
+    }
+    while let Some(i) = q.pop_front() {
+        let (x, y) = (i % wu, i / wu);
+        for j in [(x > 0).then(|| i - 1), (x + 1 < wu).then(|| i + 1), (y > 0).then(|| i - wu), (y + 1 < hu).then(|| i + wu)].into_iter().flatten() {
+            if d[j] > d[i] + 1 {
+                d[j] = d[i] + 1;
+                q.push_back(j);
+            }
+        }
+    }
+    let maxd = ((w.min(h) as f32) * 0.10).round() as u32;
+    let lum = |i: usize| {
+        let p = &img.as_raw()[i * 4..i * 4 + 4];
+        (p[0] as u32 * 30 + p[1] as u32 * 59 + p[2] as u32 * 11) / 100
+    };
+    let neutral = |i: usize| {
+        let p = &img.as_raw()[i * 4..i * 4 + 4];
+        p[0].max(p[1]).max(p[2]) - p[0].min(p[1]).min(p[2]) < 24
+    };
+    let mut bands: Vec<Vec<u32>> = vec![Vec::new(); maxd as usize + 1];
+    for i in 0..n {
+        if d[i] >= 1 && d[i] <= maxd && img.as_raw()[i * 4 + 3] > 24 && neutral(i) {
+            bands[d[i] as usize].push(lum(i));
+        }
+    }
+    let med = |v: &mut Vec<u32>| -> Option<u32> {
+        if v.len() < 16 {
+            return None;
+        }
+        v.sort_unstable();
+        Some(v[v.len() / 2])
+    };
+    let Some(inner) = med(&mut bands[maxd as usize]) else { return 0 };
+    let mut rim = 0;
+    for k in 1..maxd as usize {
+        match med(&mut bands[k]) {
+            Some(m) if m > inner + 18 => rim = k as u32,
+            _ => {}
+        }
+    }
+    // a rim is thin; a light band reaching deep in is the artwork itself
+    if rim as f32 > w.min(h) as f32 * 0.07 { 0 } else { rim }
+}
+
+/// The icon without its own light rim: cropped by the rim width on every
+/// side (the plate draws the outline instead).
+pub fn strip_light_rim(img: &RgbaImage) -> Option<RgbaImage> {
+    let r = light_rim_width(img);
+    if r == 0 {
+        return None;
+    }
+    let k = r + 1;
+    let (w, h) = img.dimensions();
+    if w <= 2 * k + 8 || h <= 2 * k + 8 {
+        return None;
+    }
+    Some(image::imageops::crop_imm(img, k, k, w - 2 * k, h - 2 * k).to_image())
+}
+
 pub fn crop_to_content(img: &RgbaImage) -> RgbaImage {
     match crate::imageops::alpha_bbox(img, 16) {
         Some((x0, y0, x1, y1)) if (x1 - x0, y1 - y0) != img.dimensions() && x1 > x0 + 8 && y1 > y0 + 8 => {

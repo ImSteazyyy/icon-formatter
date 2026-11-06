@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:path/path.dart' as p;
 
 import '../app/models.dart' show copySegment;
@@ -427,6 +428,9 @@ class WorkspaceController extends ChangeNotifier {
 
   /// How many items have an output, without touching the disk: safe to call
   /// on every rebuild (a batch rebuilds the screen several times a second).
+  /// Scroll position of the icon grid (jump to top / bottom buttons).
+  final ScrollController gridScroll = ScrollController();
+
   /// Studio search: file name, app name or path contains [query].
   String query = '';
 
@@ -448,6 +452,7 @@ class WorkspaceController extends ChangeNotifier {
 
   @override
   void dispose() {
+    gridScroll.dispose();
     AppState.I.removeListener(_onSettings);
     batch.removeListener(_onBatch);
     batch.dispose();

@@ -1,5 +1,20 @@
 # Novità
 
+## 1.5.0 — 2026-11-06
+
+### Icone
+- **Fotocamera e icone con una grande lente scura:** l'interno nero non diventa più grigio. Lo schiarimento dei grigi resta solo per i dettagli scuri piccoli (strade, tasti, contorni).
+- **Contatti, NoMoreBackground e le altre icone già in stile vetro:** il contorno chiaro dell'icona originale viene tolto, e il bordo è quello del nuovo piatto.
+
+### Modifica icona (Pack)
+- **"Solo posizione e dimensione"** lascia l'immagine com'è: non scontorna e non schiarisce i colori. Una piastrella intera arriva fino al bordo del piatto.
+- **Pulsante "Personalizza"** con le stesse regolazioni di Studio.
+- **Icone modificate a mano:** quando rigeneri il pack con un altro stile vengono rifatte sul nuovo sfondo, con l'immagine e il trattamento che avevi scelto.
+
+### Interfaccia
+- **Ricerca sempre visibile** mentre scorri, in Studio, Pack e "Le tue app".
+- **Due frecce in basso a destra** per andare subito in cima o in fondo alla lista.
+
 ## 1.4.0 — 2026-11-06
 
 ### Icone
