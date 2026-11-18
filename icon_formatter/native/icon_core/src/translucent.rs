@@ -1,4 +1,4 @@
-//! Procedural "Nothing Translucent"-inspired background.
+//! Procedural translucent background.
 //!
 //! Neutral smoky charcoal glass rendered into the PNG (no dependency on the
 //! launcher's live blur or wallpaper): vertical light falloff, frosted grain,

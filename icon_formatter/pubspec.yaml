@@ -1,13 +1,15 @@
 name: icon_formatter
-description: "Icon Formatter: icon composition, Nothing Translucent styling, AI theming, pack cleanup and Android icon packs."
+description: "Icon Formatter: icon composition, translucent styling, AI theming, pack cleanup and Android icon packs."
 publish_to: 'none'
-version: 1.5.0+9
+version: 1.0.0+10
 
 environment:
   sdk: ^3.13.7
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   icon_bridge:
     path: rust_builder
@@ -22,7 +24,7 @@ dependencies:
   desktop_drop: ^0.6.0
   url_launcher: ^6.3.0
   window_manager: ^0.5.1
-  liquid_glass_widgets: ^1.16.1
+  liquid_glass_widgets: ^1.17.5
 
 dev_dependencies:
   flutter_test:
@@ -40,3 +42,11 @@ flutter:
     - assets/branding/
     - assets/iconpack_template.zip
     - assets/iconpack_base.apk
+    - assets/fonts/OFL.txt
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf

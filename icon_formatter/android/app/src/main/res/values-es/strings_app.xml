@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- texts shown by the Android side (notifications, pack errors) -->
+<resources>
+    <string name="notif_channel" formatted="false">Cambios en las apps</string>
+    <string name="notif_title" formatted="false">Icon pack por actualizar</string>
+    <string name="notif_text" formatted="true">%d apps instaladas, actualizadas o con icono nuevo</string>
+    <string name="err_shizuku_off" formatted="false">Shizuku no está activo</string>
+    <string name="err_shizuku_perm" formatted="false">Permiso de Shizuku no concedido</string>
+    <string name="err_pack_too_big" formatted="true">El pack tiene %1$d iconos, el máximo en el teléfono es %2$d</string>
+    <string name="err_no_residue" formatted="false">El pack está instalado: no hay datos restantes que eliminar</string>
+    <string name="err_not_updated" formatted="false">El paquete no se actualizó con la instalación</string>
+    <string name="err_not_installed" formatted="false">El pack no está instalado</string>
+    <string name="msg_version_retry" formatted="false">El teléfono tiene una versión más reciente del pack: numeración actualizada, pulsa Instalar de nuevo.</string>
+</resources>

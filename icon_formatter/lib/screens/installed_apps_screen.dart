@@ -7,7 +7,6 @@ import 'package:path/path.dart' as p;
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
-import '../services/ai_service.dart';
 import '../services/export_service.dart';
 import '../services/platform_service.dart';
 import '../src/rust/api/engine.dart';
@@ -18,7 +17,7 @@ import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
 import '../l10n/strings.dart';
 
-enum AppPipeline { original, translucent, preset, ai }
+enum AppPipeline { original, translucent, preset }
 
 /// Installed Apps / App Icon Scanner. Android only: never built into the
 /// Windows navigation (see shell.dart).
@@ -51,9 +50,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   AppPipeline pipeline = AppPipeline.translucent;
 
   // AI sequential run
-  bool aiRunning = false;
-  bool aiCancel = false;
-  int aiDone = 0, aiTotal = 0, aiErrors = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -141,7 +137,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       if (existing.isEmpty) c.addItem(_itemFor(a, b));
       c.select(a.key);
       if (!mounted) return;
-      await showModalBottomSheet(
+      await showAppSheet(
         context: context,
         isScrollControlled: true,
         builder: (ctx) => SizedBox(
@@ -156,7 +152,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                 ),
               ),
               Expanded(
-                child: AdjustPanel(c: c, showModes: pipeline != AppPipeline.ai, onOpenBases: widget.onOpenBases),
+                child: AdjustPanel(c: c, showModes: true, onOpenBases: widget.onOpenBases),
               ),
             ],
           ),
@@ -196,7 +192,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       showMsg(context, S.selezionaAlmenoApp);
       return;
     }
-    if (pipeline == AppPipeline.ai) return _processAi(list);
     c.mode = switch (pipeline) {
       AppPipeline.original => StudioMode.original,
       AppPipeline.preset => StudioMode.preset,
@@ -208,54 +203,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
     final ok = items.where((i) => i.result?.ok == true).map((i) => i.id);
     AppState.I.update(() => AppState.I.processedPackages.addAll(ok));
     if (mounted && skipped > 0) showMsg(context, S.appSenzaIconaLeggibileSono(skipped));
-  }
-
-  Future<void> _processAi(List<InstalledApp> list) async {
-    if (!await AiService.isConfigured()) {
-      if (mounted) showMsg(context, S.aiNonConfigurataImpostaProvider2, error: true);
-      return;
-    }
-    if (!mounted) return;
-    final ok = await confirm(
-      context,
-      S.generareIconeAi(list.length),
-      S.ogniIconaERichiestaPagamento(aiProviders[AppState.I.ai.provider]!.name, aiProviders[AppState.I.ai.provider]!.costNote),
-      ok: S.genera,
-    );
-    if (!ok) return;
-    final items = await _prepare(list);
-    c.outputDir ??= await AppPaths.I.outputSession('apps');
-    final themePrompt = aiThemes.values.first;
-    setState(() {
-      aiRunning = true;
-      aiCancel = false;
-      aiDone = 0;
-      aiErrors = 0;
-      aiTotal = items.length;
-    });
-    for (final it in items) {
-      if (aiCancel) break;
-      try {
-        final full = display[it.id] ?? it.bytes!;
-        final png = await AiService.generate(
-          references: [full],
-          prompt: AiService.buildPrompt(theme: themePrompt, regeneration: false),
-        );
-        final out = p.join(c.outputDir!, '${it.name}.png');
-        // normalise through the Rust compositor: isolate + calibrated size
-        final composed = await previewBytes(bytes: png, settings: c.settingsForItem(it));
-        await File(out).writeAsBytes(composed.png);
-        it.result = ItemResult(id: it.id, name: it.name, ok: true, output: out, ambiguous: composed.ambiguous, confidence: composed.confidence, method: S.ai(composed.method), notes: composed.notes);
-        AppState.I.update(() => AppState.I.processedPackages.add(it.id));
-      } catch (e) {
-        aiErrors++;
-        it.result = ItemResult(id: it.id, name: it.name, ok: false, error: e.toString(), ambiguous: true, confidence: 0, method: 'ai', notes: const []);
-      }
-      if (!mounted) return;
-      setState(() => aiDone++);
-      c.notify();
-    }
-    if (mounted) setState(() => aiRunning = false);
   }
 
   Future<void> _exportPack({required String kind}) async {
@@ -318,13 +265,12 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                   child: LargeHeader(
                     S.leTueApp,
-                    subtitle: activePack == null ? null : S.iconeDelPack(activePack!),
                     actions: [
                       GlassIconButton(
                         tooltip: S.regolazioni,
                         icon: Icons.tune,
                         label: S.stile,
-                        onPressed: () => showModalBottomSheet(
+                        onPressed: () => showAppSheet(
                           context: context,
                           isScrollControlled: true,
                           showDragHandle: true,
@@ -335,7 +281,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Padding(
+                                  Padding(
                                     padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
                                     child: Text(
                                       S.stileTitolo,
@@ -345,12 +291,11 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                                   Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 12),
                                     child: ChoiceRows<AppPipeline>(
-                                      options: const [
-                                        (AppPipeline.translucent, S.nothingTranslucent),
+                                      options: [
+                                        (AppPipeline.translucent, S.traslucido),
                                         (AppPipeline.original, S.originalComposition),
                                         (AppPipeline.preset, S.customPreset),
-                                        (AppPipeline.ai, S.aiIconTheme),
-                                      ],
+                                        ],
                                       value: pipeline,
                                       onChanged: (v) {
                                         setState(() => pipeline = v);
@@ -358,8 +303,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                                       },
                                     ),
                                   ),
-                                  if (pipeline != AppPipeline.ai)
-                                    Expanded(
+                                  Expanded(
                                       child: AdjustPanel(c: c, showModes: false, onOpenBases: widget.onOpenBases),
                                     ),
                                 ],
@@ -406,7 +350,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ? SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(24),
-                        child: Text(S.impossibileLeggereApp(error), style: const TextStyle(color: Palette.danger)),
+                        child: Text(S.impossibileLeggereApp(error), style: TextStyle(color: Palette.danger)),
                       ),
                     )
                   : ListenableBuilder(
@@ -417,7 +361,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                         return SliverPadding(
                           padding: EdgeInsets.fromLTRB(20, 8, 20, under + 200),
                           sliver: SliverGrid.builder(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 100, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 0.72),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 120, mainAxisExtent: 150, mainAxisSpacing: 8, crossAxisSpacing: 8),
                             itemCount: list.length,
                             itemBuilder: (context, i) {
                               final a = list[i];
@@ -427,41 +371,57 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                               final sel = selected.contains(a.key);
                               Color? dot;
                               if (res != null) dot = !res.ok ? Palette.danger : (res.ambiguous ? Palette.warn : Palette.ok);
-                              return GestureDetector(
-                                onTap: () => setState(() => sel ? selected.remove(a.key) : selected.add(a.key)),
-                                onLongPress: () => _preview(a),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    color: sel ? accent.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.025),
-                                    border: Border.all(color: sel ? accent.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.06)),
-                                  ),
-                                  padding: const EdgeInsets.all(6),
+                              void toggle() => setState(() => sel ? selected.remove(a.key) : selected.add(a.key));
+                              final status = a.isSystem ? S.pbSistema : (AppState.I.processedPackages.contains(a.key) ? S.elaborataBreve : '');
+                              // same card as in Pack: the icon large on its own
+                              // tile, name and state centred under it
+                              return Tile(
+                                padding: const EdgeInsets.all(6),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: toggle,
+                                  onLongPress: () => _preview(a),
                                   child: Column(
                                     children: [
                                       Expanded(
-                                        child: Stack(
-                                          children: [
-                                            Positioned.fill(
-                                              child: out != null
-                                                  ? IconImage(key: ValueKey(out + res.hashCode.toString()), path: out)
-                                                  : missingIcons.contains(a.key)
-                                                  ? const Icon(Icons.hide_image_outlined, color: Palette.text3)
-                                                  : display[a.key] != null
-                                                  ? IconImage(bytes: display[a.key])
-                                                  : const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5))),
-                                            ),
-                                            Positioned(
-                                              left: -6,
-                                              top: -6,
-                                              child: Checkbox(visualDensity: VisualDensity.compact, value: sel, onChanged: (v) => setState(() => v! ? selected.add(a.key) : selected.remove(a.key))),
-                                            ),
-                                            if (dot != null) Positioned(right: 0, top: 0, child: StatusDot(color: dot)),
-                                          ],
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          decoration: BoxDecoration(
+                                            color: sel ? accent.withValues(alpha: 0.16) : (nothingStyle ? NothingColors.raised : Palette.fg.withValues(alpha: 0.04)),
+                                            borderRadius: BorderRadius.circular(14),
+                                            border: Border.all(color: sel ? accent.withValues(alpha: 0.7) : Colors.transparent, width: 1.5),
+                                          ),
+                                          child: Stack(
+                                            children: [
+                                              Positioned.fill(
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(12),
+                                                  child: out != null
+                                                      ? IconImage(key: ValueKey(out + res.hashCode.toString()), path: out)
+                                                      : missingIcons.contains(a.key)
+                                                      ? Icon(Icons.hide_image_outlined, color: Palette.text3)
+                                                      : display[a.key] != null
+                                                      ? IconImage(bytes: display[a.key])
+                                                      : const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5))),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                left: 6,
+                                                top: 6,
+                                                child: Icon(
+                                                  sel ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                                  size: 20,
+                                                  color: sel ? accent : Palette.text3,
+                                                ),
+                                              ),
+                                              if (dot != null) Positioned(right: 6, top: 6, child: StatusDot(color: dot)),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
-                                      Text(a.isSystem ? 'sistema' : (AppState.I.processedPackages.contains(a.key) ? 'elaborata' : ''), style: const TextStyle(fontSize: 9, color: Palette.text3)),
+                                      const SizedBox(height: 6),
+                                      Text(a.label, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: Palette.text)),
+                                      Text(status, maxLines: 1, style: TextStyle(fontSize: 11, color: Palette.text3)),
                                     ],
                                   ),
                                 ),
@@ -480,13 +440,13 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
             right: 0,
             top: -statusBar,
             height: statusBar + 28,
-            child: const IgnorePointer(
+            child: IgnorePointer(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xF5000000), Color(0xE0000000), Color(0x00000000)],
+                    colors: [Palette.bg.withValues(alpha: 0.96), Palette.bg.withValues(alpha: 0.88), Palette.bg.withValues(alpha: 0)],
                     stops: [0.0, 0.62, 1.0],
                   ),
                 ),
@@ -505,17 +465,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                 listenable: c.batch,
                 builder: (context, _) {
                   final b = c.batch;
-                  if (aiRunning || aiTotal > 0) {
-                    return ProgressStrip(
-                      done: aiDone,
-                      total: aiTotal,
-                      errors: aiErrors,
-                      running: aiRunning,
-                      label: 'AI',
-                      onCancel: () => setState(() => aiCancel = true),
-                      onDismiss: () => setState(() => aiTotal = aiDone = aiErrors = 0),
-                    );
-                  }
                   if (b.total == 0) return const SizedBox.shrink();
                   return ProgressStrip(
                     done: b.done,
@@ -534,10 +483,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       // floating liquid-glass action bar (content scrolls underneath);
           // hidden while the keyboard is open, so it never covers the filters
           if (MediaQuery.viewInsetsOf(context).bottom == 0)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: under - 4, // the nav box includes 12dp of top padding
+            FloatingBarSlot(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -546,45 +492,49 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ActionBar(
                     // how many are selected, and select all / none, under the
                     // thumb next to the start button
-                    header: Row(
-                      children: [
-                        const Icon(Icons.check_box_outlined, size: 16, color: Palette.text),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Tooltip(
-                            message: S.toccaSelezionareTieniPremutoAnteprima,
-                            child: Text(
-                              S.appSelezionate(list.length, selected.length),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.text),
-                            ),
-                          ),
-                        ),
-                        TextButton.icon(
-                          key: const ValueKey('apps-select-all'),
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(0, 34),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            disabledForegroundColor: Colors.white.withValues(alpha: 0.85),
-                          ),
-                          onPressed: list.isEmpty
-                              ? null
-                              : () => setState(() {
-                                  final all = list.every((a) => selected.contains(a.key));
-                                  all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
-                                }),
-                          icon: Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.deselect_rounded : Icons.select_all_rounded, size: 18),
-                          label: Text(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? S.deseleziona : S.selezionaTutte),
-                        ),
-                      ],
+                    // select all / none with the count, on the same row as
+                    // the start button
+                    leading: Tooltip(
+                      message: '${S.appSelezionate(list.length, selected.length)} · ${S.toccaSelezionareTieniPremutoAnteprima}',
+                      child: OutlinedButton(
+                        key: const ValueKey('apps-select-all'),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14), minimumSize: const Size(0, kButtonHeight)),
+                        onPressed: list.isEmpty
+                            ? null
+                            : () => setState(() {
+                                final all = list.every((a) => selected.contains(a.key));
+                                all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
+                              }),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 20),
+                          const SizedBox(width: 6),
+                          Text('${selected.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                    ),
+                    compactLeading: IconButton(
+                      tooltip: S.selezionaTutte,
+                      onPressed: list.isEmpty
+                          ? null
+                          : () => setState(() {
+                              final all = list.every((a) => selected.contains(a.key));
+                              all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
+                            }),
+                      icon: Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded),
+                    ),
+                    compactPrimary: ListenableBuilder(
+                      listenable: c.batch,
+                      builder: (context, _) => IconButton.filled(
+                        tooltip: selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length),
+                        onPressed: c.batch.running || selected.isEmpty ? null : _process,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                      ),
                     ),
                     primary: ListenableBuilder(
                       listenable: c.batch,
                       builder: (context, _) => FilledButton.icon(
                         key: const ValueKey('apps-start'),
-                        onPressed: c.batch.running || aiRunning || selected.isEmpty ? null : _process,
+                        onPressed: c.batch.running || selected.isEmpty ? null : _process,
                         icon: const Icon(Icons.play_arrow_rounded),
                         // one line in the bar, whatever the count
                         label: FittedBox(

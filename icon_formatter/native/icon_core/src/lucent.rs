@@ -1,4 +1,4 @@
-//! "Lucent" rendering (Nothing OS 5.0 translucent icons).
+//! "Lucent" rendering (translucent icons).
 //!
 //! Port of the rendering method of Nothing IconGen
 //! (<https://github.com/linuxct/nothing-icongen>, AGPL-3.0-only, © linuxct):
@@ -9,7 +9,7 @@
 //! * `IconArtwork.buildIcon`: frosted backdrop plate (`container_frosted_backdrop`,
 //!   `#66000000` dark / `#66FFFFFF` light) with the glyph tinted SRC_IN by the
 //!   ink colour (`system_neutral1_50` dark / `system_neutral1_900` light);
-//! * `PackIconEncoder`: compensation for Nothing Launcher drawing a pack icon
+//! * `PackIconEncoder`: compensation for a launcher drawing a pack icon
 //!   as source → ShadowGenerator shadows → source again.
 //!
 //! Differences from IconGen, by design: the input is a raster icon (not an
@@ -22,20 +22,20 @@ use crate::imageops::resize;
 use crate::squircle;
 use image::{Rgba, RgbaImage};
 
-const FALLBACK_NOTE: &str = "La sorgente non ha un piatto/sfondo: uso il piatto circolare di Nothing";
+const FALLBACK_NOTE: &str = "La sorgente non ha un piatto/sfondo: uso il piatto circolare";
 /// Longest glyph side on the fallback circle for bare logos.
 const BARE_LOGO_SCALE: f32 = 0.62;
 
-/// IconGen `PortableMonochrome.GLYPH_SCALE`.
+/// Longest glyph side on the plate (launcher normalisation).
 pub const GLYPH_SCALE: f32 = 0.388_888_9;
-/// IconGen `IconArtwork.NATIVE_BACKGROUND_SCALE`.
+/// Plate size relative to the icon canvas.
 pub const NATIVE_BACKGROUND_SCALE: f32 = 0.93;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PlateShape {
     /// Silhouette of the source icon (its alpha channel).
     Original,
-    /// IconGen / Nothing Launcher circular plate.
+    /// Circular plate.
     Circle,
     Squircle(squircle::Shape),
 }
@@ -44,28 +44,28 @@ pub enum PlateShape {
 pub struct LucentParams {
     /// Ink (foreground) colour, RGB.
     pub ink: [u8; 3],
-    /// Frosted backdrop colour; `[3]` is its alpha (0x66 on Nothing OS).
+    /// Frosted backdrop colour; `[3]` is its alpha (0x66 by default).
     pub backdrop: [u8; 4],
     pub shape: PlateShape,
-    /// Nothing ink conversion (optional). Default false: the glyph keeps its
+    /// Ink conversion (optional). Default false: the glyph keeps its
     /// own colours and only the plate uses the Lucent treatment.
     pub monochrome: bool,
     /// Keep the glyph's original position/size inside the icon; false uses
-    /// the Nothing Launcher normalisation (longest side 0.389 / 0.93).
+    /// the launcher normalisation (longest side 0.389 / 0.93).
     pub keep_composition: bool,
     /// Manual glyph scale multiplier.
     pub glyph_scale: f32,
     /// Manual glyph offset, fraction of the output size.
     pub offset_x: f32,
     pub offset_y: f32,
-    /// Subtle light rim on the plate edge (0 = off, as on Nothing OS).
+    /// Subtle light rim on the plate edge (0 = off).
     pub rim: f32,
     /// Dark plate: lift dark neutral greys of the glyph so they stay visible.
     pub lift_greys: bool,
     /// Bake the launcher's ShadowGenerator shadow into the PNG.
     pub launcher_shadow: bool,
-    /// Apply IconGen's PackIconEncoder (only for packs used by Nothing Launcher).
-    pub nothing_encode: bool,
+    /// Apply the PackIconEncoder compensation (launchers that draw icons twice).
+    pub launcher_encode: bool,
     /// How the symbol is taken from the source (per-app override).
     pub strategy: GlyphStrategy,
 }
@@ -79,7 +79,7 @@ pub enum GlyphStrategy {
     Auto,
     /// The symbol takes the colour of the original plate (holes transparent).
     PlateColor,
-    /// The whole original icon fills the plate edge to edge (Maps, Gboard...).
+    /// The whole original icon fills the plate edge to edge (maps, keyboards...).
     FullBleed,
     /// The isolated symbol as it is, no unwrap and no recolouring.
     AsIs,
@@ -106,7 +106,7 @@ impl LucentParams {
             rim: 0.0,
             lift_greys: true,
             launcher_shadow: false,
-            nothing_encode: false,
+            launcher_encode: false,
             strategy: GlyphStrategy::Auto,
         }
     }
@@ -536,9 +536,9 @@ fn inverse_alpha(target: u8, shadow: u8) -> u8 {
     }
 }
 
-/// Port of IconGen `PackIconEncoder.encode`: the returned PNG, drawn by
+/// `PackIconEncoder.encode`: the returned PNG, drawn by
 /// Nothing Launcher as source → shadows → source, reproduces `target`.
-pub fn nothing_encode(target: &RgbaImage) -> RgbaImage {
+pub fn launcher_encode(target: &RgbaImage) -> RgbaImage {
     let size = target.width() as usize;
     assert_eq!(target.width(), target.height());
     let ta: Vec<u8> = target.pixels().map(|p| p[3]).collect();
@@ -714,7 +714,7 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     } else {
         // the "symbol" is the whole icon and that icon is a translucent tile:
         // an icon already in the frosted style whose artwork touches the edge
-        // (Contacts' tabs, HoYoLAB's mascot), so nothing could be separated
+        // (tabs, mascots), so nothing could be separated
         // from it. Re-mask it onto the new plate as it is, edge to edge,
         // instead of shrinking it into a tile inside the tile.
         if bare && crate::compose::is_tile_loose(glyph) && !crate::compose::is_tile(glyph) {
@@ -777,7 +777,7 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     if p.monochrome && glyph.width() > 0 && glyph.height() > 0 {
         let (mut mask, complex) = monochrome_mask(glyph);
         let ink_dark = 0.2126 * p.ink[0] as f32 + 0.7152 * p.ink[1] as f32 + 0.0722 * p.ink[2] as f32 <= 128.0;
-        // IconGen's inverted mask is defined on its circular plate only
+        // the inverted mask is defined on the circular plate only
         if complex && ink_dark && icon_gen_mode {
             mask = light_mask(&mask, glyph.width(), glyph.height());
         }
@@ -911,9 +911,9 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         }
     }
 
-    if p.nothing_encode {
-        out = nothing_encode(&out);
-        notes.push("Codificata per Nothing Launcher (compensazione IconGen)".into());
+    if p.launcher_encode {
+        out = launcher_encode(&out);
+        notes.push("Codificata per il launcher".into());
     } else if p.launcher_shadow {
         let a: Vec<f32> = out.pixels().map(|q| q[3] as f32 / 255.0).collect();
         let s = launcher_shadow(&a, n);
@@ -1056,7 +1056,7 @@ mod tests {
         let src = icon();
         let res = crate::segment::isolate(&src, &crate::segment::SegmentOptions::default());
         let target = render(&src, &res.glyph, res.bbox, 96, &LucentParams::dark()).image;
-        let encoded = nothing_encode(&target);
+        let encoded = launcher_encode(&target);
         let shown = simulate_launcher(&encoded);
         let mut worst = 0i32;
         for (a, b) in shown.pixels().zip(target.pixels()).filter(|(_, b)| b[3] > 0) {

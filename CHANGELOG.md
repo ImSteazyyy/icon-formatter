@@ -4,7 +4,7 @@
 
 ### Icone
 - **Fotocamera e icone con una grande lente scura:** l'interno nero non diventa più grigio. Lo schiarimento dei grigi resta solo per i dettagli scuri piccoli (strade, tasti, contorni).
-- **Contatti, NoMoreBackground e le altre icone già in stile vetro:** il contorno chiaro dell'icona originale viene tolto, e il bordo è quello del nuovo piatto.
+- **Icone già in stile vetro:** il contorno chiaro dell'icona originale viene tolto, e il bordo è quello del nuovo piatto.
 
 ### Modifica icona (Pack)
 - **"Solo posizione e dimensione"** lascia l'immagine com'è: non scontorna e non schiarisce i colori. Una piastrella intera arriva fino al bordo del piatto.
@@ -18,13 +18,13 @@
 ## 1.4.0 — 2026-11-06
 
 ### Icone
-- **Barra bianca in alto (Fit, Samsung Health e simili):** il riflesso chiaro sul bordo superiore delle icone sorgente veniva preso come parte del simbolo. Ora resta fuori, e il simbolo torna centrato.
-- **Forma "Originale":** le icone a schermo intero (NoMoreBackground, Maps, Gboard) non diventano più rotonde. Tengono il contorno della sorgente.
-- **Google:** il giallo della "G" non viene più tolto insieme allo sfondo bianco. La rimozione dello sfondo segue le sfumature di luminosità, non i colori diversi.
+- **Barra bianca in alto su alcune icone:** il riflesso chiaro sul bordo superiore delle icone sorgente veniva preso come parte del simbolo. Ora resta fuori, e il simbolo torna centrato.
+- **Forma "Originale":** le icone a schermo intero non diventano più rotonde. Tengono il contorno della sorgente.
+- **Loghi multicolore:** un segmento giallo chiaro non viene più tolto insieme allo sfondo bianco. La rimozione dello sfondo segue le sfumature di luminosità, non i colori diversi.
 - **Bordi scalettati:** sulle icone senza anti-aliasing il bordo viene ammorbidito di un pixel, solo sulla trasparenza: niente aloni né sbavature.
-- **Opzione "Mantieni il bianco interno"** per la singola icona (Studio e Pack). Calendar e simili tengono la pagina bianca.
+- **Opzione "Mantieni il bianco interno"** per la singola icona (Studio e Pack). Le icone calendario e simili tengono la pagina bianca.
 - **La modalità scelta per la singola icona ora vale anche per "Elabora tutte"**; prima la applicava solo l'anteprima.
-- **Modalità "Bordo pieno senza alone"** per la singola icona. Toglie l'alone scuro attorno alle strisce colorate sul bordo (es. Contatti); di default le icone restano come prima.
+- **Modalità "Bordo pieno senza alone"** per la singola icona. Toglie l'alone scuro attorno alle strisce colorate sul bordo; di default le icone restano come prima.
 
 ### Calendario dinamico
 - **Studio › Aggiungi › "Calendario da un icon pack":** da un icon pack (APK o ZIP) prende solo le icone calendario (`<calendar>` nell'appfilter, un'icona per giorno del mese). Le scontorna come le altre e le manda al Pack.
@@ -39,7 +39,7 @@
 - **Dettaglio e "Scegli icona" non escono più dallo schermo**, anche con la tastiera aperta.
 
 ### Le tue app
-- **Icone del pack in uso nel launcher** (letto da Nothing Launcher); per le app che il pack non copre, l'icona originale.
+- **Icone del pack in uso nel launcher** (letto dal launcher); per le app che il pack non copre, l'icona originale.
 - **Ricerca e filtri scorrono con la lista**, che sale sotto la barra di stato con una sfumatura.
 
 ### Studio
@@ -56,8 +56,8 @@
 
 ## 1.3.1 — 2026-11-05
 
-### Fluidità e batteria (misurate sul Nothing Phone (2a) Plus)
-- **120 Hz.** Nothing OS teneva l'app a 90 Hz; ora l'app chiede la modalità più veloce dello schermo mentre è aperta e la rilascia quando esce.
+### Fluidità e batteria (misurate su un telefono reale)
+- **120 Hz.** Il sistema teneva l'app a 90 Hz; ora l'app chiede la modalità più veloce dello schermo mentre è aperta e la rilascia quando esce.
 - **Swipe tra le sezioni: da 22 ms a 8,4 ms per frame (120 fps).** Le ombre del testo erano sfocate, e su Impeller ogni ombra sfocata è un passaggio di sfocatura per riga di testo a ogni frame. Ora sono fatte di copie nitide semitrasparenti: stesso aspetto, costo quasi nullo, e ora ci sono su tutti i testi e le icone, pulsanti compresi.
 - **Vetro statico.** Le superfici in vetro sopra lo sfondo fisso non rifanno più la sfocatura a ogni frame; solo il vetro sopra contenuto che si muove (barra in basso, barra azioni, menu) la fa dal vivo.
 - **Durante l'elaborazione: 120 fps invece di scatti fino a 275 ms.**
@@ -67,8 +67,8 @@
 
 ### Icone
 - **Smart Center** perdeva tutto tranne il pallino rosso: la X veniva presa per una piastrella. Ora una piastrella deve avere i quattro lati pieni.
-- **Icone già nello stile traslucido** (Contatti, HoYoLAB) non vengono più rimpicciolite in un riquadro dentro il riquadro: sono riportate intere sulla nuova forma, senza schiarire due volte i toni scuri.
-- **Icone rotonde su sfondo chiaro con il disegno fino al bordo** (NoMoreBackground): lo sfondo chiaro e le forme grigie chiare su di esso vengono tolti, e il disegno occupa il piatto.
+- **Icone già nello stile traslucido** non vengono più rimpicciolite in un riquadro dentro il riquadro: sono riportate intere sulla nuova forma, senza schiarire due volte i toni scuri.
+- **Icone rotonde su sfondo chiaro con il disegno fino al bordo**: lo sfondo chiaro e le forme grigie chiare su di esso vengono tolti, e il disegno occupa il piatto.
 
 ### Interfaccia
 - Titoli e sottotitoli centrati; i pulsanti dell'intestazione stanno su una riga sotto il titolo, alla stessa larghezza (Studio: "Aggiungi" e "Personalizza").
@@ -86,15 +86,15 @@
 ## 1.3.0 — 2026-11-05
 
 ### Correzioni
-- **"Rimuovi sempre lo sfondo" cancellava i loghi.** Con sensibilità alta il controllo del piatto scambiava un anello multicolore (Chrome) per un piatto uniforme e toglieva tutto il logo. Ora il piatto è giudicato con una tolleranza stretta, un "piatto" che si porterebbe via quasi tutto viene mantenuto, e le sorgenti già scontornate saltano la rimozione.
+- **"Rimuovi sempre lo sfondo" cancellava i loghi.** Con sensibilità alta il controllo del piatto scambiava un anello multicolore per un piatto uniforme e toglieva tutto il logo. Ora il piatto è giudicato con una tolleranza stretta, un "piatto" che si porterebbe via quasi tutto viene mantenuto, e le sorgenti già scontornate saltano la rimozione.
 - **Miniature vecchie.** Un'icona rielaborata nello stesso file continuava a mostrare l'immagine precedente. Ora le immagini sono identificate da percorso e data di modifica.
-- **Icone sbagliate dalle app installate (KFC, Contatti, Smart Center, HoYoLAB…).** Per le icone adattive l'app leggeva il livello in primo piano a 108 dp interi, senza la maschera di sistema, così nell'icona finiva grafica che il launcher non mostra mai: strisce e linguette oltre il bordo, o un pallino rosso fuori dal piatto. Ora il livello è disegnato come lo disegna il launcher (i 72 dp centrali, ritagliati dalla maschera). I disegni che arrivano al bordo della maschera sono trattati come piastrelle piene.
+- **Icone sbagliate da alcune app installate.** Per le icone adattive l'app leggeva il livello in primo piano a 108 dp interi, senza la maschera di sistema, così nell'icona finiva grafica che il launcher non mostra mai: strisce e linguette oltre il bordo, o un pallino rosso fuori dal piatto. Ora il livello è disegnato come lo disegna il launcher (i 72 dp centrali, ritagliati dalla maschera). I disegni che arrivano al bordo della maschera sono trattati come piastrelle piene.
 - **Simbolo su piatto colorato.**
   - Vengono ricolorati anche i simboli grigio medio, per esempio un robot Android su un disco blu.
   - Il colore del piatto è calcolato con una mediana, quindi sfumature e riflessi non bloccano più il rilevamento.
   - Viene riconosciuto anche un disco colorato sopra una piastrella scura.
   - I simboli bianchi restano bianchi.
-- **Puntini sulle sfumature (Fotocamera Nothing).** Lo schiarimento dei grigi sul piatto scuro usava una soglia netta sulla saturazione e schiariva un pixel sì e uno no sulle sfumature. Ora sfuma gradualmente.
+- **Puntini sulle sfumature.** Lo schiarimento dei grigi sul piatto scuro usava una soglia netta sulla saturazione e schiariva un pixel sì e uno no sulle sfumature. Ora sfuma gradualmente.
 - **Controller della sezione Pack**: veniva distrutto insieme alla schermata, anche se è condiviso da tutta l'app.
 
 ### Modifiche: un'interfaccia che si spiega da sola
@@ -102,7 +102,7 @@
   - Un solo pulsante "Importa icone" apre un menu pop-up in vetro: immagini, cartella, ZIP/APK, PNG pronti, app del telefono.
   - Il "+" in alto, accanto a "Personalizza", compare solo quando ci sono già icone.
   - La barra in basso ha un pulsante di avvio e "Altro" per tutte le altre azioni (manda al Pack, esporta, condividi, svuota), senza scorrimento orizzontale.
-- **Menu pop-up stile iOS 26** in liquid glass, che si aprono dal controllo toccato. Sono usati per l'import, per "Altro", per il menu delle app nel Pack e per la scelta dello stile. Si chiudono toccando fuori o trascinando verso il basso.
+- **Menu pop-up in vetro**, che si aprono dal controllo toccato. Sono usati per l'import, per "Altro", per il menu delle app nel Pack e per la scelta dello stile. Si chiudono toccando fuori o trascinando verso il basso.
 - **Intestazioni uniformi.**
   - Titolo e sottotitolo stanno in una sola colonna, e i pulsanti non finiscono mai sopra il testo.
   - Il margine laterale è di 20 dp ovunque, e le barre flottanti sono allineate alla barra di navigazione.
@@ -114,7 +114,7 @@
   - Due schede, "Tema AI online" e "AI locale", e il modello locale si scarica con un tocco.
   - Le impostazioni "Servizio AI" spiegano che per lo scontorno non serve una chiave API.
   - I metodi di scontorno sono elencati con la spiegazione di ciascuno.
-- **Valori predefiniti del Liquid Glass**: quelli scelti sul Nothing Phone (2a) Plus.
+- **Valori predefiniti del vetro**: quelli scelti sul telefono di prova.
   - Sfocatura 22,6, smerigliatura 61, saturazione 2,5, tinta 8.
   - Spessore 0, rifrazione 1,0, aberrazione 12, profondità attiva.
   - Luce 0, angolo luce 74°, bordo lucido spento.
@@ -123,7 +123,7 @@
 ### Aggiunte
 - **Avvisi in alto** sullo schermo, che si tolgono con uno swipe laterale. Togliere un avviso non interrompe il lavoro in corso.
 - **Swipe tra le sezioni** su Android. La barra in basso segue, e le sezioni restano in memoria, quindi non vengono ricaricate.
-- **Catalogo completo delle app nel Pack.** Compaiono tutte le app con icona nel launcher: quelle di sistema (Fotocamera, Telefono, Contatti, Impostazioni), Icon Formatter stesso e i suoi pack.
+- **Catalogo completo delle app nel Pack.** Compaiono tutte le app con icona nel launcher: quelle di sistema, Icon Formatter stesso e i suoi pack.
   - Stati: Abbinata, Da verificare (il nome corrisponde ma il disegno è diverso), Dubbia, Icona mancante, Verificata, Esclusa.
   - La schermata mostra quante app del launcher rileva Android.
 - **Modifica icona** (tenendo premuta un'app nel Pack).
@@ -160,7 +160,7 @@
 ### Aggiunte
 - **Applicazione del pack sul telefono con Shizuku (senza PC, senza root).** Icon Formatter crea l'APK del pack sul telefono, lo firma, lo installa e lo seleziona in Nothing Launcher.
   - **Creazione:** l'APK base (`assets/iconpack_base.apk`, 2000 slot drawable vuoti, creato da `tool/make_base_apk.py`) viene riempito con i PNG del pack, più `appfilter.xml` / `drawable.xml` binari, `mapping.json` e `pack.json`. Poi viene firmato con apksig, con una chiave tenuta nell'Android Keystore.
-  - **Installazione e selezione:** `pm install`, poi la sequenza di IconGen: il selettore di icon pack di Nothing Launcher si apre dietro l'app, e `nothing_icon_pack` viene impostato a `THEMED_ICONS_NOTHING` e riportato al pack 0,5 s dopo.
+  - **Installazione e selezione:** `pm install`, poi la sequenza di selezione: il selettore di icon pack di Nothing Launcher si apre dietro l'app, e `nothing_icon_pack` viene impostato a `THEMED_ICONS_NOTHING` e riportato al pack 0,5 s dopo.
   - **Un'app separata:** il pack ha il suo package (`com.iconformatter.pack.device`), quindi i pack di sistema non vengono toccati. Ogni build lo aggiorna con una versione progressiva (1.0, 1.1, 1.2, …), e "Ripristina pack precedente" rimette la selezione precedente.
   - **Permessi:** il permesso Shizuku viene chiesto all'avvio, solo se manca.
   - **Senza Shizuku:** l'installazione passa dall'installer di sistema con conferma, e il pack si sceglie a mano nel launcher.
@@ -168,7 +168,7 @@
 - **Rigenera con modalità… (per singola icona):**
   - Automatica.
   - Colore del piatto: il simbolo prende il colore del piatto originale.
-  - Bordo pieno: da bordo a bordo, come Mappe o Gboard.
+  - Bordo pieno: da bordo a bordo, come le icone di mappe o tastiere.
   - Normale.
 - **Ricolorazione automatica:** un simbolo scuro e neutro su un disco o una piastrella colorati (per esempio un cartellino scuro su un disco giallo) prende il colore del piatto, e i buchi nel simbolo diventano trasparenti. I simboli bianchi restano bianchi.
 - **Scheda AI › Modelli locali:**
@@ -183,13 +183,13 @@
   - Pack: passi numerati.
   - Studio: quando è vuoto mostra una guida in 3 passi.
   - Ovunque: titoli grandi, pulsanti in vetro nelle intestazioni, finestre, fogli e menu ridisegnati.
-- **Liquid Glass globale (Impostazioni › Vetro):**
+- **Vetro globale (Impostazioni › Vetro):**
   - I parametri guidano ogni superficie in vetro: barra in basso, pannelli e card, pulsanti e finestre (con lo schermo dietro sfocato).
   - L'effetto si applica in tempo reale, senza riavvio.
   - Impostazioni: qualità (Più veloce / Bilanciato / Qualità), sfocatura, smerigliatura, saturazione, colore e intensità della tinta, spessore, curvatura, rifrazione, aberrazione cromatica, profondità (ombra), luce, bordo lucido, leggibilità, lente e dove usarlo.
   - L'anteprima fissa in alto riproduce la schermata base dello Studio.
   - La riduzione automatica della qualità del pacchetto è disattivata, così viene rispettata la qualità scelta.
-- **Icone a tutto bordo:** una piastrella piena con margine trasparente (come la restituiscono i launcher) ora viene riconosciuta, quindi icone come Mappe e Gboard non escono più piccole dentro il piatto.
+- **Icone a tutto bordo:** una piastrella piena con margine trasparente (come la restituiscono i launcher) ora viene riconosciuta, quindi le icone a tutto bordo non escono più piccole dentro il piatto.
 - **Prestazioni su Android:** le icone delle griglie sono decodificate alla dimensione mostrata (`cacheWidth`) dentro un `RepaintBoundary`.
 
 ### Correzioni
@@ -199,12 +199,12 @@
 ## 1.1.1 — 2026-11-05
 
 ### Correzioni
-- Lucent: le icone prese dalle app installate (icone adattive rese come piastrella arrotondata piena, per esempio Google Maps o Gboard) perdevano gran parte del contenuto, perché la segmentazione esterna trattava tutta la piastrella come un logo nudo. Quando la sorgente è essa stessa una piastrella piena, ora il suo sfondo interno viene rimosso direttamente. Il contenuto (strade, tasti, figure) resta intero, arriva al bordo del piatto ed è ritagliato su di esso, sia nell'anteprima sia nell'esportazione.
+- Lucent: le icone prese dalle app installate (icone adattive rese come piastrella arrotondata piena, per esempio mappe o tastiere) perdevano gran parte del contenuto, perché la segmentazione esterna trattava tutta la piastrella come un logo nudo. Quando la sorgente è essa stessa una piastrella piena, ora il suo sfondo interno viene rimosso direttamente. Il contenuto (strade, tasti, figure) resta intero, arriva al bordo del piatto ed è ritagliato su di esso, sia nell'anteprima sia nell'esportazione.
 
 ## 1.1.0 — 2026-11-05
 
 ### Aggiunte
-- **Render Lucent (Nothing OS 5.0)**: un nuovo modulo Rust (`lucent.rs`) porta il metodo di [Nothing IconGen](https://github.com/linuxct/nothing-icongen) (commit `02c915f`, AGPL-3.0). Comprende il piatto smerigliato `#66000000` / `#66FFFFFF`, la conversione luminanza→inchiostro del launcher (facoltativa) e la compensazione `PackIconEncoder` per Nothing Launcher.
+- **Render Lucent**: un nuovo modulo Rust (`lucent.rs`) crea il piatto traslucido smerigliato (`#66000000` scuro / `#66FFFFFF` chiaro) sulla forma dell'icona, con la conversione facoltativa del simbolo a un solo colore e la compensazione per i launcher che disegnano due volte le icone. Componenti di terze parti in THIRD_PARTY_NOTICES.md.
   - Il glifo mantiene i colori originali.
   - Il piatto è lo squircle di riferimento; sono disponibili anche il cerchio o la sagoma dell'icona caricata.
   - Il contenuto è ritagliato sul bordo del piatto.
@@ -217,7 +217,7 @@
   - I risultati compaiono in una griglia Prima/Dopo con gli stati Sicura/Dubbia/Mancante/Esclusa/Verificata.
   - Le associazioni si correggono con la ricerca, si sostituiscono con un file, si escludono, si verificano o si rielaborano. Le correzioni vengono salvate tra una sessione e l'altra.
   - Esportazione in cartella o ZIP con `appfilter.xml`.
-- **APK dell'icon pack** (Windows, con Android SDK + JDK): "Crea APK" produce un icon pack installabile (intent di ADW/Nova/Lawnchair…). Al suo interno un visualizzatore di icone nello stile dell'app mostra per ogni icona l'app e il package, e se l'app è installata.
+- **APK dell'icon pack** (Windows, con Android SDK + JDK): "Crea APK" produce un icon pack installabile (riconosciuto dai launcher che supportano gli icon pack). Al suo interno un visualizzatore di icone nello stile dell'app mostra per ogni icona l'app e il package, e se l'app è installata.
 - **Scontorno con AI locale**: modello facoltativo U²-Net-p (4,6 MB, Apache-2.0) eseguito con `tract` (Rust puro, CPU) su Windows e Android.
   - Il modello si scarica e si carica su richiesta e resta in cache in memoria.
   - La rimozione viene saltata se lo sfondo è già trasparente.
@@ -235,7 +235,7 @@
 - Navigazione in basso: lente di selezione grigio scuro con accento rosa-lilla desaturato.
 - I pulsanti di import "ZIP" ora sono "ZIP o APK".
 - Composizione su una base: i glifi che arrivano al bordo (o le piastrelle) vengono mappati sul piatto e ritagliati sulla sua forma.
-- Licenza: AGPL-3.0-only (per il codice derivato da Nothing IconGen).
+- Licenza: AGPL-3.0-only (vedi THIRD_PARTY_NOTICES.md).
 
 ### Note e limiti
 - L'aggiornamento silenzioso del pack nel launcher non è disponibile: vedi README › Limiti.

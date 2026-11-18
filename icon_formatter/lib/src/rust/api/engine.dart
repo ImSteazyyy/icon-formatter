@@ -48,7 +48,7 @@ Future<PreviewResult> previewBytes({
   settings: settings,
 );
 
-/// Renders only the background (live preview of Nothing Translucent / base).
+/// Renders only the background (live preview of Translucent / base).
 Future<Uint8List> renderBackgroundPng({
   required BackgroundSettings background,
   required int size,
@@ -181,6 +181,10 @@ Future<void> aiUnloadModel() =>
     RustLib.instance.api.crateApiEngineAiUnloadModel();
 
 /// Associates originals with generated icons (name, package, file, visual).
+/// File where the matching signatures are kept between launches.
+Future<void> setMatchCacheFile({required String path}) =>
+    RustLib.instance.api.crateApiEngineSetMatchCacheFile(path: path);
+
 Future<List<MatchOutput>> matchIcons({
   required List<MatchInput> originals,
   required List<MatchInput> generated,
@@ -643,12 +647,12 @@ class ItemResult {
           notes == other.notes;
 }
 
-/// Lucent (Nothing OS 5.0) plate, ported from Nothing IconGen.
+/// Lucent plate (see native/icon_core/src/lucent.rs).
 class LucentSettings {
   /// Ink colour (ARGB) for the optional monochrome glyph.
   final int ink;
 
-  /// Frosted backdrop (ARGB, alpha 0x66 on Nothing OS).
+  /// Frosted backdrop (ARGB, alpha 0x66 by default).
   final int backdrop;
   final LucentShape shape;
   final bool monochrome;
@@ -656,7 +660,7 @@ class LucentSettings {
   final double glyphScale;
   final double rim;
   final bool launcherShadow;
-  final bool nothingEncode;
+  final bool launcherEncode;
 
   /// How the symbol is taken from the original (per-app override).
   final LucentStrategy strategy;
@@ -670,7 +674,7 @@ class LucentSettings {
     required this.glyphScale,
     required this.rim,
     required this.launcherShadow,
-    required this.nothingEncode,
+    required this.launcherEncode,
     required this.strategy,
   });
 
@@ -684,7 +688,7 @@ class LucentSettings {
       glyphScale.hashCode ^
       rim.hashCode ^
       launcherShadow.hashCode ^
-      nothingEncode.hashCode ^
+      launcherEncode.hashCode ^
       strategy.hashCode;
 
   @override
@@ -700,7 +704,7 @@ class LucentSettings {
           glyphScale == other.glyphScale &&
           rim == other.rim &&
           launcherShadow == other.launcherShadow &&
-          nothingEncode == other.nothingEncode &&
+          launcherEncode == other.launcherEncode &&
           strategy == other.strategy;
 }
 
@@ -708,7 +712,7 @@ enum LucentShape {
   /// Silhouette of the source icon.
   original,
 
-  /// Nothing Launcher / IconGen circle.
+  /// Circular plate.
   circle,
 
   /// Reference squircle (0.93, n 4.25).

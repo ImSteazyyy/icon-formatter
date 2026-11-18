@@ -117,15 +117,15 @@ class _ToastViewState extends State<_ToastView> with SingleTickerProviderStateMi
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
         decoration: BoxDecoration(
-          color: t.error ? const Color(0xF23A2422) : const Color(0xF2242329),
+          color: t.error ? const Color(0xF23A2422) : Palette.toast,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: Palette.fg.withValues(alpha: 0.08)),
           boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
         ),
         child: Row(children: [
           Icon(t.error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, size: 20, color: t.error ? Palette.danger : accent),
           const SizedBox(width: 10),
-          Expanded(child: Text(t.message, style: const TextStyle(fontSize: 13.5, color: Palette.text))),
+          Expanded(child: Text(t.message, style: TextStyle(fontSize: 13.5, color: Palette.text))),
           if (t.actionLabel != null)
             TextButton(
               onPressed: () {

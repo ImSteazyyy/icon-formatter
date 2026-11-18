@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show ScrollController;
 import 'package:path/path.dart' as p;
 
-import '../app/models.dart' show copySegment;
+import '../app/models.dart' show copySegment, copyPlacement;
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../services/batch_controller.dart';
@@ -135,18 +135,34 @@ class WorkspaceController extends ChangeNotifier {
 
   /// [placeOnly]: ready-made PNGs, not cut out nor recoloured; they are
   /// only cropped to their content, centred and sized on the icon background.
-  void addPaths(List<PackImage> imgs, {bool placeOnly = false}) {
+  List<WorkItem> addPaths(List<PackImage> imgs, {bool placeOnly = false}) {
+    final added = <WorkItem>[];
     for (final im in imgs) {
       final stem = p.basenameWithoutExtension(im.rel);
-      items.add(
-        WorkItem(id: 'i${DateTime.now().microsecondsSinceEpoch}_${items.length}', name: uniqueStem(stem), rel: im.rel, path: im.abs)
+      added.add(
+        WorkItem(id: 'i${DateTime.now().microsecondsSinceEpoch}_${items.length + added.length}', name: uniqueStem(stem), rel: im.rel, path: im.abs)
           ..segOverride = placeOnly ? SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false) : null
           ..strategyOverride = placeOnly ? LucentStrategy.asIs : null,
       );
+      items.add(added.last);
     }
     selectedId ??= items.isEmpty ? null : items.first.id;
     notifyListeners();
     schedulePreview(immediate: true);
+    return added;
+  }
+
+  /// Size of one icon (its own placement, else the global one).
+  double itemScale(WorkItem it) => (it.placementOverride ?? settings.placement).scaleMul;
+
+  /// "Dimensione": sets the size of [its] only and re-renders them.
+  Future<void> setItemsScale(List<WorkItem> its, double v) async {
+    for (final it in its) {
+      it.placementOverride = copyPlacement(it.placementOverride ?? settings.placement, scaleMul: v);
+    }
+    notifyListeners();
+    await process(only: its);
+    notifyListeners();
   }
 
   /// Studio › "Calendario da un icon pack": every day of the pack's calendar
@@ -228,7 +244,7 @@ class WorkspaceController extends ChangeNotifier {
           glyphScale: l.glyphScale,
           rim: l.rim,
           launcherShadow: l.launcherShadow,
-          nothingEncode: l.nothingEncode,
+          launcherEncode: l.launcherEncode,
           strategy: st,
         ),
       );

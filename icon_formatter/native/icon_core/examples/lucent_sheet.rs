@@ -1,5 +1,5 @@
 //! cargo run --release --example lucent_sheet -- out.png in1.png in2.png ...
-//! Columns: original | Lucent dark (original shape) | Lucent light | IconGen circle,
+//! Columns: original | Lucent dark (original shape) | Lucent light | circle,
 //! each over a colourful "wallpaper" so the translucency is visible.
 use icon_core::{imageops, lucent, segment};
 use image::{Rgba, RgbaImage};

@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -808499180;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1802838885;
 
 // Section: executor
 
@@ -1004,6 +1004,41 @@ fn wire__crate__api__engine__sanitize_drawable_name_impl(
         },
     )
 }
+fn wire__crate__api__engine__set_match_cache_file_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_match_cache_file",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>({
+                        crate::api::engine::set_match_cache_file(api_path);
+                    })?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__engine__set_worker_threads_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -1679,7 +1714,7 @@ impl SseDecode for crate::api::engine::LucentSettings {
         let mut var_glyphScale = <f32>::sse_decode(deserializer);
         let mut var_rim = <f32>::sse_decode(deserializer);
         let mut var_launcherShadow = <bool>::sse_decode(deserializer);
-        let mut var_nothingEncode = <bool>::sse_decode(deserializer);
+        let mut var_launcherEncode = <bool>::sse_decode(deserializer);
         let mut var_strategy = <crate::api::engine::LucentStrategy>::sse_decode(deserializer);
         return crate::api::engine::LucentSettings {
             ink: var_ink,
@@ -1690,7 +1725,7 @@ impl SseDecode for crate::api::engine::LucentSettings {
             glyph_scale: var_glyphScale,
             rim: var_rim,
             launcher_shadow: var_launcherShadow,
-            nothing_encode: var_nothingEncode,
+            launcher_encode: var_launcherEncode,
             strategy: var_strategy,
         };
     }
@@ -2063,10 +2098,13 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
         25 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        27 => {
+            wire__crate__api__engine__set_match_cache_file_impl(port, ptr, rust_vec_len, data_len)
+        }
+        29 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2092,7 +2130,7 @@ fn pde_ffi_dispatcher_sync_impl(
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
         26 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2447,7 +2485,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::LucentSettings {
             self.glyph_scale.into_into_dart().into_dart(),
             self.rim.into_into_dart().into_dart(),
             self.launcher_shadow.into_into_dart().into_dart(),
-            self.nothing_encode.into_into_dart().into_dart(),
+            self.launcher_encode.into_into_dart().into_dart(),
             self.strategy.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -3149,7 +3187,7 @@ impl SseEncode for crate::api::engine::LucentSettings {
         <f32>::sse_encode(self.glyph_scale, serializer);
         <f32>::sse_encode(self.rim, serializer);
         <bool>::sse_encode(self.launcher_shadow, serializer);
-        <bool>::sse_encode(self.nothing_encode, serializer);
+        <bool>::sse_encode(self.launcher_encode, serializer);
         <crate::api::engine::LucentStrategy>::sse_encode(self.strategy, serializer);
     }
 }

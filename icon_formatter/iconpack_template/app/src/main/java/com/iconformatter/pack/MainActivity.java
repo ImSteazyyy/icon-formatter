@@ -61,10 +61,17 @@ public class MainActivity extends Activity {
         }
         // packs built on the phone share one base APK: name and accent come from assets/pack.json
         String packTitle = getString(R.string.app_name);
+        // style and texts of the app that made the pack (Nothing style by default)
+        boolean nothing = true;
+        String subFmt = "%1$d icone · %2$d app installate su questo telefono";
+        String searchHint = "Cerca per nome o package";
         try (InputStream in = getAssets().open("pack.json")) {
             JSONObject meta = new JSONObject(readAll(in));
             if (meta.has("accent")) accent = Color.parseColor(meta.getString("accent"));
             if (meta.has("name")) packTitle = meta.getString("name");
+            nothing = !"glass".equals(meta.optString("style", "nothing"));
+            subFmt = meta.optString("sub", subFmt);
+            searchHint = meta.optString("search", searchHint);
         } catch (Exception ignored) {
             // Windows build: values are compiled into the resources
         }
@@ -72,8 +79,12 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         // dark background with a soft accent glow, like Icon Formatter's backdrop
-        GradientDrawable rootBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{(accent & 0x00FFFFFF) | 0x33000000, 0xFF0E0E0F, 0xFF0E0E0F});
-        root.setBackground(rootBg);
+        if (nothing) {
+            root.setBackgroundColor(0xFF000000);
+        } else {
+            GradientDrawable rootBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{(accent & 0x00FFFFFF) | 0x33000000, 0xFF0E0E0F, 0xFF0E0E0F});
+            root.setBackground(rootBg);
+        }
         root.setPadding(dp(16), dp(28), dp(16), 0);
         // edge-to-edge (enforced on Android 15+): keep content below the status bar
         root.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -85,37 +96,45 @@ public class MainActivity extends Activity {
 
         // header: accent tile + name, as in Icon Formatter's title bar
         LinearLayout head = new LinearLayout(this);
-        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setGravity(nothing ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.mipmap.ic_launcher);
         head.addView(logo, new LinearLayout.LayoutParams(dp(30), dp(30)));
         TextView title = new TextView(this);
         title.setText(packTitle);
         title.setTextColor(0xFFE9E7E2);
-        title.setTextSize(22);
+        title.setTextSize(nothing ? 30 : 22);
         title.setPadding(dp(10), 0, 0, 0);
-        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        android.graphics.Typeface serif = null;
+        if (nothing) {
+            try {
+                serif = android.graphics.Typeface.createFromAsset(getAssets(), "fonts/InstrumentSerif-Regular.ttf");
+            } catch (Exception ignored) {
+            }
+        }
+        title.setTypeface(serif != null ? serif : android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
         head.addView(title);
         root.addView(head);
 
         int installed = 0;
         for (Item i : all) if (i.installed) installed++;
         TextView sub = new TextView(this);
-        sub.setText(String.format(Locale.ITALY, "%d icone · %d app installate su questo telefono", all.size(), installed));
-        sub.setTextColor(0xFF9E9B94);
+        sub.setText(String.format(Locale.ROOT, subFmt, all.size(), installed));
+        sub.setTextColor(nothing ? 0xFF929292 : 0xFF9E9B94);
+        if (nothing) sub.setGravity(Gravity.CENTER);
         sub.setTextSize(13);
         sub.setPadding(0, dp(4), 0, dp(10));
         root.addView(sub);
 
         EditText search = new EditText(this);
-        search.setHint("Cerca per nome o package");
+        search.setHint(searchHint);
         search.setHintTextColor(0xFF6E6C67);
         search.setTextColor(0xFFE9E7E2);
         search.setSingleLine(true);
         GradientDrawable sbg = new GradientDrawable();
-        sbg.setColor(0x66232226);
+        sbg.setColor(nothing ? 0xFF141414 : 0x66232226);
         sbg.setCornerRadius(dp(24));
-        sbg.setStroke(dp(1), (accent & 0x00FFFFFF) | 0x55000000);
+        if (!nothing) sbg.setStroke(dp(1), (accent & 0x00FFFFFF) | 0x55000000);
         search.setBackground(sbg);
         search.setPadding(dp(14), dp(10), dp(14), dp(10));
         root.addView(search);
@@ -129,6 +148,7 @@ public class MainActivity extends Activity {
         grid.setPadding(0, dp(12), 0, dp(24));
         grid.setClipToPadding(false);
         final int fAccent = accent;
+        final boolean fNothing = nothing;
         adapter = new BaseAdapter() {
             @Override public int getCount() { return shown.size(); }
             @Override public Object getItem(int p) { return shown.get(p); }
@@ -141,9 +161,15 @@ public class MainActivity extends Activity {
                 cell.setOrientation(LinearLayout.VERTICAL);
                 cell.setGravity(Gravity.CENTER_HORIZONTAL);
                 cell.setPadding(dp(4), dp(8), dp(4), dp(8));
-                GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0x40FFFFFF & 0x22FFFFFF | 0x1A000000, 0x14FFFFFF});
+                GradientDrawable bg;
+                if (fNothing) {
+                    bg = new GradientDrawable();
+                    bg.setColor(0xFF141414);
+                } else {
+                    bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0x40FFFFFF & 0x22FFFFFF | 0x1A000000, 0x14FFFFFF});
+                    bg.setStroke(dp(1), 0x26FFFFFF);
+                }
                 bg.setCornerRadius(dp(20));
-                bg.setStroke(dp(1), 0x26FFFFFF);
                 cell.setBackground(bg);
                 ImageView iv = new ImageView(MainActivity.this);
                 if (it.res != 0) iv.setImageResource(it.res);
@@ -158,7 +184,7 @@ public class MainActivity extends Activity {
                 cell.addView(label);
                 TextView pkg = new TextView(MainActivity.this);
                 pkg.setText(it.pkg.isEmpty() ? "—" : it.pkg);
-                pkg.setTextColor(it.installed ? fAccent : 0xFF6E6C67);
+                pkg.setTextColor(fNothing ? (it.installed ? 0xFF929292 : 0xFF5A5A5A) : (it.installed ? fAccent : 0xFF6E6C67));
                 pkg.setTextSize(9);
                 pkg.setSingleLine(true);
                 pkg.setGravity(Gravity.CENTER);
@@ -206,7 +232,18 @@ public class MainActivity extends Activity {
                 it.label = o.optString("label");
                 it.pkg = o.optString("package");
                 it.drawable = o.optString("drawable");
+                if (it.drawable.isEmpty() && o.has("calendar")) {
+                    int day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH);
+                    it.drawable = o.optString("calendar") + day;
+                }
                 it.res = getResources().getIdentifier(it.drawable, "drawable", getPackageName());
+                if (it.label.isEmpty() && !it.pkg.isEmpty()) {
+                    try {
+                        it.label = pm.getApplicationLabel(pm.getApplicationInfo(it.pkg, 0)).toString();
+                    } catch (Exception e) {
+                        it.label = it.pkg;
+                    }
+                }
                 try {
                     pm.getPackageInfo(it.pkg, 0);
                     it.installed = !it.pkg.isEmpty();

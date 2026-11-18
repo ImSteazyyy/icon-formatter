@@ -63,7 +63,7 @@ class _LocalAiBoxState extends State<LocalAiBox> {
       listenable: st,
       builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: 8),
-        const Text(S.aiLocaleInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+        Text(S.aiLocaleInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
         const SizedBox(height: 8),
         for (final m in aiModelsHere)
           Padding(
@@ -78,8 +78,8 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(m.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text(S.aiModelloDettagli(_mb(m.bytes), m.ramMb), style: const TextStyle(fontSize: 12, color: Palette.text2)),
-                    Text(m.note, style: const TextStyle(fontSize: 11, color: Palette.text3)),
+                    Text(S.aiModelloDettagli(_mb(m.bytes), m.ramMb), style: TextStyle(fontSize: 12, color: Palette.text2)),
+                    Text(m.note, style: TextStyle(fontSize: 11, color: Palette.text3)),
                     const SizedBox(height: 4),
                     Wrap(spacing: 6, children: [
                       if (m.phone) _Tag(S.aiTagTelefono),
@@ -88,7 +88,7 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                   ]),
                 ),
                 if (st.modelReady(m)) ...[
-                  const Icon(Icons.check_circle_outline, color: Palette.ok, size: 18),
+                  Icon(Icons.check_circle_outline, color: Palette.ok, size: 18),
                   IconButton(
                     tooltip: S.aiEliminaModello,
                     icon: const Icon(Icons.delete_outline),
@@ -98,14 +98,14 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                     },
                   ),
                 ] else if (downloading == null)
-                  FilledButton.tonal(key: ValueKey('ai-download-${m.id}'), onPressed: () => _download(m), child: const Text(S.aiScarica))
+                  FilledButton.tonal(key: ValueKey('ai-download-${m.id}'), onPressed: () => _download(m), child: Text(S.aiScarica))
                 else if (downloading == m.id)
-                  TextButton(onPressed: () => setState(() => cancel = true), child: const Text(S.annulla)),
+                  TextButton(onPressed: () => setState(() => cancel = true), child: Text(S.annulla)),
               ]),
               if (downloading == m.id && progress != null) LinearProgressIndicator(value: progress),
             ]),
           ),
-        if (error != null) Text(error!, style: const TextStyle(color: Palette.danger, fontSize: 12)),
+        if (error != null) Text(error!, style: TextStyle(color: Palette.danger, fontSize: 12)),
         const SizedBox(height: 8),
         SliderRow(label: S.aiSogliaBassa, value: cfg.low, max: 0.9, onChanged: (v) => st.update(() => cfg.low = v.clamp(0, cfg.high - 0.02))),
         SliderRow(label: S.aiSogliaAlta, value: cfg.high, min: 0.1, onChanged: (v) => st.update(() => cfg.high = v.clamp(cfg.low + 0.02, 1))),
@@ -113,7 +113,7 @@ class _LocalAiBoxState extends State<LocalAiBox> {
         OutlinedButton.icon(
           key: const ValueKey('ai-test'),
           icon: const Icon(Icons.layers_outlined),
-          label: const Text(S.aiProvaMaschera),
+          label: Text(S.aiProvaMaschera),
           onPressed: st.modelReady(cfg.model)
               ? () async {
                   final r = await FilePicker.platform.pickFiles(type: FileType.image);
@@ -123,7 +123,7 @@ class _LocalAiBoxState extends State<LocalAiBox> {
               : null,
         ),
         if (!st.modelReady(cfg.model))
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 6),
             child: Text(S.aiModelloMancante, style: TextStyle(fontSize: 12, color: Palette.warn)),
           ),
@@ -186,7 +186,7 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
 
   Widget _tile(String title, Widget child) => Expanded(
         child: Column(children: [
-          Text(title, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+          Text(title, style: TextStyle(fontSize: 12, color: Palette.text2)),
           const SizedBox(height: 6),
           AspectRatio(aspectRatio: 1, child: ClipRRect(borderRadius: BorderRadius.circular(10), child: child)),
         ]),
@@ -197,7 +197,7 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
     final st = AppState.I;
     final r = res;
     return AlertDialog(
-      title: const Text(S.aiMascheraTitolo),
+      title: Text(S.aiMascheraTitolo),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -211,7 +211,7 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
             ]),
             const SizedBox(height: 10),
             if (busy) const LinearProgressIndicator(),
-            if (error != null) Text(error!, style: const TextStyle(color: Palette.danger)),
+            if (error != null) Text(error!, style: TextStyle(color: Palette.danger)),
             if (r != null) ...[
               Row(children: [
                 Icon(
@@ -226,9 +226,9 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
                     style: const TextStyle(fontSize: 13),
                   ),
                 ),
-                Text('${r.millis} ms', style: const TextStyle(fontSize: 12, color: Palette.text3)),
+                Text('${r.millis} ms', style: TextStyle(fontSize: 12, color: Palette.text3)),
               ]),
-              for (final n in r.notes) Text('· $n', style: const TextStyle(fontSize: 11, color: Palette.text3)),
+              for (final n in r.notes) Text('· $n', style: TextStyle(fontSize: 11, color: Palette.text3)),
             ],
             const SizedBox(height: 8),
             SliderRow(
@@ -245,11 +245,11 @@ class _AiMaskDialogState extends State<_AiMaskDialog> {
               onChanged: (v) => setState(() => st.update(() => st.localAi.high = v.clamp(st.localAi.low + 0.02, 1))),
               onChangeEnd: (_) => _run(),
             ),
-            const Text(S.aiCorrezioneInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+            Text(S.aiCorrezioneInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
           ]),
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text(S.chiudi))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(S.chiudi))],
     );
   }
 }

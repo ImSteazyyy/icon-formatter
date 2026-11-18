@@ -32,7 +32,7 @@ class BgRemovalService {
   static const _storage = FlutterSecureStorage();
   static const _keyName = 'bg_api_key_removebg';
   static const pricingUrl = 'https://www.remove.bg/pricing';
-  static const costNote = S.removeBgConsuma1Credito;
+  static String get costNote => S.removeBgConsuma1Credito;
 
   /// Cache: source key -> cutout PNG path (one API call per image).
   static final Map<String, String> _cache = {};

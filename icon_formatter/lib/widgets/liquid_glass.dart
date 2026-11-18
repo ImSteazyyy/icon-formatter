@@ -7,19 +7,80 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../app/models.dart';
 import '../app/state.dart';
+import '../app/theme.dart';
+
+/// "Stile Nothing": solid black and grey surfaces, no glass.
+bool get nothingStyle => AppState.I.appearance.style == UiStyle.nothing;
+
+/// Nothing style surfaces (from the darkest to the lightest).
+class NothingColors {
+  // light: the Nothing light surfaces (#F2F2F2 page, white cards)
+  static bool get _light => AppState.I.appearance.light;
+  static Color get bg => _light ? const Color(0xFFF2F2F2) : const Color(0xFF000000);
+  static Color get card => _light ? const Color(0xFFFCFCFC) : const Color(0xFF141414);
+  static Color get raised => _light ? const Color(0xFFE9E9E9) : const Color(0xFF1C1C1C);
+  static Color get control => _light ? const Color(0xFFE3E3E3) : const Color(0xFF292929);
+  static Color get tertiary => _light ? const Color(0xFFC8C8C8) : const Color(0xFF323232);
+
+  /// The "on" pill (active filter, done step, switch track): white on
+  /// black, near black on light.
+  static Color get on => _light ? const Color(0xFF1C1C1C) : const Color(0xFFF2F2F2);
+
+  /// Text and icons on [on].
+  static Color get onOn => _light ? Colors.white : Colors.black;
+
+  /// Blurred pill of the bottom bar.
+  static Color get navPill => _light ? const Color(0xC7FFFFFF) : const Color(0xB3292929);
+}
 
 /// Space at the bottom covered by floating glass bars (Android phone
 /// layout). Scrollable pages add it as bottom padding so content scrolls
 /// under the glass instead of being cut off.
 class GlassInsets extends InheritedWidget {
-  const GlassInsets({super.key, required this.bottom, required super.child});
+  const GlassInsets({super.key, required this.bottom, this.folded = false, required super.child});
 
   final double bottom;
 
+  /// The bottom bar is folded into its round button (Glass style).
+  final bool folded;
+
   static double of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassInsets>()?.bottom ?? 0;
 
+  static bool foldedOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassInsets>()?.folded ?? false;
+
   @override
-  bool updateShouldNotify(GlassInsets old) => old.bottom != bottom;
+  bool updateShouldNotify(GlassInsets old) => old.bottom != bottom || old.folded != folded;
+}
+
+/// Where a floating action bar sits over the bottom bar. With the bar open
+/// it stands above it; with the bar folded it drops down next to the round
+/// button left, at the bottom edge (the bar is out of the way).
+class FloatingBarSlot extends StatelessWidget {
+  const FloatingBarSlot({super.key, required this.child, this.side = 12});
+
+  final Widget child;
+
+  /// Gap to the screen edges when the bar is open.
+  final double side;
+
+  @override
+  Widget build(BuildContext context) {
+    final under = GlassInsets.of(context);
+    final folded = GlassInsets.foldedOf(context);
+    final inset = MediaQuery.of(context).viewPadding.bottom;
+    // folded button: 50 dp round, 12 dp from the left and bottom edges
+    // same start as the tab bar: rising faster than it opens, dropping a bit
+    // slower than it folds, so the two never cross
+    return AnimatedPositioned(
+      duration: Duration(milliseconds: folded ? 340 : 200),
+      curve: folded ? Curves.easeInOutCubic : Curves.easeOutCubic,
+      left: folded ? 12 + 50 + 8 : side,
+      right: side,
+      // centred on the folded button (measured on the emulator)
+      bottom: folded ? inset + 12 : under - 4, // the nav box includes 12dp of top padding
+      child: child,
+    );
+  }
 }
 
 /// Glass material from Impostazioni › Vetro, rendered by
@@ -28,6 +89,42 @@ class GlassInsets extends InheritedWidget {
 /// visible everywhere at once (no restart, no per-screen copies).
 LiquidGlassSettings appGlassSettings({bool dark = false, double chromatic = 0.5}) {
   final g = AppState.I.glass;
+  if (nativeGlass) {
+    // native dark material; each control scales the preset value it stands
+    // for, so the defaults reproduce the preset exactly
+    // every control is a ratio to its default applied to the preset value,
+    // so the defaults give the preset unchanged
+    final base = AppState.I.appearance.light ? _nativeLight : _nativeDark;
+    double ratio(double v, double def) => (v / def).clamp(0.0, double.infinity);
+    // Film: opacity of the body colour
+    final alpha = (ratio(g.nFilm, 0.5) * base.glassColor.a).clamp(0.0, 1.0);
+    final Color color;
+    if (dark) {
+      color = Colors.black.withValues(alpha: (g.lensDarkness * 0.7).clamp(0.0, 0.6));
+    } else if (g.tintColor != 0) {
+      // Tint: the hue of the chosen colour, light and pastel, same opacity
+      final hsv = HSVColor.fromColor(Color(g.tintColor | 0xFF000000));
+      color = HSVColor.fromAHSV(alpha, hsv.hue, 0.33, 1).toColor();
+    } else {
+      color = Colors.white.withValues(alpha: alpha);
+    }
+    // Frost (dp) sets how much frost; with Frost off the body is clear and
+    // only a light blur is left
+    final frost = base.frost * ratio(g.nFrost, 2);
+    return base.copyWith(
+      glassColor: color,
+      frost: g.nFrostOn ? frost : 0,
+      blur: g.nFrostOn ? base.blur : math.max(base.blur, frost * 0.25),
+      // Colour: scales the saturation boost above neutral
+      saturation: 1 + ratio(g.nColour, 0.6) * (base.saturation - 1),
+      rimLight: base.rimLight * ratio(g.nEdgeLight, 0.55),
+      thickness: math.max(1.0, base.thickness * ratio(g.nEdgeDepth, 19.2)),
+      refractiveIndex: 1 + ratio(g.nBend, 28.8) * (base.refractiveIndex - 1),
+      chromaticAberration: g.nSplit ? 0.4 : 0,
+      // Depth: a deeper, darker edge
+      edgeAbsorption: base.edgeAbsorption * (g.depth ? 2 : 1),
+    );
+  }
   // Frost is applied as extra diffusion + milky tint so it is visible in
   // every quality mode (the package's own frost/aberration exist only in the
   // Premium Impeller pipeline). Aberration is also drawn by GlossOverlay.
@@ -54,11 +151,98 @@ LiquidGlassSettings appGlassSettings({bool dark = false, double chromatic = 0.5}
   );
 }
 
+/// Light appearance: the package's iOS 27 light values.
+const _nativeLight = LiquidGlassSettings(
+  glassColor: Color(0x87F8F8F8),
+  saturation: 2.1,
+  blur: 0.6,
+  blurWeight: 0.8,
+  frost: 14,
+  frostOpacity: 0.73,
+  frostClamp: 0.4,
+  frostWeight: 2.0,
+  thickness: 32,
+  refractiveIndex: 1.24,
+  lensModel: GlassLensModel.paraxial,
+  lightAngle: 1.5707963267948966,
+  lightIntensity: 0,
+  fresnelStrength: 0,
+  chromaticAberration: 0,
+  edgeAbsorption: 0.035,
+  rimShade: 1,
+  rimLight: 1,
+);
+
+/// Base of "Vetro nativo": dark frosted body, thin outline, light on the rim.
+const _nativeDark = LiquidGlassSettings(
+  glassColor: Color(0x1FFFFFFF),
+  saturation: 1.4,
+  blur: 0.6,
+  blurWeight: 2.5,
+  frost: 14,
+  frostOpacity: 0.85,
+  frostClamp: -0.45,
+  frostWeight: 0.5,
+  thickness: 32,
+  refractiveIndex: 1.24,
+  lensModel: GlassLensModel.paraxial,
+  lightAngle: -1.5707963267948966,
+  lightIntensity: 0,
+  fresnelStrength: 0,
+  chromaticAberration: 0,
+  edgeAbsorption: 0.035,
+  rimShade: 1,
+  rimShadeEnds: 0,
+  rimLight: 1.15,
+  bodyShade: 0.28,
+  shadowElevation: 0,
+);
+
 /// Bottom bar material: glass, or a solid anthracite pill when
 /// "Vetro nella barra in basso" is off.
 LiquidGlassSettings navGlassSettings() {
   if (AppState.I.glass.useNav) return appGlassSettings(chromatic: 0.6);
-  return const LiquidGlassSettings(glassColor: Color(0xF21C1C1F), blur: 0, thickness: 0, chromaticAberration: 0, lightIntensity: 0, saturation: 1);
+  return LiquidGlassSettings(glassColor: Palette.overlayBase.withValues(alpha: 0.95), blur: 0, thickness: 0, chromaticAberration: 0, lightIntensity: 0, saturation: 1);
+}
+
+/// The bottom tab bar of the Glass style; the settings preview draws the
+/// same widget, so what the preview shows is what the bar does.
+Widget appGlassTabBar({
+  Key? key,
+  required List<IconData> icons,
+  required List<String> labels,
+  required int index,
+  required ValueChanged<int> onSelect,
+  bool minimized = false,
+  VoidCallback? onExpand,
+}) {
+  final g = AppState.I.glass;
+  final accent = AppState.I.appearance.accentColor;
+  final bar = navGlassSettings();
+  return GlassTabBar.minimizable(
+    key: key,
+    // icons only; the names stay for screen readers
+    tabs: [for (var i = 0; i < icons.length; i++) GlassTab(icon: Icon(icons[i]), semanticLabel: labels[i])],
+    // the active tab is white on its puck, the others carry the accent
+    selectedIconColor: Palette.fg,
+    unselectedIconColor: Color.lerp(accent, Palette.fg, 0.55),
+    iconSize: 26,
+    selectedIndex: index,
+    onTabSelected: onSelect,
+    minimized: minimized,
+    onMinimizedTabTap: onExpand,
+    horizontalPadding: 12,
+    verticalPadding: 12,
+    settings: bar,
+    quality: glassQualityFor(live: true),
+    // Scheda attiva: from no puck to solid white
+    indicatorColor: g.native ? Palette.fg.withValues(alpha: g.nActiveTab.clamp(0.0, 1.0)) : null,
+    // while dragging, a clear round lens that lifts above the bar and
+    // magnifies the icon under it
+    indicatorSettings: bar.copyWith(frost: 0, blur: 0, glassColor: Colors.white.withValues(alpha: 0.03)),
+    indicatorExpansion: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+    magnification: 1.25,
+  );
 }
 
 /// Where a glass surface sits; each role can be switched to a solid
@@ -68,7 +252,7 @@ enum GlassRole { panel, button, nav, lens }
 bool glassEnabled(GlassRole r) {
   final g = AppState.I.glass;
   return switch (r) {
-    GlassRole.panel => g.usePanels,
+    GlassRole.panel => g.native ? g.nPanels : g.usePanels,
     GlassRole.button => g.useButtons,
     GlassRole.nav => g.useNav,
     GlassRole.lens => g.useNav,
@@ -76,11 +260,12 @@ bool glassEnabled(GlassRole r) {
 }
 
 /// Solid anthracite used where glass is switched off (and by plain cards).
-const solidSurface = Color(0xFF1C1C1F);
+Color get solidSurface => Palette.overlayBase;
 
 /// Drop shadow of glass surfaces ("Profondità").
 List<BoxShadow> glassDepthShadows(double radius) {
-  if (!AppState.I.glass.depth) return const [];
+  // native glass: Depth deepens the edge instead (see appGlassSettings)
+  if (nothingStyle || nativeGlass || !AppState.I.glass.depth) return const [];
   return [
     BoxShadow(color: Colors.black.withValues(alpha: 0.38), blurRadius: 18, offset: const Offset(0, 8)),
     BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 4, offset: const Offset(0, 1)),
@@ -92,10 +277,10 @@ List<BoxShadow> glassDepthShadows(double radius) {
 /// Drawn without blur. On Impeller a blurred text shadow is an offscreen
 /// blur pass per text run per frame: with the default 60 / 6.0 the glass
 /// labels cost dozens of blur passes per frame and page swipes dropped to
-/// 30-60 fps on the Phone (2a) Plus. The soft edge is rebuilt from a few
+/// 30-60 fps on the test phone. The soft edge is rebuilt from a few
 /// crisp copies placed on rings as wide as the blur, each faint; a crisp
 /// glyph copy costs about as much as the text itself.
-List<Shadow> glassTextShadows() => glassTextShadowsFor(AppState.I.glass);
+List<Shadow> glassTextShadows() => nothingStyle || AppState.I.appearance.light ? const [] : glassTextShadowsFor(AppState.I.glass);
 
 List<Shadow> glassTextShadowsFor(GlassConfig g) {
   if (g.textShadow <= 0.01) return const [];
@@ -134,6 +319,23 @@ Widget withGlassShadows(Widget child) {
 /// Linux (Impeller on OpenGL ES) it leaves the window blank, so "Qualità"
 /// falls back to the standard glass there.
 bool get premiumGlassSupported => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+
+/// Render tier of one surface. With the native material, Materiale chooses
+/// it for everything: Qualità = premium, Bilanciato = standard, Più veloce =
+/// minimal, on bars and cards alike.
+GlassQuality glassQualityFor({required bool live}) {
+  if (!nativeGlass) return appGlassQuality;
+  return switch (AppState.I.glass.quality) {
+    // one tier for bars and cards alike, so they always look the same
+    GlassQualityLevel.quality => premiumGlassSupported ? GlassQuality.premium : GlassQuality.standard,
+    GlassQualityLevel.balanced => GlassQuality.standard,
+    GlassQualityLevel.fast => GlassQuality.minimal,
+  };
+}
+
+/// "Vetro nativo": the native dark material. Its outline, frost and shading are
+/// drawn in full by "Qualità", approximated by the lighter levels.
+bool get nativeGlass => AppState.I.glass.native;
 
 GlassQuality get appGlassQuality => switch (AppState.I.glass.quality) {
       GlassQualityLevel.fast => GlassQuality.minimal,
@@ -183,35 +385,55 @@ class LiquidGlass extends StatelessWidget {
       listenable: AppState.I,
       builder: (context, _) {
         final shadows = glassDepthShadows(radius);
+        if (nothingStyle) {
+          return Container(
+            padding: padding,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(color: dark ? NothingColors.control : NothingColors.card, borderRadius: BorderRadius.circular(radius)),
+            child: child,
+          );
+        }
         Widget body;
-        if (!glassEnabled(role)) {
+        // native style: cards are solid, but a panel floating over the
+        // content (action bars, menus) is glass like the bottom bar
+        final floating = live && role == GlassRole.panel && AppState.I.glass.native && AppState.I.glass.useNav;
+        if (!glassEnabled(role) && !floating) {
           body = Container(
             padding: padding,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF26252B) : solidSurface,
+              color: dark ? Palette.raised : (AppState.I.glass.native ? Palette.card : solidSurface),
               borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              border: Border.all(color: Palette.fg.withValues(alpha: 0.06)),
             ),
             child: child,
           );
         } else {
-          final settings = appGlassSettings(dark: dark, chromatic: chromatic);
+          // cards in scrolling pages: the bar's colour, rim and light without
+          // the frost, and no backdrop read (a scrolling list made the frost
+          // lag and turn black); floating chrome keeps the full material
+          final full = appGlassSettings(dark: dark, chromatic: chromatic);
+          final settings = nativeGlass && !live ? full.copyWith(frost: 0, blur: 0) : full;
+          final quality = live ? glassQualityFor(live: true) : (nativeGlass ? GlassQuality.standard : appGlassQuality);
           Widget glass = GlassContainer(
             shape: LiquidRoundedSuperellipse(borderRadius: radius),
             padding: padding,
             settings: settings,
             useOwnLayer: true,
-            quality: appGlassQuality,
+            quality: quality,
             clipBehavior: Clip.antiAlias,
             child: withGlassShadows(child),
           );
+          // native material: the lightweight renderer needs its own backdrop
+          // read, or the card comes out black
           if (!live) {
             // tells the lightweight renderer the blur is already there, so it
             // pushes no BackdropFilterLayer for this surface
-            glass = InheritedLiquidGlass(settings: settings, quality: appGlassQuality, isBlurProvidedByAncestor: true, child: glass);
+            glass = InheritedLiquidGlass(settings: settings, quality: quality, isBlurProvidedByAncestor: true, child: glass);
           }
-          body = GlossOverlay(radius: radius, child: glass);
+          // native glass: the rim light is in the material already, as on
+          // the bottom bar; the extra gloss would set the two apart
+          body = nativeGlass ? glass : GlossOverlay(radius: radius, child: glass);
         }
         if (shadows.isEmpty) return body;
         return DecoratedBox(
@@ -221,6 +443,55 @@ class LiquidGlass extends StatelessWidget {
       },
     );
   }
+}
+
+/// Bottom sheet that floats like the bars: away from the screen edges,
+/// every corner rounded, a solid body and its own grab handle.
+Future<T?> showAppSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isScrollControlled = false,
+  bool showDragHandle = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: isScrollControlled,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    showDragHandle: false,
+    builder: (ctx) {
+      final theme = Theme.of(ctx).bottomSheetTheme;
+      final r = AppState.I.appearance.radius + 12;
+      final bottom = MediaQuery.of(ctx).viewPadding.bottom;
+      return Padding(
+        padding: EdgeInsets.fromLTRB(12, 0, 12, 12 + bottom),
+        child: Material(
+          color: theme.backgroundColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(r),
+            side: nothingStyle ? BorderSide.none : BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: MediaQuery.removePadding(
+            context: ctx,
+            removeBottom: true,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (showDragHandle)
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+              Flexible(child: builder(ctx)),
+            ]),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// Dialogs and sheets: the screen behind is blurred with the glass blur
@@ -240,7 +511,7 @@ Future<T?> showAppDialog<T>({required BuildContext context, required WidgetBuild
   );
 }
 
-/// Glossy specular rim over a glass shape (Impostazioni › Liquid Glass ›
+/// Glossy specular rim over a glass shape (Impostazioni › Vetro ›
 /// Lucentezza): bright where the edge faces the light, as on the reference
 /// icons, plus a soft sheen on the lit side.
 class GlossOverlay extends StatelessWidget {
@@ -258,7 +529,8 @@ class GlossOverlay extends StatelessWidget {
         final g = AppState.I.glass;
         final gloss = g.gloss ? g.glossIntensity : 0.0;
         final chroma = (g.chromatic / 0.05).clamp(0.0, 1.0);
-        if (gloss <= 0.01 && chroma <= 0.01) return child!;
+        // the native material draws its own rim line and light
+        if (nativeGlass || (gloss <= 0.01 && chroma <= 0.01)) return child!;
         return CustomPaint(
           foregroundPainter: GlossPainter(radius: radius, intensity: gloss, lightAngle: g.lightAngle, chroma: chroma),
           child: child,

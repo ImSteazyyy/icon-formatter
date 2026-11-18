@@ -1,5 +1,5 @@
 //! cargo run --release --example regress_tr -- OUT_DIR in1.png ...
-//! "Nothing Translucent" path (translucent plate + place_on_plate), 256 px.
+//! "Translucent" path (translucent plate + place_on_plate), 256 px.
 use icon_core::{compose, imageops, segment, translucent};
 use std::sync::Arc;
 

@@ -21,3 +21,6 @@ Thumbs.db
 # screenshot dei test (emulatore/telefono): possono contenere icone e marchi di terzi
 /screens_*/
 /release_*/
+
+# Grafo locale del codice (graphify)
+graphify-out/

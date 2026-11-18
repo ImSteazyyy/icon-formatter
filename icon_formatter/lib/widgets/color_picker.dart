@@ -108,7 +108,7 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(widget.title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
+          Text(widget.title, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
           const SizedBox(height: 16),
           // saturation (left to right) and brightness (bottom to top)
           AspectRatio(
@@ -211,9 +211,9 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
           ]),
           const SizedBox(height: 16),
           Row(children: [
-            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: const Text(S.annulla))),
+            Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(context), child: Text(S.annulla))),
             const SizedBox(width: 10),
-            Expanded(child: FilledButton(onPressed: () => Navigator.pop(context, argb), child: const Text(S.applica))),
+            Expanded(child: FilledButton(onPressed: () => Navigator.pop(context, argb), child: Text(S.applica))),
           ]),
         ]),
       ),

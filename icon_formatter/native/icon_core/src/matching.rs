@@ -217,6 +217,82 @@ fn cache_key(c: &Candidate) -> Option<u64> {
 }
 
 static CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u64, Option<Signature>>>> = std::sync::OnceLock::new();
+static CACHE_FILE: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+static CACHE_DIRTY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Keeps the signatures in [path] across launches: computing one segments
+/// the icon, and a phone's few hundred apps cost seconds on every Pack open.
+pub fn set_signature_cache_file(path: &Path) {
+    let cache = CACHE.get_or_init(Default::default);
+    if let (Ok(bytes), Ok(mut m)) = (std::fs::read(path), cache.lock()) {
+        for (k, v) in decode_cache(&bytes) {
+            m.entry(k).or_insert(v);
+        }
+    }
+    if let Ok(mut f) = CACHE_FILE.lock() {
+        *f = Some(path.to_path_buf());
+    }
+}
+
+fn save_cache() {
+    if !CACHE_DIRTY.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    let Some(path) = CACHE_FILE.lock().ok().and_then(|f| f.clone()) else { return };
+    let Some(bytes) = CACHE.get().and_then(|c| c.lock().ok()).map(|m| encode_cache(&m)) else { return };
+    let tmp = path.with_extension("tmp");
+    if std::fs::write(&tmp, bytes).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
+    }
+}
+
+// record: key u64, shape len u16 (0 = no signature), shape f32s, hue f32s
+fn encode_cache(m: &std::collections::HashMap<u64, Option<Signature>>) -> Vec<u8> {
+    let mut out = b"SIG1".to_vec();
+    for (k, v) in m {
+        out.extend_from_slice(&k.to_le_bytes());
+        match v {
+            Some(s) => {
+                out.extend_from_slice(&(s.shape.len() as u16).to_le_bytes());
+                for x in s.shape.iter().chain(s.hue.iter()) {
+                    out.extend_from_slice(&x.to_le_bytes());
+                }
+            }
+            None => out.extend_from_slice(&0u16.to_le_bytes()),
+        }
+    }
+    out
+}
+
+fn decode_cache(b: &[u8]) -> Vec<(u64, Option<Signature>)> {
+    let mut out = Vec::new();
+    if !b.starts_with(b"SIG1") {
+        return out;
+    }
+    let f32_at = |i: usize| f32::from_le_bytes(b[i..i + 4].try_into().unwrap());
+    let mut i = 4;
+    while i + 10 <= b.len() {
+        let k = u64::from_le_bytes(b[i..i + 8].try_into().unwrap());
+        let n = u16::from_le_bytes(b[i + 8..i + 10].try_into().unwrap()) as usize;
+        i += 10;
+        if n == 0 {
+            out.push((k, None));
+            continue;
+        }
+        let end = i + (n + HUE_BINS + 1) * 4;
+        if end > b.len() {
+            break; // truncated file: keep what was read
+        }
+        let shape = (0..n).map(|j| f32_at(i + j * 4)).collect();
+        let mut hue = [0.0f32; HUE_BINS + 1];
+        for (j, h) in hue.iter_mut().enumerate() {
+            *h = f32_at(i + (n + j) * 4);
+        }
+        out.push((k, Some(Signature { shape, hue })));
+        i = end;
+    }
+    out
+}
 
 /// Signature of a candidate, computed once per image (path+mtime or bytes)
 /// and kept for the whole session: repeated matching is almost free.
@@ -239,6 +315,7 @@ fn cached_signature(c: &Candidate) -> Option<Signature> {
             m.clear();
         }
         m.insert(k, sig.clone());
+        CACHE_DIRTY.store(true, std::sync::atomic::Ordering::Relaxed);
     }
     sig
 }
@@ -292,6 +369,7 @@ pub fn match_icons(originals: &[Candidate], generated: &[Candidate]) -> Vec<Matc
     // signatures (cached) and text keys, computed once per icon
     let os: Vec<Option<Signature>> = originals.par_iter().map(cached_signature).collect();
     let gs: Vec<Option<Signature>> = generated.par_iter().map(cached_signature).collect();
+    save_cache();
     let ok: Vec<Keys> = originals.par_iter().map(keys).collect();
     let gk: Vec<Keys> = generated.par_iter().map(keys).collect();
     struct Pair {
@@ -387,6 +465,22 @@ mod tests {
     use super::*;
     use image::Rgba;
 
+    #[test]
+    fn signature_cache_round_trip() {
+        let a = signature(&icon(0, [200, 40, 40]));
+        let mut m = std::collections::HashMap::new();
+        m.insert(7u64, Some(a.clone()));
+        m.insert(9u64, None);
+        let back: std::collections::HashMap<_, _> = decode_cache(&encode_cache(&m)).into_iter().collect();
+        assert!(back[&9].is_none());
+        let b = back[&7].as_ref().unwrap();
+        assert_eq!(b.shape, a.shape);
+        assert_eq!(b.hue, a.hue);
+        // truncated file: no panic, partial read
+        let bytes = encode_cache(&m);
+        let _ = decode_cache(&bytes[..bytes.len() - 3]);
+    }
+
     fn icon(kind: u8, color: [u8; 3]) -> RgbaImage {
         let mut img = RgbaImage::from_pixel(96, 96, Rgba([20, 20, 20, 255]));
         for y in 0..96u32 {
@@ -411,18 +505,18 @@ mod tests {
 
     #[test]
     fn normalizes_names() {
-        assert_eq!(normalize("ic_WhatsApp_512.png"), "whatsapp");
-        assert_eq!(normalize("Square Music 2.png"), "squaremusic");
+        assert_eq!(normalize("ic_Chat_512.png"), "chat");
+        assert_eq!(normalize("Blue Music 2.png"), "bluemusic");
         assert_eq!(normalize("com.whatsapp"), "comwhatsapp");
     }
 
     #[test]
     fn matches_by_package_name_and_visual() {
         let o = vec![
-            cand("o1", "WhatsApp", "com.whatsapp", "", icon(0, [40, 200, 90])),
-            cand("o2", "Telegram", "org.telegram.messenger", "", icon(1, [40, 150, 230])),
+            cand("o1", "Chat", "com.example.chat", "", icon(0, [40, 200, 90])),
+            cand("o2", "Messages", "com.example.messages", "", icon(1, [40, 150, 230])),
             cand("o3", "", "", "foo.png", icon(2, [230, 60, 60])),
-            cand("o4", "Nothing", "", "", icon(0, [200, 200, 0])),
+            cand("o4", "Notes", "", "", icon(0, [200, 200, 0])),
         ];
         let g = vec![
             cand("g2", "", "", "telegram.png", icon(1, [40, 150, 230])),

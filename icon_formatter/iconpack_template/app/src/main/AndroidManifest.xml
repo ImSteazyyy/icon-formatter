@@ -21,7 +21,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- icon pack discovery used by launchers (ADW, Nova, Lawnchair, Niagara, ...) -->
+            <!-- icon pack discovery used by launchers (intents read by third-party launchers) -->
             <intent-filter>
                 <action android:name="org.adw.launcher.THEMES" />
                 <category android:name="android.intent.category.DEFAULT" />

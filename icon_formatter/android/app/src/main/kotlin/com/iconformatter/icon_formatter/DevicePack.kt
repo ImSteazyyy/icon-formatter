@@ -33,7 +33,7 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
 /**
- * Builds the icon pack APK on the phone and applies it to Nothing Launcher.
+ * Builds the icon pack APK on the phone and applies it to the system launcher.
  *
  * The pack is its own app ([PACKAGE]); the system packs are never touched.
  * Build: assets/iconpack_base.apk (template with empty drawable slots, see
@@ -41,15 +41,18 @@ import java.util.zip.ZipOutputStream
  * mapping.json and pack.json, then is signed with apksig using a key kept in
  * the Android Keystore (same key every time, so updates install in place).
  *
- * Apply (same sequence as Nothing IconGen's IconPackSelector, but through
+ * Apply (the launcher selection sequence, through
  * Shizuku's shell identity instead of a targetSdk 22 build): install with
- * `pm install`, open Nothing Launcher's icon pack picker behind our task so
+ * `pm install`, open the launcher's icon pack picker behind our task so
  * it re-parses external packs, then write Settings.System `nothing_icon_pack`
  * to THEMED_ICONS_NOTHING and back to [PACKAGE] 500 ms later.
  */
 object DevicePack {
+    /** Application context, for texts in the app language (set by MainActivity). */
+    lateinit var appCtx: Context
+
     const val PACKAGE = "com.iconformatter.pack.device"
-    const val NOTHING_LAUNCHER = "com.nothing.launcher"
+    const val LAUNCHER_PKG = "com.nothing.launcher"
     private const val SELECTOR = "nothing_icon_pack"
     private const val TEMPORARY_PACK = "THEMED_ICONS_NOTHING"
     private const val KEY_ALIAS = "iconformatter_pack"
@@ -91,8 +94,8 @@ object DevicePack {
 
     /** Runs a shell command as Shizuku's user (shell/adb). */
     private fun shell(cmd: String, stdin: InputStream? = null): Pair<Int, String> {
-        check(Shizuku.pingBinder()) { "Shizuku non è attivo" }
-        check(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) { "Permesso Shizuku non concesso" }
+        check(Shizuku.pingBinder()) { AppText.get(appCtx, R.string.err_shizuku_off) }
+        check(Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) { AppText.get(appCtx, R.string.err_shizuku_perm) }
         // newProcess is hidden in the public API since v12; reflection is the
         // documented-by-practice way for one-shot shell commands.
         val m = Shizuku::class.java.getDeclaredMethod(
@@ -119,7 +122,7 @@ object DevicePack {
      */
     class Built(val apk: File, val count: Int, val versionName: String)
 
-    fun build(context: Context, packDir: String, name: String, accent: String): Built {
+    fun build(context: Context, packDir: String, name: String, accent: String, extra: Map<String, Any?> = emptyMap()): Built {
         val (vCode, vName) = nextVersion(context)
         val dir = File(packDir)
         val pngs = File(dir, "res/drawable-nodpi").listFiles { f -> f.name.endsWith(".png") }?.sortedBy { it.name } ?: emptyList()
@@ -141,7 +144,7 @@ object DevicePack {
                 .filter { it.startsWith("res/") && it.substringAfterLast('/').startsWith("cal") && it.endsWith(".png") }
                 .associateBy { it.substringAfterLast('/').removeSuffix(".png") }
             check(plainPngs.size <= slotEntries.size) {
-                "Il pack ha ${plainPngs.size} icone, il massimo sul telefono è ${slotEntries.size}"
+                AppText.get(context, R.string.err_pack_too_big, plainPngs.size, slotEntries.size)
             }
             // drawable name -> slot name
             val rename = HashMap<String, String>()
@@ -172,10 +175,11 @@ object DevicePack {
                 for (k in 0 until arr.length()) {
                     val o = arr.getJSONObject(k)
                     rename[o.optString("drawable")]?.let { o.put("drawable", it) }
+                    rename[o.optString("calendar")]?.let { o.put("calendar", it) }
                 }
                 arr.toString()
             } ?: "[]"
-            val meta = JSONObject().put("name", name).put("accent", accent).toString()
+            val meta = JSONObject().put("name", name).put("accent", accent).apply { extra.forEach { (k, v) -> put(k, v) } }.toString()
 
             val unsigned = File(work, "unsigned.apk")
             ZipOutputStream(unsigned.outputStream().buffered()).use { out ->
@@ -284,7 +288,7 @@ object DevicePack {
         if (installed != was) p.edit().putBoolean("wasInstalled", installed).apply()
         if (was && !installed) {
             removed = true
-            // Nothing Launcher would keep pointing at a pack that is gone
+            // the launcher would keep pointing at a pack that is gone
             if (canShell()) {
                 try {
                     if (currentSelector() == PACKAGE) {
@@ -312,7 +316,7 @@ object DevicePack {
      * copies of other users. Needs Shizuku; the version is remembered first.
      */
     fun cleanupResidual(context: Context): Boolean {
-        check(installedVersionCode(context) == null) { "Il pack è installato: nessun residuo da pulire" }
+        check(installedVersionCode(context) == null) { AppText.get(context, R.string.err_no_residue) }
         residualVersionCode(context)?.let { rememberVersion(context, it) }
         val (code, out) = shell("pm uninstall $PACKAGE")
         // "Unknown package" = nothing left: also fine
@@ -375,7 +379,7 @@ object DevicePack {
      */
     fun patchManifest(axml: ByteArray, code: Int, name: String): ByteArray {
         val b = ByteBuffer.wrap(axml).order(ByteOrder.LITTLE_ENDIAN)
-        check(b.getShort(0).toInt() == 0x0003) { "manifest non valido" }
+        check(b.getShort(0).toInt() == 0x0003) { "invalid manifest" }
         var pos = b.getShort(2).toInt()
         var strings = mutableListOf<String>()
         var poolStart = -1
@@ -416,7 +420,7 @@ object DevicePack {
         }
         val vcName = resIds.indexOf(0x0101021b)
         val vnName = resIds.indexOf(0x0101021c)
-        check(vcName >= 0 && vnName >= 0) { "versionCode/versionName non trovati" }
+        check(vcName >= 0 && vnName >= 0) { "versionCode/versionName not found" }
         val body = axml.copyOf()
         val bb = ByteBuffer.wrap(body).order(ByteOrder.LITTLE_ENDIAN)
         for ((start, _) in chunks.map { it[0] to it[1] }) {
@@ -622,7 +626,7 @@ object DevicePack {
         }
         check(code == 0 && out.contains("Success")) { "pm install: $out" }
         val after = installedVersion(context)
-        check(after != null && after != before) { "Il pacchetto non risulta aggiornato dopo l'installazione" }
+        check(after != null && after != before) { AppText.get(appCtx, R.string.err_not_updated) }
         return out
     }
 
@@ -646,7 +650,7 @@ object DevicePack {
     // ------------------------------------------------------------------ apply
 
     fun launcherInstalled(context: Context): String? = try {
-        context.packageManager.getPackageInfo(NOTHING_LAUNCHER, 0).versionName ?: "?"
+        context.packageManager.getPackageInfo(LAUNCHER_PKG, 0).versionName ?: "?"
     } catch (_: PackageManager.NameNotFoundException) {
         null
     }
@@ -657,11 +661,11 @@ object DevicePack {
     }
 
     /**
-     * Selects [PACKAGE] in Nothing Launcher. Returns a report; `verified` is
+     * Selects [PACKAGE] in the system launcher. Returns a report; `verified` is
      * true only when Settings reads back our package after the toggle.
      */
     fun apply(activity: Activity): Map<String, Any?> {
-        check(installedVersion(activity) != null) { "Il pack non è installato" }
+        check(installedVersion(activity) != null) { AppText.get(activity, R.string.err_not_installed) }
         val launcher = launcherInstalled(activity)
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val previous = currentSelector()
@@ -671,7 +675,7 @@ object DevicePack {
         var prepared = false
         if (launcher != null) {
             // the picker re-parses external packs when its view is created
-            val i = Intent("com.nothing.launcher.icon_pack_picker").setPackage(NOTHING_LAUNCHER)
+            val i = Intent("com.nothing.launcher.icon_pack_picker").setPackage(LAUNCHER_PKG)
                 .addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
                         Intent.FLAG_ACTIVITY_MULTIPLE_TASK or Intent.FLAG_ACTIVITY_NO_HISTORY or
@@ -709,7 +713,7 @@ object DevicePack {
     }
 
     fun openPicker(context: Context): Boolean = try {
-        context.startActivity(Intent("com.nothing.launcher.icon_pack_picker").setPackage(NOTHING_LAUNCHER).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent("com.nothing.launcher.icon_pack_picker").setPackage(LAUNCHER_PKG).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true
     } catch (_: Exception) {
         false
@@ -735,7 +739,7 @@ class InstallResultReceiver : BroadcastReceiver() {
                     Regex("current (\\d+)").find(msg)?.groupValues?.get(1)?.toIntOrNull()?.let { DevicePack.rememberVersion(context, it) }
                     android.widget.Toast.makeText(
                         context,
-                        "Sul telefono c'è una versione del pack più recente: numerazione aggiornata, premi di nuovo Installa.",
+                        AppText.get(context, R.string.msg_version_retry),
                         android.widget.Toast.LENGTH_LONG,
                     ).show()
                 }

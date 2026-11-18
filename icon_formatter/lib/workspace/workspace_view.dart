@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
+import '../app/state.dart';
 import '../app/theme.dart';
 import '../services/export_service.dart';
 import '../widgets/common.dart';
@@ -54,8 +56,8 @@ class WorkTile extends StatelessWidget {
           duration: const Duration(milliseconds: 140),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: sel ? accent.withValues(alpha: 0.10) : Colors.white.withValues(alpha: 0.025),
-            border: Border.all(color: sel ? accent.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.06)),
+            color: sel ? accent.withValues(alpha: 0.10) : Palette.fg.withValues(alpha: 0.025),
+            border: Border.all(color: sel ? accent.withValues(alpha: 0.7) : Palette.fg.withValues(alpha: 0.06)),
           ),
           padding: const EdgeInsets.all(8),
           child: Column(
@@ -70,7 +72,7 @@ class WorkTile extends StatelessWidget {
                       ),
                     ),
                     if (dot != null) Positioned(right: 0, top: 0, child: StatusDot(color: dot)),
-                    if (it.hasOverride) const Positioned(left: 0, top: 0, child: Icon(Icons.edit, size: 12, color: Palette.text2)),
+                    if (it.hasOverride) Positioned(left: 0, top: 0, child: Icon(Icons.edit, size: 12, color: Palette.text2)),
                     if (selectable)
                       Positioned(
                         left: -8,
@@ -96,19 +98,20 @@ class WorkTile extends StatelessWidget {
 
   Future<void> _menu(BuildContext context, Offset? pos) async {
     final items = <PopupMenuEntry<String>>[
-      const PopupMenuItem(value: 'zoom', child: Text(S.ingrandisci)),
+      PopupMenuItem(value: 'zoom', child: Text(S.ingrandisci)),
       PopupMenuItem(value: 'exclude', child: Text(it.excluded ? S.includi : S.escludi)),
-      const PopupMenuItem(value: 'redo', child: Text(S.rielaboraQuestaIcona)),
-      const PopupMenuItem(value: 'mode', child: Text(S.rigeneraConModalita)),
+      PopupMenuItem(value: 'redo', child: Text(S.rielaboraQuestaIcona)),
+      PopupMenuItem(value: 'size', child: Text(S.dimensione)),
+      PopupMenuItem(value: 'mode', child: Text(S.rigeneraConModalita)),
       PopupMenuItem(value: 'white', child: Text(c.keepsInnerWhite(it) ? S.togliBiancoInterno : S.mantieniBiancoInterno)),
-      if (it.hasOverride) const PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
-      const PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
+      if (it.hasOverride) PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
+      PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
     ];
     String? v;
     if (pos != null) {
       v = await showMenu<String>(context: context, position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx, pos.dy), items: items);
     } else {
-      v = await showModalBottomSheet<String>(
+      v = await showAppSheet<String>(
         context: context,
         builder: (ctx) => SafeArea(
           child: Column(
@@ -127,12 +130,14 @@ class WorkTile extends StatelessWidget {
         c.toggleExcluded(it);
       case 'redo':
         c.process(only: [it]);
+      case 'size':
+        if (context.mounted) await showIconSizeDialog(context, c, [it]);
       case 'white':
         c.setKeepInnerWhite(it, !c.keepsInnerWhite(it));
       case 'mode':
         if (!context.mounted) return;
         final cur = it.strategyOverride ?? LucentStrategy.auto;
-        final st = await showModalBottomSheet<LucentStrategy>(
+        final st = await showAppSheet<LucentStrategy>(
           context: context,
           builder: (ctx) => SafeArea(
             child: Padding(
@@ -143,9 +148,9 @@ class WorkTile extends StatelessWidget {
                 children: [
                   Text(S.modalitaSimbolo(it.label ?? it.name), style: Theme.of(ctx).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  const Text(S.modalitaSimboloInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
+                  Text(S.modalitaSimboloInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
                   const SizedBox(height: 8),
-                  for (final (v, t, d) in const [
+                  for (final (v, t, d) in [
                     (LucentStrategy.auto, S.modoAuto, S.modoAutoDesc),
                     (LucentStrategy.plateColor, S.modoColorePiatto, S.modoColorePiattoDesc),
                     (LucentStrategy.fullBleed, S.modoBordoPieno, S.modoBordoPienoDesc),
@@ -188,7 +193,7 @@ class PreviewPane extends StatelessWidget {
       builder: (context, _) {
         final it = c.selected;
         if (it == null) {
-          return const Center(
+          return Center(
             child: Text(S.selezionaOImportaIcona, style: TextStyle(color: Palette.text3)),
           );
         }
@@ -210,7 +215,7 @@ class PreviewPane extends StatelessWidget {
                               c.previewError!,
                               maxLines: 4,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Palette.danger, fontSize: 11),
+                              style: TextStyle(color: Palette.danger, fontSize: 11),
                             ),
                           )
                         : const CircularProgressIndicator(strokeWidth: 2),
@@ -254,7 +259,7 @@ class PreviewPane extends StatelessWidget {
                             key: const ValueKey('preview-name'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.text),
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.text),
                           ),
                         ),
                       ],
@@ -265,11 +270,11 @@ class PreviewPane extends StatelessWidget {
                         '${info.size}px · ${info.method} · ${(info.confidence * 100).round()}%',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5, color: Palette.text2),
+                        style: TextStyle(fontSize: 11.5, color: Palette.text2),
                       ),
                     ],
                     if (info != null && info.ambiguous)
-                      const Text(
+                      Text(
                         S.risultatoAmbiguoVerifica,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -305,7 +310,7 @@ class PreviewPane extends StatelessWidget {
                     child: Text(
                       S.pxConfidenza(it.label ?? it.name, info.size, info.method, (info.confidence * 100).round()),
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Palette.text2),
+                      style: TextStyle(fontSize: 12, color: Palette.text2),
                     ),
                   ),
                 ] else
@@ -339,6 +344,7 @@ class WorkspaceView extends StatelessWidget {
     this.tileBuilder,
     this.onAdd,
     this.primaryAction,
+    this.compactPrimaryAction,
     this.moreActions = const [],
   });
 
@@ -348,6 +354,9 @@ class WorkspaceView extends StatelessWidget {
 
   /// Phones: the one big action of the bottom bar ("Elabora tutte").
   final Widget? primaryAction;
+
+  /// Icon-only start button for the compact bar (tab bar folded).
+  final Widget? compactPrimaryAction;
 
   /// Phones: the other actions, in a sheet opened from "Altro" (tap or drag up).
   final List<MoreAction> moreActions;
@@ -362,18 +371,8 @@ class WorkspaceView extends StatelessWidget {
   final VoidCallback? onOpenBases;
   final Widget Function(WorkItem it)? tileBuilder;
 
-  /// One-line guide for the current state of the list.
-  String _hint() {
-    if (c.items.isEmpty) return S.hintVuoto;
-    if (c.batch.running) return S.hintInCorso;
-    final n = c.processedCount;
-    if (n == 0) return S.hintDaElaborare;
-    if (n < c.active.length) return S.hintParziale(n, c.active.length);
-    return S.hintFatto;
-  }
-
   /// "Stile": every adjustment of the icons, with a title that explains it.
-  Future<void> openStyleSheet(BuildContext context) => showModalBottomSheet(
+  Future<void> openStyleSheet(BuildContext context) => showAppSheet(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -382,14 +381,14 @@ class WorkspaceView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
             child: Text(
               S.stileTitolo,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text),
             ),
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
             child: Text(S.stileSpiegazione, style: TextStyle(fontSize: 13, color: Palette.text2)),
           ),
@@ -430,7 +429,7 @@ class WorkspaceView extends StatelessWidget {
                   if (b.fatal != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
-                      child: Text(b.fatal!, style: const TextStyle(color: Palette.danger)),
+                      child: Text(b.fatal!, style: TextStyle(color: Palette.danger)),
                     ),
                 ],
               ),
@@ -529,10 +528,8 @@ class WorkspaceView extends StatelessWidget {
         // phone portrait: grid scrolls under floating liquid-glass bars
         final under = GlassInsets.of(context);
         // floating bars line up with the navigation pill (12 dp from the edge)
-        final floating = Positioned(
-          left: -8,
-          right: -8,
-          bottom: under - 4, // the nav box includes 12dp of top padding
+        final floating = FloatingBarSlot(
+          side: -8,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -540,7 +537,7 @@ class WorkspaceView extends StatelessWidget {
               // the glass shape clips the scrolling actions, so they disappear
               // along its rounded edge instead of a straight inner line
               if (primaryAction != null)
-                ActionBar(primary: primaryAction!, more: moreActions)
+                ActionBar(primary: primaryAction!, compactPrimary: compactPrimaryAction, more: moreActions)
               else if (bottomActions.isNotEmpty && onAdd == null)
                 LiquidGlass(
                   radius: 30,
@@ -570,7 +567,6 @@ class WorkspaceView extends StatelessWidget {
                   LargeHeader(
                     title,
                     // empty list: the centre card explains; then one line of guidance
-                    subtitle: c.items.isEmpty ? null : _hint(),
                     // "Aggiungi" (once the list has icons: the empty state has its
                     // own central button) and "Personalizza", equal pills
                     actions: [
@@ -604,7 +600,7 @@ class WorkspaceView extends StatelessWidget {
                                 height: (box.maxHeight * 0.20).clamp(128, 176),
                                 child: PreviewPane(c: c, compact: true),
                               ),
-                            const SizedBox(height: 8),
+                            if (c.items.isNotEmpty) const SizedBox(height: 8),
                             Expanded(child: _grid(context, 92, bottomPad: under + 136, search: true)),
                           ],
                         ),
@@ -633,11 +629,13 @@ class WorkspaceView extends StatelessWidget {
           // scrollable: the guide never overflows on short screens
           return LayoutBuilder(
             builder: (context, box) => SingleChildScrollView(
-              padding: EdgeInsets.only(bottom: bottomPad, top: 8),
+              padding: EdgeInsets.only(bottom: bottomPad, top: 2),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: (box.maxHeight - bottomPad - 8).clamp(0, double.infinity)),
-                child: Center(
-                  child: emptyHint ?? const Text(S.nessunaIcona, style: TextStyle(color: Palette.text3)),
+                // right under the header: centred it left a big empty gap
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: emptyHint ?? Text(S.nessunaIcona, style: TextStyle(color: Palette.text3)),
                 ),
               ),
             ),
@@ -657,7 +655,7 @@ class WorkspaceView extends StatelessWidget {
                     S.nessunRisultato(c.query),
                     key: const ValueKey('studio-no-results'),
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Palette.text2),
+                    style: TextStyle(color: Palette.text2),
                   ),
                 ),
               ),
@@ -745,9 +743,17 @@ class MoreAction {
 /// Bottom bar on phones: one big start button and "Altro" (the other
 /// actions, in a glass pop-up menu).
 class ActionBar extends StatelessWidget {
-  const ActionBar({super.key, required this.primary, required this.more, this.header});
+  const ActionBar({super.key, required this.primary, required this.more, this.header, this.leading, this.compactPrimary, this.compactLeading});
   final Widget primary;
   final List<MoreAction> more;
+
+  /// Small control before the start button, on the same row.
+  final Widget? leading;
+
+  /// Icon-only versions shown while the tab bar is folded: the bar then
+  /// sits next to the folded button, as tall as it, with no labels.
+  final Widget? compactPrimary;
+  final Widget? compactLeading;
 
   /// Small line above the buttons (e.g. selection count + "Seleziona tutte").
   final Widget? header;
@@ -764,11 +770,38 @@ class ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (compactPrimary != null && GlassInsets.foldedOf(context)) {
+      // folded: icons only, 50 dp like the folded tab button
+      Widget slot(Widget w) => SizedBox(width: 42, height: 42, child: w);
+      return LiquidGlass(
+        key: const ValueKey('action-bar'),
+        radius: 25,
+        live: true,
+        child: _barButtons(context, SizedBox(
+          height: 50,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+              if (compactLeading != null) slot(compactLeading!),
+              slot(compactPrimary!),
+              Builder(
+                builder: (bctx) => slot(IconButton(
+                  key: const ValueKey('more-actions'),
+                  tooltip: S.altro,
+                  onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                )),
+              ),
+            ]),
+          ),
+        )),
+      );
+    }
     return LiquidGlass(
       key: const ValueKey('action-bar'),
       radius: 30,
       live: true,
-      child: Padding(
+      child: _barButtons(context, Padding(
         padding: const EdgeInsets.all(6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -776,28 +809,189 @@ class ActionBar extends StatelessWidget {
             if (header != null) Padding(padding: const EdgeInsets.fromLTRB(10, 2, 0, 4), child: header),
             Row(
               children: [
+                if (leading != null) ...[SizedBox(height: kButtonHeight, child: leading), const SizedBox(width: 8)],
                 // both buttons share one height (the start button used the
                 // theme's own, shorter than "Altro")
                 Expanded(
                   child: SizedBox(height: kButtonHeight, child: primary),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  height: kButtonHeight,
-                  child: Builder(
-                    builder: (bctx) => OutlinedButton.icon(
-                      key: const ValueKey('more-actions'),
-                      onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),
-                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                      label: const Text(S.altro),
-                    ),
-                  ),
+                // narrow bar (next to the folded tab button): "Altro" is just
+                // its arrow, so the start button keeps a readable label
+                LayoutBuilder(
+                  builder: (bctx, _) {
+                    final narrow = MediaQuery.sizeOf(bctx).width - (GlassInsets.foldedOf(bctx) ? 70 : 0) < 400;
+                    void open() => _open(context, anchorOf(bctx));
+                    return SizedBox(
+                      height: kButtonHeight,
+                      width: narrow ? kButtonHeight : null,
+                      child: narrow
+                          ? Tooltip(
+                              message: S.altro,
+                              child: OutlinedButton(
+                                key: const ValueKey('more-actions'),
+                                style: OutlinedButton.styleFrom(padding: EdgeInsets.zero, shape: const CircleBorder()),
+                                onPressed: more.isEmpty ? null : open,
+                                child: const Icon(Icons.keyboard_arrow_up_rounded),
+                              ),
+                            )
+                          : OutlinedButton.icon(
+                              key: const ValueKey('more-actions'),
+                              onPressed: more.isEmpty ? null : open,
+                              icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                              label: Text(S.altro),
+                            ),
+                    );
+                  },
                 ),
               ],
             ),
           ],
         ),
-      ),
+      )),
     );
   }
+
+  /// Glass style: the buttons speak the bottom bar's language. No outlines;
+  /// the start button is the white puck of the active tab ("Scheda attiva").
+  static Widget _barButtons(BuildContext context, Widget child) {
+    if (nothingStyle) return child;
+    final g = AppState.I.glass;
+    final puck = Palette.fg.withValues(alpha: g.native ? g.nActiveTab.clamp(0.12, 1.0) : 0.18);
+    final t = Theme.of(context);
+    return Theme(
+      data: t.copyWith(
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(side: BorderSide.none, foregroundColor: Palette.fg, backgroundColor: Colors.transparent),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: puck,
+            foregroundColor: Palette.fg,
+            disabledBackgroundColor: puck,
+            disabledForegroundColor: Palette.fg.withValues(alpha: 0.85),
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// "Dimensione": one slider for [its] with the first icon as live preview.
+/// The icons are re-rendered when the finger lifts.
+Future<void> showIconSizeDialog(BuildContext context, WorkspaceController c, List<WorkItem> its) async {
+  if (its.isEmpty) return;
+  var v = c.itemScale(its.first);
+  await showAppDialog<void>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setS) => AlertDialog(
+        title: Text(S.dimensioneIcona),
+        content: SizedBox(
+          width: 360,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(S.dimensioneSub(its.length), style: TextStyle(fontSize: 12, color: Palette.text2)),
+            const SizedBox(height: 12),
+            ListenableBuilder(
+              listenable: c,
+              builder: (_, _) {
+                final it = its.first;
+                return SizedBox(
+                  width: 132,
+                  height: 132,
+                  child: Checkerboard(cell: 8, child: IconImage(path: it.outputPath ?? it.path, bytes: it.outputPath == null ? it.bytes : null)),
+                );
+              },
+            ),
+            Row(children: [
+              Expanded(
+                child: Slider(
+                  value: v,
+                  min: 0.5,
+                  max: 1.6,
+                  divisions: 110,
+                  onChanged: (x) => setS(() => v = x),
+                  onChangeEnd: (x) => c.setItemsScale(its, x),
+                ),
+              ),
+              SizedBox(width: 44, child: Text('${(v * 100).round()}%', textAlign: TextAlign.end)),
+            ]),
+          ]),
+        ),
+        actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: Text(S.fatto))],
+      ),
+    ),
+  );
+}
+
+/// Many images at once (an icon pack, a big folder): pick the ones to add.
+/// Returns null when cancelled.
+Future<List<PackImage>?> pickImagesDialog(BuildContext context, List<PackImage> all) {
+  final chosen = <String>{};
+  var q = '';
+  return showAppDialog<List<PackImage>>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setS) {
+        final list = q.isEmpty ? all : all.where((i) => i.rel.toLowerCase().contains(q)).toList();
+        final mq = MediaQuery.of(ctx);
+        final avail = mq.size.height - mq.viewInsets.bottom - mq.padding.vertical - 220;
+        final allShown = list.isNotEmpty && list.every((i) => chosen.contains(i.abs));
+        return AlertDialog(
+          title: Text(S.scegliIconeTitolo(all.length)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          content: SizedBox(
+            width: 560,
+            height: avail.clamp(200.0, 560.0),
+            child: Column(children: [
+              Row(children: [
+                Expanded(child: TextField(decoration: pillSearchDecoration(ctx, S.cercaIcone), onChanged: (v) => setS(() => q = v.trim().toLowerCase()))),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => setS(() => allShown ? chosen.removeAll(list.map((i) => i.abs)) : chosen.addAll(list.map((i) => i.abs))),
+                  child: Text(allShown ? S.nessuna : S.selezionaTutte),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 88, mainAxisExtent: 100, crossAxisSpacing: 4, mainAxisSpacing: 4),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final im = list[i];
+                    final on = chosen.contains(im.abs);
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setS(() => on ? chosen.remove(im.abs) : chosen.add(im.abs)),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: on ? Theme.of(ctx).colorScheme.primary : Colors.transparent, width: 2),
+                          color: on ? Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.14) : null,
+                        ),
+                        child: Column(children: [
+                          SizedBox(width: 60, height: 60, child: IconImage(path: im.abs)),
+                          const SizedBox(height: 2),
+                          Text(p.basenameWithoutExtension(im.rel), maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.annulla)),
+            FilledButton(
+              onPressed: chosen.isEmpty ? null : () => Navigator.pop(ctx, all.where((i) => chosen.contains(i.abs)).toList()),
+              child: Text(S.aggiungiN(chosen.length)),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

@@ -228,7 +228,7 @@ object AutoSync {
         if (Build.VERSION.SDK_INT >= 33 && c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val nm = c.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Modifiche alle app", NotificationManager.IMPORTANCE_LOW))
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, AppText.get(c, R.string.notif_channel), NotificationManager.IMPORTANCE_LOW))
         }
         val open = PendingIntent.getActivity(
             c, 0,
@@ -238,9 +238,9 @@ object AutoSync {
         val b = if (Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(c, CHANNEL) else @Suppress("DEPRECATION") android.app.Notification.Builder(c)
         nm.notify(
             NOTIF_ID,
-            b.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Icon pack da aggiornare")
-                .setContentText("$n app installate, aggiornate o con icona cambiata")
+            b.setSmallIcon(R.mipmap.ic_launcher_foreground)
+                .setContentTitle(AppText.get(c, R.string.notif_title))
+                .setContentText(AppText.get(c, R.string.notif_text, n))
                 .setContentIntent(open)
                 .setAutoCancel(true)
                 .build(),

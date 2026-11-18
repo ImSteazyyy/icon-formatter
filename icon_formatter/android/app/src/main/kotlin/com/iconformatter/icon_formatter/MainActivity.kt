@@ -35,8 +35,8 @@ class MainActivity : FlutterActivity() {
     /** Display mode last written to the window (0 = no preference). */
     private var requestedMode = 0
 
-    // Nothing OS (and other phones that pick the rate per app) keeps an app
-    // that asks for nothing at its middle rate: 90 Hz on the Phone (2a) Plus,
+    // phones that pick the refresh rate per app keeps an app
+    // that asks for nothing at its middle rate: 90 Hz on the test phone,
     // while the panel can do 120. A frame rate voted from a view is clamped
     // the same way; a window naming the display mode it wants is honoured.
     // Asked while the app is on screen and released when it leaves. With no
@@ -78,6 +78,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        DevicePack.appCtx = applicationContext
         super.configureFlutterEngine(flutterEngine)
         AutoSync.registerUnlock(applicationContext)
         // ask Shizuku permission once when Shizuku is running and it is missing
@@ -86,6 +87,10 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "listApps" -> background(result) { listApps(call.argument<Boolean>("includeSystem") ?: true) }
                 "getIcons" -> background(result) { getIcons(call) }
+                "setLanguage" -> {
+                    AppText.setLanguage(applicationContext, call.argument<String>("code") ?: "")
+                    result.success(true)
+                }
                 "appCatalog" -> background(result) {
                     appCatalog(call.argument<String>("dir")!!, (call.argument<Int>("size") ?: 432).coerceIn(48, 1024))
                 }
@@ -145,6 +150,7 @@ class MainActivity : FlutterActivity() {
                         call.argument<String>("packDir")!!,
                         call.argument<String>("name") ?: "Icon Formatter Pack",
                         call.argument<String>("accent") ?: "#BA4CD4",
+                        call.argument<Map<String, Any?>>("meta") ?: emptyMap(),
                     )
                     mapOf("apk" to built.apk.absolutePath, "count" to built.count, "version" to built.versionName)
                 }
@@ -161,7 +167,7 @@ class MainActivity : FlutterActivity() {
                 "devicePackArchiveInfo" -> background(result) { DevicePack.archiveInfo(applicationContext, call.argument<String>("path")!!) }
                 "devicePackUninstall" -> background(result) { DevicePack.uninstallShizuku(applicationContext); true }
                 "devicePackRestore" -> background(result) { DevicePack.restore(applicationContext) }
-                "openNothingPicker" -> result.success(DevicePack.openPicker(this))
+                "openLauncherPicker" -> result.success(DevicePack.openPicker(this))
                 else -> result.notImplemented()
             }
         }
@@ -190,7 +196,7 @@ class MainActivity : FlutterActivity() {
     // ------------------------------------------------------------- installed apps
 
     /** Launcher activities visible through the <queries> MAIN/LAUNCHER intent (no QUERY_ALL_PACKAGES). */
-    private fun listApps(includeSystem: Boolean): List<Map<String, Any?>> {
+    private fun listApps(includeSystem: Boolean, iconInfo: Boolean = true): List<Map<String, Any?>> {
         val pm = packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val infos = if (Build.VERSION.SDK_INT >= 33) {
@@ -208,7 +214,9 @@ class MainActivity : FlutterActivity() {
             if (!includeSystem && isSystem) continue
             var adaptive = false
             var mono = false
-            try {
+            // loading every icon only to read its type cost seconds on each
+            // Pack open; the catalogue does not need it
+            if (iconInfo) try {
                 val d = ri.loadIcon(pm)
                 if (Build.VERSION.SDK_INT >= 26 && d is AdaptiveIconDrawable) {
                     adaptive = true
@@ -239,7 +247,8 @@ class MainActivity : FlutterActivity() {
      * pool, off the UI thread.
      */
     private fun appCatalog(dir: String, size: Int): Map<String, Any?> {
-        val apps = listApps(true)
+        val t0 = System.currentTimeMillis()
+        val apps = listApps(true, iconInfo = false)
         val d = File(dir).apply { mkdirs() }
         val pm = packageManager
         val keep = HashSet<String>()
@@ -268,6 +277,7 @@ class MainActivity : FlutterActivity() {
         pool.shutdown()
         // icons of uninstalled / updated apps are removed from the cache
         d.listFiles()?.forEach { if (it.name !in keep) it.delete() }
+        android.util.Log.i("IconFormatter", "appCatalog ${apps.size} apps in ${System.currentTimeMillis() - t0} ms")
         return mapOf("apps" to out, "visible" to apps.size)
     }
 
@@ -307,7 +317,7 @@ class MainActivity : FlutterActivity() {
             if (fg != null && (bg == null || isPlainLayer(bg))) {
                 // the foreground as the launcher shows it: the central 72dp of
                 // the 108dp layer, clipped by the system mask (artwork outside
-                // the mask, e.g. KFC stripes or Contacts tabs, is never visible)
+                // the mask, e.g. stripes or tabs reaching the corners, is never visible)
                 val mask = maskBitmap(d, size)
                 val bmp = drawLayerMasked(d, fg, mask, size)
                 val (cover, edge) = maskStats(bmp, mask)

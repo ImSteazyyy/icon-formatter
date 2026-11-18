@@ -25,7 +25,7 @@ Rect anchorOf(BuildContext context) {
   return box.localToGlobal(Offset.zero) & box.size;
 }
 
-/// iOS 26 style pop-up menu: a liquid-glass panel that grows out of the
+/// Pop-up menu: a glass panel that grows out of the
 /// control that opened it (above it when the control sits low on the
 /// screen). Tap outside, or drag the panel down, to close it.
 Future<T?> showGlassMenu<T>(BuildContext context, {required Rect anchor, required List<GlassMenuItem<T>> items, String? title}) {
@@ -95,12 +95,12 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
     if (widget.title != null) {
       rows.add(Padding(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 6),
-        child: Text(widget.title!, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Palette.text3)),
+        child: Text(widget.title!, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Palette.text3)),
       ));
     }
     for (var i = 0; i < widget.items.length; i++) {
       final it = widget.items[i];
-      if (i > 0 || widget.title != null) rows.add(Divider(height: 1, thickness: 0.6, indent: 18, endIndent: 18, color: Colors.white.withValues(alpha: 0.08)));
+      if (i > 0 || widget.title != null) rows.add(Divider(height: 1, thickness: 0.6, indent: 18, endIndent: 18, color: Palette.fg.withValues(alpha: 0.08)));
       final color = !it.enabled ? Palette.text3 : (it.destructive ? Palette.danger : Palette.text);
       rows.add(InkWell(
         key: ValueKey('menu-${it.label}'),
@@ -112,10 +112,10 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(it.label, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: color)),
-                if (it.subtitle != null) Text(it.subtitle!, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+                if (it.subtitle != null) Text(it.subtitle!, style: TextStyle(fontSize: 12, color: Palette.text2)),
               ]),
             ),
-            // iOS: the symbol sits on the trailing side
+            // the symbol sits on the trailing side
             if (it.icon != null) Padding(padding: const EdgeInsets.only(left: 12), child: Icon(it.icon, size: 21, color: color)),
           ]),
         ),

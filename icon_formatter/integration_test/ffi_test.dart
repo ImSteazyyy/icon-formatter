@@ -29,7 +29,7 @@ void main() {
   test('defaults and version cross the bridge', () {
     expect(coreVersion(), isNotEmpty);
     expect(defaultPlacementSettings().glyphRatio, closeTo(0.645, 0.01));
-    expect(sanitizeDrawableName(name: 'com.WhatsApp'), 'com_whatsapp');
+    expect(sanitizeDrawableName(name: 'com.Example'), 'com_example');
   });
 
   test('translucent background is RGBA, neutral and squircle-shaped', () async {

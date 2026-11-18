@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -53,7 +54,7 @@ class PbIcon {
       return SizedBox(
         width: size,
         height: size,
-        child: const Icon(Icons.image_not_supported_outlined, color: Palette.text3),
+        child: Icon(Icons.image_not_supported_outlined, color: Palette.text3),
       );
     }
     return SizedBox(
@@ -184,6 +185,8 @@ class PackBuilderController extends ChangeNotifier {
   String get _customDir => p.join(AppPaths.I.root.path, 'pack_custom');
   String get _catalogDir => p.join(AppPaths.I.root.path, 'catalog');
 
+  bool _sigCacheSet = false;
+
   bool _restored = false;
 
   void _restore() {
@@ -250,14 +253,17 @@ class PackBuilderController extends ChangeNotifier {
   Future<void> loadCatalog({bool force = false}) async {
     if (!Platform.isAndroid || busy || (catalogLoaded && !force)) return;
     _set(S.pbLetturaApp, running: true);
+    final sw = Stopwatch()..start();
     try {
       final (apps, visible) = await PlatformService.appCatalog(_catalogDir);
+      debugPrint('pack: catalogue ${apps.length} apps ${sw.elapsedMilliseconds} ms');
       catalogVisible = visible;
       originals.removeWhere((o) => o.id.startsWith('app:'));
       originals.insertAll(0, [for (final (a, icon) in apps) PbIcon(id: 'app:${a.key}', label: a.label, package: a.package, activity: a.activity, path: icon, isSystem: a.isSystem)]);
       catalogLoaded = true;
       _set(S.pbCatalogo(apps.length, visible), running: false);
       await match();
+      debugPrint('pack: catalogue + match ${sw.elapsedMilliseconds} ms');
     } catch (e) {
       _set(S.errore(e), running: false);
     }
@@ -481,6 +487,10 @@ class PackBuilderController extends ChangeNotifier {
     if (originals.isEmpty) return;
     _set(S.pbAbbinamento, running: true);
     try {
+      if (!_sigCacheSet) {
+        _sigCacheSet = true;
+        await setMatchCacheFile(path: p.join(AppPaths.I.root.path, 'match_signatures.bin'));
+      }
       final res = generated.isEmpty ? const <MatchOutput>[] : await matchIcons(originals: [for (final o in originals) o.toInput()], generated: [for (final g in generated) g.toInput()]);
       final byId = {for (final r in res) r.original: r};
       rows
@@ -502,7 +512,7 @@ class PackBuilderController extends ChangeNotifier {
         if (m != null) {
           row.generatedId = m.generated;
           row.auto = m.state;
-          row.reason = m.generated == null ? S.pbNessunaIcona : m.reason;
+          row.reason = m.generated == null ? S.pbNessunaIcona : matchReasonText(m.reason);
         } else {
           row.reason = S.pbNessunaIcona;
         }
@@ -672,7 +682,7 @@ class PackBuilderController extends ChangeNotifier {
           glyphScale: l.glyphScale,
           rim: l.rim,
           launcherShadow: l.launcherShadow,
-          nothingEncode: l.nothingEncode,
+          launcherEncode: l.launcherEncode,
           strategy: strategy,
         ),
       );
@@ -794,7 +804,7 @@ class PackBuilderController extends ChangeNotifier {
   }
 
   /// Android: builds the pack APK on the phone, installs it and (with
-  /// Shizuku) selects it in Nothing Launcher. Returns the user message.
+  /// Shizuku) selects it in the system launcher. Returns the user message.
   Future<String?> applyOnDevice({String name = 'Icon Formatter Pack', Future<bool> Function()? confirmReplace}) async {
     _set(S.dpCompilazione, running: true);
     try {
@@ -842,7 +852,7 @@ class PackBuilderController extends ChangeNotifier {
       final info = await PlatformService.devicePackInfo();
       if (info['launcher'] == null) {
         _set(S.dpInstallato(n, v), running: false);
-        return S.dpNoNothing;
+        return S.dpNoLauncher;
       }
       _set(S.dpApplicazione, running: true);
       final r = await PlatformService.devicePackApply();
@@ -940,14 +950,14 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
   @override
   void initState() {
     super.initState();
-    c._pickKindImpl = () => showModalBottomSheet<String>(
+    c._pickKindImpl = () => showAppSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: const Icon(Icons.folder_open_outlined), title: const Text(S.cartella), onTap: () => Navigator.pop(ctx, 'folder')),
-            ListTile(leading: const Icon(Icons.folder_zip_outlined), title: const Text(S.zipOApk), onTap: () => Navigator.pop(ctx, 'zip')),
+            ListTile(leading: const Icon(Icons.folder_open_outlined), title: Text(S.cartella), onTap: () => Navigator.pop(ctx, 'folder')),
+            ListTile(leading: const Icon(Icons.folder_zip_outlined), title: Text(S.zipOApk), onTap: () => Navigator.pop(ctx, 'zip')),
           ],
         ),
       ),
@@ -1038,7 +1048,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                               child: Text(
                                 c.status!,
                                 key: const ValueKey('pb-status'),
-                                style: const TextStyle(fontSize: 12.5, color: Palette.text2),
+                                style: TextStyle(fontSize: 12.5, color: Palette.text2),
                               ),
                             ),
                           ],
@@ -1065,17 +1075,19 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                 children: [
                   // the last summary ("N su M abbinate") is the subtitle once the
                   // work is done; while working the strip floats over card 1
-                  LargeHeader(S.pbTitolo, subtitle: !c.busy && c.status != null ? c.status : S.pbSottotitoloBreve),
+                  LargeHeader(S.pbTitolo),
                   // status floats over the first card, right under the title
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
                       StepCard(
                         step: 1,
-                        title: Platform.isAndroid ? S.pbPasso1Catalogo : S.pbPasso1,
-                        subtitle: Platform.isAndroid
-                            ? (c.catalogVisible == null ? S.pbCatalogoLettura : S.pbCatalogoInfo(c.originals.where((o) => o.id.startsWith('app:')).length, c.catalogVisible!))
-                            : (c.originals.isEmpty ? S.pbPasso1Sub : S.pbOriginaliN(c.originals.length)),
+                        icon: Platform.isAndroid ? Icons.apps_rounded : null,
+                        title: Platform.isAndroid
+                            ? (c.catalogVisible == null ? S.pbPasso1Catalogo : '${S.pbPasso1Catalogo} · ${c.originals.where((o) => o.id.startsWith('app:')).length}')
+                            : S.pbPasso1,
+                        // desktop: the subtitle says what to load
+                        subtitle: Platform.isAndroid ? null : (c.originals.isEmpty ? S.pbPasso1Sub : S.pbOriginaliN(c.originals.length)),
                         done: c.originals.isNotEmpty,
                         children: [
                           if (Platform.isAndroid) ToolButton(icon: Icons.refresh_rounded, label: S.pbAggiornaCatalogo, onTap: c.busy ? null : () => _run(c.addInstalledApps)),
@@ -1087,9 +1099,9 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                   ),
                   StepCard(
                     step: 2,
+                    icon: Icons.auto_awesome_mosaic_outlined,
                     title: S.pbPasso2,
-                    subtitle: S.pbPasso2Sub,
-                    done: c.rows.any((r) => r.generatedId != null),
+                        done: c.rows.any((r) => r.generatedId != null),
                     children: [
                       ToolButton(icon: Icons.auto_fix_high_outlined, label: S.pbGeneraDaStudio, onTap: c.busy || c.originals.isEmpty ? null : () => _run(() => c.generateFromOriginals())),
                       ToolButton(icon: Icons.collections_outlined, label: S.pbImportaGenerate, onTap: c.busy ? null : () => _run(() => c.addSource(original: false))),
@@ -1107,7 +1119,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       builder: (context, box) {
                         final states = <PbState?>[null, ...PbState.values.where((s) => counts[s]! > 0 || s == PbState.missing || filter == s)];
                         // compact pills, narrower only when they would not fit
-                        final w = ((box.maxWidth - 6 * (states.length - 1)) / states.length).clamp(40.0, 64.0).floorToDouble();
+                        final w = ((box.maxWidth - 6 * (states.length - 1)) / states.length).clamp(48.0, 84.0).floorToDouble();
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -1121,6 +1133,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                                   color: s == null ? Theme.of(context).colorScheme.primary : _color(s),
                                   tooltip: s == null ? S.pbTutte(c.rows.length) : '${_label(s)} ${counts[s]}',
                                   on: filter == s,
+                                  count: s == null ? c.rows.length : counts[s],
                                   onTap: () => setState(() => filter = filter == s || s == null ? null : s),
                                 ),
                               ),
@@ -1130,13 +1143,6 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       },
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      filter == null ? S.pbTutte(c.rows.length) : '${_label(filter!)} · ${counts[filter]}',
-                      key: const ValueKey('pb-filter-label'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: filter == null ? Palette.text : _color(filter!)),
-                    ),
-                    const SizedBox(height: 4),
                   ],
                   if (c.rows.isEmpty)
                     Padding(
@@ -1145,7 +1151,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                         child: Text(
                           c.originals.isEmpty ? S.pbVuoto : S.pbPremiAbbina,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Palette.text2),
+                          style: TextStyle(color: Palette.text2),
                         ),
                       ),
                     ),
@@ -1157,12 +1163,6 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
               SliverPinnedSearch(
                 padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
                 child: TextField(controller: _search, decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
-              ),
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(20, 2, 20, 8),
-                sliver: SliverToBoxAdapter(
-                  child: Text(S.pbTieniPremuto, key: ValueKey('pb-hint'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
-                ),
               ),
             ],
             if (c.rows.isNotEmpty)
@@ -1216,7 +1216,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       children: [
                         const IconChip(icon: Icons.cleaning_services_outlined),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1250,7 +1250,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                               ),
                             ),
                           ),
-                          child: const Text(S.apri),
+                          child: Text(S.apri),
                         ),
                       ],
                     ),
@@ -1278,8 +1278,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
       anchor: anchor,
       title: S.pbApriPack,
       items: [
-        if (installed != null) const GlassMenuItem(value: 'installed', label: S.pbPackInstallato, subtitle: S.pbPackInstallatoSub, icon: Icons.phone_android_rounded),
-        const GlassMenuItem(value: 'file', label: S.pbPackDaFile, subtitle: S.pbPackDaFileSub, icon: Icons.folder_zip_outlined),
+        if (installed != null) GlassMenuItem(value: 'installed', label: S.pbPackInstallato, subtitle: S.pbPackInstallatoSub, icon: Icons.phone_android_rounded),
+        GlassMenuItem(value: 'file', label: S.pbPackDaFile, subtitle: S.pbPackDaFileSub, icon: Icons.folder_zip_outlined),
       ],
     );
     String? path;
@@ -1316,56 +1316,50 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
           onTap: () => _details(r),
           onLongPress: () => _menu(r, anchorOf(cctx)),
           onSecondaryTap: () => _menu(r, anchorOf(cctx)),
+          // the new icon large on its own tile, the original small in the
+          // corner; name and state centred under it (the reason is in the
+          // details)
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  r.original.image(size: 52),
-                  const Icon(Icons.arrow_forward_rounded, size: 16, color: Palette.text3),
-                  SizedBox(
-                    child:
-                        g?.image(size: 52) ??
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Palette.danger.withValues(alpha: 0.5)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.add_photo_alternate_outlined, color: Palette.danger, size: 22),
-                        ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: nothingStyle ? NothingColors.raised : Palette.fg.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
+                  child: Stack(children: [
+                    Center(
+                      child:
+                          g?.image(size: 64) ??
+                          Icon(Icons.add_photo_alternate_outlined, color: Palette.text3, size: 30),
+                    ),
+                    Positioned(left: 6, top: 6, child: Opacity(opacity: 0.9, child: r.original.image(size: 26))),
+                    if (r.custom) Positioned(right: 8, top: 8, child: Icon(Icons.edit_rounded, size: 14, color: Palette.text2)),
+                  ]),
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 r.original.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Palette.text),
               ),
-              Text(
-                r.original.isSystem ? '${S.pbSistema} · ${r.reason}' : r.reason,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, color: Palette.text3),
-              ),
-              const Spacer(),
+              const SizedBox(height: 2),
               Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.circle, size: 8, color: col),
-                  const SizedBox(width: 4),
-                  Expanded(
+                  Icon(Icons.circle, size: 7, color: col),
+                  const SizedBox(width: 5),
+                  Flexible(
                     child: Text(
-                      _label(st),
+                      r.original.isSystem ? '${_label(st)} · ${S.pbSistema}' : _label(st),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, color: col),
+                      style: TextStyle(fontSize: 11.5, color: Palette.text3),
                     ),
                   ),
-                  if (r.custom) const Icon(Icons.edit_rounded, size: 12, color: Palette.text3),
                 ],
               ),
             ],
@@ -1375,7 +1369,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
     );
   }
 
-  /// Long press: iOS 26 style context menu next to the app (tap outside or
+  /// Long press: glass context menu next to the app (tap outside or
   /// drag down to close).
   Future<void> _menu(PbRow r, Rect anchor) async {
     final g = c.generatedById(r.generatedId);
@@ -1384,10 +1378,10 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
       anchor: anchor,
       title: r.original.title,
       items: [
-        const GlassMenuItem(value: 'edit', label: S.pbModificaIcona, icon: Icons.edit_outlined),
-        const GlassMenuItem(value: 'pick', label: S.pbScegliIcona, icon: Icons.grid_view_rounded),
+        GlassMenuItem(value: 'edit', label: S.pbModificaIcona, icon: Icons.edit_outlined),
+        GlassMenuItem(value: 'pick', label: S.pbScegliIcona, icon: Icons.grid_view_rounded),
         if (r.original.path != null || r.original.bytes != null) GlassMenuItem(value: 'redo', label: S.pbRielabora, icon: Icons.refresh_rounded, enabled: !c.busy),
-        if (c.hasCustom(r)) const GlassMenuItem(value: 'restore', label: S.pbRipristinaPrecedente, icon: Icons.restore_rounded),
+        if (c.hasCustom(r)) GlassMenuItem(value: 'restore', label: S.pbRipristinaPrecedente, icon: Icons.restore_rounded),
         if (g != null) GlassMenuItem(value: 'verify', label: r.verified ? S.pbVerificata : S.pbSegnaVerificata, icon: r.verified ? Icons.verified : Icons.verified_outlined),
         GlassMenuItem(value: 'exclude', label: r.excluded ? S.pbIncludi : S.pbEscludi, icon: r.excluded ? Icons.add_circle_outline : Icons.block, destructive: !r.excluded),
       ],
@@ -1440,97 +1434,162 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
         listenable: c,
         builder: (ctx, _) {
           final g = c.generatedById(r.generatedId);
-          return AlertDialog(
-            title: Text(r.original.title),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (r.original.package.isNotEmpty) Text(r.original.package, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-                    const SizedBox(height: 10),
-                    LayoutBuilder(
-                      builder: (_, box) {
-                        // two previews side by side, never wider than the dialog
-                        final side = ((box.maxWidth - 12) / 2).clamp(64.0, 140.0).floorToDouble();
-                        Widget prev(String label, Widget? img) => Column(
-                          children: [
-                            Text(label, style: const TextStyle(fontSize: 11)),
-                            const SizedBox(height: 4),
-                            Checkerboard(
-                              child: SizedBox(
-                                width: side,
-                                height: side,
-                                child: img == null ? null : FittedBox(child: img),
-                              ),
-                            ),
-                          ],
-                        );
-                        return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [prev(S.prima, r.original.image(size: 140)), prev(S.dopo, g?.image(size: 140))]);
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Text('${_label(r.state)} · ${r.reason}', style: TextStyle(fontSize: 12, color: _color(r.state))),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilledButton.tonalIcon(
+          final hasSource = r.original.path != null || r.original.bytes != null;
+          // secondary actions, two per row, all the same size
+          final actions = <(IconData, String, VoidCallback?)>[
+            (Icons.grid_view_rounded, S.pbScegliIcona, () => _pick(r)),
+            if (hasSource) (Icons.refresh_rounded, S.pbRielabora, c.busy ? null : () => _run(() => c.generateFromOriginals(only: [r]))),
+            (r.verified ? Icons.verified : Icons.verified_outlined, r.verified ? S.pbVerificata : S.pbSegnaVerificata, g == null ? null : () => c.setVerified(r, !r.verified)),
+            (r.excluded ? Icons.add_circle_outline : Icons.block, r.excluded ? S.pbIncludi : S.pbEscludi, () => c.setExcluded(r, !r.excluded)),
+          ];
+          // Glass style: every button is a glass pill, no outline
+          Widget action((IconData, String, VoidCallback?) a) => SizedBox(
+            height: 52,
+            child: glassPill(radius: 26, OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                shape: const StadiumBorder(),
+                side: glassCards ? BorderSide.none : null,
+              ),
+              onPressed: a.$3,
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(a.$1, size: 18),
+                const SizedBox(width: 6),
+                Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(a.$2, maxLines: 1, style: const TextStyle(fontSize: 13)))),
+              ]),
+            )),
+          );
+          Widget preview(String label, Widget? img, double side) => Column(children: [
+            Checkerboard(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: SizedBox(width: side, height: side, child: img == null ? null : FittedBox(child: img)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(label, style: TextStyle(fontSize: 12, color: Palette.text2)),
+          ]);
+          final body = Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(r.original.title, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
+                  if (r.original.package.isNotEmpty)
+                    Text(r.original.package, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Palette.text3)),
+                  const SizedBox(height: 16),
+                  LayoutBuilder(
+                    builder: (_, box) {
+                      // before and after side by side, as large as the dialog allows
+                      final side = ((box.maxWidth - 24) / 2).clamp(72.0, 150.0).floorToDouble();
+                      return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                        preview(S.prima, r.original.image(size: 150), side),
+                        Icon(Icons.arrow_forward_rounded, size: 18, color: Palette.text3),
+                        preview(S.dopo, g?.image(size: 150), side),
+                      ]);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Container(width: 8, height: 8, decoration: BoxDecoration(color: _color(r.state), shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Flexible(child: Text('${_label(r.state)} · ${r.reason}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Palette.text2))),
+                  ]),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: FilledButton.icon(
+                          // Glass style: the accent colour instead of a white slab
+                          style: glassCards ? FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.85), foregroundColor: Colors.white) : null,
                           icon: const Icon(Icons.edit_outlined),
-                          label: const Text(S.pbModificaIcona),
+                          label: Text(S.pbModificaIcona),
                           onPressed: () {
                             Navigator.pop(ctx);
                             _edit(r);
                           },
                         ),
-                        OutlinedButton.icon(icon: const Icon(Icons.grid_view_rounded), label: const Text(S.pbScegliIcona), onPressed: () => _pick(r)),
-                        if (r.original.path != null || r.original.bytes != null)
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: const Text(S.pbRielabora),
-                            onPressed: c.busy ? null : () => _run(() => c.generateFromOriginals(only: [r])),
-                          ),
-                        if (r.original.path != null || r.original.bytes != null)
-                      OutlinedButton.icon(
-                        key: const ValueKey('pb-keep-white'),
-                        icon: Icon(c.keepsInnerWhite(r) ? Icons.check_box_outlined : Icons.check_box_outline_blank_rounded),
-                        label: const Text(S.mantieniBiancoInterno),
-                        onPressed: c.busy ? null : () => _run(() => c.setKeepInnerWhite(r, !c.keepsInnerWhite(r))),
                       ),
-                    if (c.hasCustom(r))
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.restore_rounded),
-                            label: const Text(S.pbRipristinaPrecedente),
-                            onPressed: () async {
-                              await c.restoreEdit(r);
-                              await _refreshPack();
-                            },
-                          ),
-                        OutlinedButton.icon(
-                          icon: Icon(r.verified ? Icons.verified : Icons.verified_outlined),
-                          label: Text(r.verified ? S.pbVerificata : S.pbSegnaVerificata),
-                          onPressed: g == null ? null : () => c.setVerified(r, !r.verified),
-                        ),
-                        OutlinedButton.icon(
-                          icon: Icon(r.excluded ? Icons.add_circle_outline : Icons.block),
-                          label: Text(r.excluded ? S.pbIncludi : S.pbEscludi),
-                          onPressed: () => c.setExcluded(r, !r.excluded),
-                        ),
-                      ],
                     ),
+                    // only after a manual edit: back to the previous icon
+                    if (c.hasCustom(r)) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: IconButton.outlined(
+                          tooltip: S.pbRipristinaPrecedente,
+                          icon: const Icon(Icons.restore_rounded),
+                          onPressed: () async {
+                            await c.restoreEdit(r);
+                            await _refreshPack();
+                          },
+                        ),
+                      ),
+                    ],
+                  ]),
+                  const SizedBox(height: 10),
+                  for (var i = 0; i < actions.length; i += 2) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: action(actions[i])),
+                      const SizedBox(width: 8),
+                      Expanded(child: i + 1 < actions.length ? action(actions[i + 1]) : const SizedBox()),
+                    ]),
                   ],
-                ),
+                  // an option of the processing, not an action
+                  if (hasSource) ...[
+                    const SizedBox(height: 8),
+                    glassPill(radius: 26, Container(
+                      height: 52,
+                      padding: const EdgeInsets.only(left: 18, right: 8),
+                      decoration: ShapeDecoration(shape: StadiumBorder(side: glassCards ? BorderSide.none : BorderSide(color: Palette.fg.withValues(alpha: 0.14)))),
+                      child: Row(children: [
+                        Expanded(child: Text(S.mantieniBiancoInterno, maxLines: 2, style: TextStyle(fontSize: 13.5, color: Palette.text))),
+                        Switch(
+                          key: const ValueKey('pb-keep-white'),
+                          value: c.keepsInnerWhite(r),
+                          onChanged: c.busy ? null : (v) => _run(() => c.setKeepInnerWhite(r, v)),
+                        ),
+                      ]),
+                    )),
+                  ],
+                  const SizedBox(height: 2),
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.chiudi)),
+                ],
               ),
             ),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.chiudi))],
+          );
+          return Dialog(
+            backgroundColor: glassCards ? Colors.transparent : null,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              // glass rim and light, on a dark frosted body so the list
+              // behind never shows through the text
+              child: glassCards
+                  ? LiquidGlass(
+                      radius: 28,
+                      live: true,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: BackdropFilter(
+                          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                          child: ColoredBox(color: Colors.black.withValues(alpha: 0.35), child: body),
+                        ),
+                      ),
+                    )
+                  : body,
+            ),
           );
         },
       ),
     );
   }
+
 
   Future<void> _pick(PbRow r) async {
     final picked = await showAppDialog<PbIcon>(
@@ -1548,7 +1607,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
             final mq = MediaQuery.of(ctx);
             final avail = mq.size.height - mq.viewInsets.bottom - mq.padding.vertical - 220;
             return AlertDialog(
-              title: const Text(S.pbScegliIcona),
+              title: Text(S.pbScegliIcona),
               insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               content: SizedBox(
                 width: 520,
@@ -1576,7 +1635,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                   ],
                 ),
               ),
-              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.annulla))],
+              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.annulla))],
             );
           },
         );
@@ -1608,15 +1667,15 @@ class _IconEditPageState extends State<IconEditPage> {
   }
 
   Future<void> _openStyle() async {
-    await showModalBottomSheet(
+    await showAppSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) => SizedBox(
         height: MediaQuery.of(ctx).size.height * 0.80,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 4), child: Text(S.stileTitolo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text))),
-          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text(S.stileSpiegazioneModifica, style: TextStyle(fontSize: 13, color: Palette.text2))),
+          Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 4), child: Text(S.stileTitolo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text))),
+          Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 8), child: Text(S.stileSpiegazioneModifica, style: TextStyle(fontSize: 13, color: Palette.text2))),
           Expanded(child: AdjustPanel(c: _style)),
         ]),
       ),
@@ -1692,7 +1751,7 @@ class _IconEditPageState extends State<IconEditPage> {
                             after: Padding(
                               padding: const EdgeInsets.all(28),
                               child: result == null
-                                  ? const Center(
+                                  ? Center(
                                       child: Text(
                                         S.pbScegliImmagineHint,
                                         textAlign: TextAlign.center,
@@ -1712,7 +1771,7 @@ class _IconEditPageState extends State<IconEditPage> {
               if (error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(error!, style: const TextStyle(color: Palette.danger, fontSize: 12)),
+                  child: Text(error!, style: TextStyle(color: Palette.danger, fontSize: 12)),
                 ),
               const SizedBox(height: 14),
               StepCard(
@@ -1734,7 +1793,7 @@ class _IconEditPageState extends State<IconEditPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ChoiceRows<EditTreatment>(
-                      options: const [
+                      options: [
                         (EditTreatment.auto, S.modoAuto),
                         (EditTreatment.plateColor, S.modoColorePiatto),
                         (EditTreatment.fullBleed, S.modoBordoPieno),
@@ -1755,14 +1814,14 @@ class _IconEditPageState extends State<IconEditPage> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(key: const ValueKey('edit-cancel'), onPressed: () => Navigator.pop(context), child: const Text(S.annulla)),
+                    child: OutlinedButton(key: const ValueKey('edit-cancel'), onPressed: () => Navigator.pop(context), child: Text(S.annulla)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
                       key: const ValueKey('edit-confirm'),
                       icon: const Icon(Icons.check_rounded),
-                      label: const Text(S.pbConfermaSostituzione),
+                      label: Text(S.pbConfermaSostituzione),
                       onPressed: result == null || working ? null : () => Navigator.pop(context, result),
                     ),
                   ),
@@ -1820,12 +1879,12 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
             key: const ValueKey('autosync-switch'),
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: const Text(S.asTitolo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            title: Text(S.asTitolo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             subtitle: Text(last == 0 ? S.asMai : S.asUltimo(DateTime.fromMillisecondsSinceEpoch(last).toLocal().toString().substring(0, 16)), style: const TextStyle(fontSize: 11)),
             value: st['enabled'] == true,
             onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v)),
           ),
-          const Text(S.asInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+          Text(S.asInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -1834,13 +1893,13 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
               OutlinedButton.icon(
                 key: const ValueKey('autosync-check'),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text(S.asControllaOra),
+                label: Text(S.asControllaOra),
                 onPressed: busy ? null : () => _load(PlatformService.autoSyncCheckNow),
               ),
               if (pending.isNotEmpty && pending.every((m) => m['change'] == 'disinstallata'))
                 OutlinedButton.icon(
                   icon: const Icon(Icons.done_all_rounded, size: 18),
-                  label: const Text(S.asSegnaViste),
+                  label: Text(S.asSegnaViste),
                   onPressed: busy
                       ? null
                       : () async {
@@ -1872,8 +1931,8 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
           ),
           if (pending.isNotEmpty) ...[
             const SizedBox(height: 6),
-            for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: const TextStyle(fontSize: 12, color: Palette.text2)),
-            if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: const TextStyle(fontSize: 11, color: Palette.text3)),
+            for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: TextStyle(fontSize: 12, color: Palette.text2)),
+            if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: TextStyle(fontSize: 11, color: Palette.text3)),
           ],
         ],
       ),
@@ -1881,7 +1940,7 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
   }
 }
 
-/// Android: install the pack and select it in Nothing Launcher through
+/// Android: install the pack and select it in the system launcher through
 /// Shizuku (DevicePack.kt). Without Shizuku: system installer + manual pick.
 class LauncherApplyCard extends StatefulWidget {
   const LauncherApplyCard({super.key, required this.builder});
@@ -1972,7 +2031,7 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
                     S.dpTitolo,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text),
@@ -1993,7 +2052,7 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
                   child: Text(
                     stateText,
                     key: const ValueKey('shizuku-state'),
-                    style: const TextStyle(fontSize: 12.5, color: Palette.text),
+                    style: TextStyle(fontSize: 12.5, color: Palette.text),
                   ),
                 ),
               ],
@@ -2002,21 +2061,21 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
             Text(
               [
                 if (info['version'] != null) S.dpVersioneInstallata(info['version']),
-                launcher == null ? S.dpNoNothing : S.dpLauncher(launcher),
+                launcher == null ? S.dpNoLauncher : S.dpLauncher(launcher),
                 if (sh == 'granted') S.dpSelettore(info['selector']),
               ].join(' · '),
-              style: const TextStyle(fontSize: 11, color: Palette.text3),
+              style: TextStyle(fontSize: 11, color: Palette.text3),
             ),
             if (info['state'] == 'residual') ...[
               const SizedBox(height: 6),
               Text(
                 S.dpResiduo(info['residualVersion']),
                 key: const ValueKey('dp-residual'),
-                style: const TextStyle(fontSize: 12, color: Palette.warn),
+                style: TextStyle(fontSize: 12, color: Palette.warn),
               ),
             ],
             const SizedBox(height: 4),
-            const Text(S.dpInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+            Text(S.dpInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -2026,7 +2085,7 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
                   FilledButton.icon(
                     key: const ValueKey('dp-apply'),
                     icon: const Icon(Icons.auto_awesome_outlined, size: 18),
-                    label: const Text(S.dpApplica),
+                    label: Text(S.dpApplica),
                     onPressed: working || !hasRows
                         ? null
                         : () => _do(() => widget.builder.applyOnDevice(confirmReplace: () => confirm(context, S.dpSostituireTitolo, S.dpSostituireTesto, ok: S.dpSostituisci))),
@@ -2035,27 +2094,27 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
                   FilledButton.tonalIcon(
                     key: const ValueKey('dp-install'),
                     icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text(S.dpSoloInstalla),
+                    label: Text(S.dpSoloInstalla),
                     onPressed: working || !hasRows
                         ? null
                         : () => _do(() => widget.builder.applyOnDevice(confirmReplace: () => confirm(context, S.dpSostituireTitolo, S.dpSostituireTesto, ok: S.dpSostituisci))),
                   ),
-                if (sh == 'denied') OutlinedButton(onPressed: PlatformService.shizukuRequest, child: const Text(S.dpConcedi)),
-                if (sh == 'stopped' || sh == 'old') OutlinedButton(onPressed: PlatformService.openShizuku, child: const Text(S.dpApriShizuku)),
+                if (sh == 'denied') OutlinedButton(onPressed: PlatformService.shizukuRequest, child: Text(S.dpConcedi)),
+                if (sh == 'stopped' || sh == 'old') OutlinedButton(onPressed: PlatformService.openShizuku, child: Text(S.dpApriShizuku)),
                 if (sh == 'granted' && info['state'] == 'residual')
                   OutlinedButton.icon(
                     key: const ValueKey('dp-cleanup'),
                     icon: const Icon(Icons.cleaning_services_outlined, size: 18),
-                    label: const Text(S.dpPulisciResidui),
+                    label: Text(S.dpPulisciResidui),
                     onPressed: working ? null : () => _do(() async => await PlatformService.devicePackCleanup() ? S.dpResiduiPuliti : S.dpResiduiRimasti),
                   ),
                 if (sh == 'granted' && info['installed'] == true)
-                  OutlinedButton(onPressed: working ? null : () => _do(() async => S.dpRipristinato(await PlatformService.devicePackRestore())), child: const Text(S.dpRipristina)),
+                  OutlinedButton(onPressed: working ? null : () => _do(() async => S.dpRipristinato(await PlatformService.devicePackRestore())), child: Text(S.dpRipristina)),
                 TextButton(
                   onPressed: () async {
-                    if (!await PlatformService.openNothingPicker()) await PlatformService.openHomeSettings();
+                    if (!await PlatformService.openLauncherPicker()) await PlatformService.openHomeSettings();
                   },
-                  child: const Text(S.dpScegliManuale),
+                  child: Text(S.dpScegliManuale),
                 ),
               ],
             ),
@@ -2064,4 +2123,20 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
       ),
     );
   }
+}
+
+/// The match reason from the core ("package · somiglianza 87%",
+/// "solo somiglianza visiva 64%") in the app language.
+String matchReasonText(String raw) {
+  final only = RegExp(r'^solo somiglianza visiva (\d+)%$').firstMatch(raw);
+  if (only != null) return S.pbSoloSomiglianza(only.group(1));
+  final m = RegExp(r'^(.*) · somiglianza (\d+)%$').firstMatch(raw);
+  final why = m?.group(1) ?? raw;
+  final text = switch (why) {
+    'package' => S.pbPerPackage,
+    'nome app' => S.pbPerNomeApp,
+    'nome file' => S.pbPerNomeFile,
+    _ => why,
+  };
+  return m == null ? text : '$text · ${S.pbSomiglianza(m.group(2))}';
 }

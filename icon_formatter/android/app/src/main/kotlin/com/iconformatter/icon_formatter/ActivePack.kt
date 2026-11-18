@@ -12,7 +12,7 @@ import org.xmlpull.v1.XmlPullParser
  * The icon pack the launcher is using right now (not necessarily the one
  * Icon Formatter generated), and its icons for given app components.
  *
- * Which pack is active is only readable for Nothing Launcher: Settings.System
+ * Which pack is active is only readable for the system launcher: Settings.System
  * `nothing_icon_pack` (directly when Android allows it, else through Shizuku).
  * Other launchers keep the choice in their private data: then there is no
  * active pack for us and the stock icons are shown.

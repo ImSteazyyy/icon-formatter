@@ -9,12 +9,14 @@ import '../services/export_service.dart';
 import '../services/import_service.dart';
 import '../widgets/common.dart';
 import '../widgets/glass_menu.dart';
+import '../widgets/liquid_glass.dart' show nothingStyle, NothingColors;
 import 'pack_builder_screen.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
 import '../l10n/strings.dart';
+import '../src/rust/api/engine.dart' show PackImage;
 
-/// Original Composition / Nothing Translucent / Custom Presets.
+/// Original Composition / Translucent / Custom Presets.
 class StudioScreen extends StatefulWidget {
   const StudioScreen({super.key, required this.onOpenBases, this.onOpenPack, this.onOpenApps});
 
@@ -43,12 +45,23 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     super.dispose();
   }
 
-  Future<void> _import(Future<List<dynamic>> Function() f, {bool placeOnly = false}) async {
+  Future<void> _import(Future<List<PackImage>> Function() f, {bool placeOnly = false}) async {
     try {
-      final imgs = await f();
-      if (imgs.isEmpty) return;
-      c.addPaths(imgs.cast(), placeOnly: placeOnly);
+      var imgs = await f();
+      if (imgs.isEmpty || !mounted) return;
+      // an icon pack or a big folder: the user picks the icons wanted
+      if (imgs.length > 24) {
+        final picked = await pickImagesDialog(context, imgs);
+        if (picked == null || picked.isEmpty || !mounted) return;
+        imgs = picked;
+      }
+      final added = c.addPaths(imgs, placeOnly: placeOnly);
       if (mounted) showMsg(context, S.iconeImportate(imgs.length));
+      // ready-made icons: size them right away
+      if (placeOnly && mounted) {
+        await c.process(only: added);
+        if (mounted) await showIconSizeDialog(context, c, added);
+      }
     } catch (e) {
       if (mounted) showMsg(context, S.importazioneNonRiuscita(e), error: true);
     }
@@ -108,24 +121,21 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
   }
 
   /// The one import menu (centre button and "+"): files, folder, ZIP/APK
-  /// and, on Android, the phone's apps. iOS 26 style glass pop-up.
+  /// and, on Android, the phone's apps. Glass pop-up.
   Future<void> _importMenu(Rect anchor) async {
     final v = await showGlassMenu<String>(context, anchor: anchor, items: [
-      const GlassMenuItem(value: 'file', label: S.importaImmagini, subtitle: S.importaImmaginiSub, icon: Icons.image_outlined),
-      const GlassMenuItem(value: 'folder', label: S.importaCartella, subtitle: S.importaCartellaSub, icon: Icons.folder_open_outlined),
-      const GlassMenuItem(value: 'zip', label: S.importaZipApk, subtitle: S.importaZipSub, icon: Icons.folder_zip_outlined),
-      const GlassMenuItem(value: 'ready', label: S.importaPronti, subtitle: S.importaProntiSub, icon: Icons.crop_free_rounded),
-      const GlassMenuItem(value: 'calendar', label: S.calendarioDaPack, subtitle: S.calendarioDaPackSub, icon: Icons.calendar_month_outlined),
+      GlassMenuItem(value: 'file', label: S.importaImmagini, subtitle: S.importaImmaginiSub, icon: Icons.image_outlined),
+      GlassMenuItem(value: 'folder', label: S.importaCartella, subtitle: S.importaCartellaSub, icon: Icons.folder_open_outlined),
+      GlassMenuItem(value: 'ready', label: S.importaPronti, subtitle: S.importaProntiSub, icon: Icons.crop_free_rounded),
+      GlassMenuItem(value: 'calendar', label: S.calendarioDaPack, subtitle: S.calendarioDaPackSub, icon: Icons.calendar_month_outlined),
       if (Platform.isAndroid && widget.onOpenApps != null)
-        const GlassMenuItem(value: 'apps', label: S.usaAppDelTelefono, subtitle: S.usaAppDelTelefonoSub, icon: Icons.apps_rounded),
+        GlassMenuItem(value: 'apps', label: S.usaAppDelTelefono, subtitle: S.usaAppDelTelefonoSub, icon: Icons.apps_rounded),
     ]);
     switch (v) {
       case 'file':
         await _import(ImportService.pickFiles);
       case 'folder':
         await _import(ImportService.pickFolderImages);
-      case 'zip':
-        await _import(ImportService.pickZip);
       case 'ready':
         await _import(ImportService.pickFiles, placeOnly: true);
       case 'calendar':
@@ -173,12 +183,12 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         key: const ValueKey('send-to-pack'),
         onPressed: c.items.isEmpty ? null : _sendToPack,
         icon: const Icon(Icons.dashboard_customize_outlined),
-        label: const Text(S.mandaAlPack),
+        label: Text(S.mandaAlPack),
       ),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text(S.esportaCartella)),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text(S.esportaZip)),
+      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: Text(S.esportaCartella)),
+      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: Text(S.esportaZip)),
       if (Platform.isAndroid)
-        OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text(S.condividi)),
+        OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: Text(S.condividi)),
     ];
     // empty Studio: one obvious primary action, the steps underneath
     Widget step(int n, String title) => Padding(
@@ -188,11 +198,11 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
               width: 24,
               height: 24,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16), shape: BoxShape.circle),
-              child: Text('$n', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
+              decoration: BoxDecoration(color: nothingStyle ? NothingColors.tertiary : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16), shape: BoxShape.circle),
+              child: Text('$n', style: TextStyle(fontSize: 12, color: nothingStyle ? Palette.fg : Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 10),
-            Expanded(child: Text(title, style: const TextStyle(fontSize: 13.5, color: Palette.text2))),
+            Expanded(child: Text(title, style: TextStyle(fontSize: 13.5, color: Palette.text2))),
           ]),
         );
     final empty = ConstrainedBox(
@@ -205,9 +215,9 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Icon(Icons.auto_awesome_mosaic_outlined, size: 44, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 12),
-          const Text(S.studioVuotoTitolo, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
+          Text(S.studioVuotoTitolo, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
           const SizedBox(height: 6),
-          Text(Platform.isWindows ? S.studioVuotoSubWin : S.studioVuotoSub, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13.5, color: Palette.text2)),
+          Text(Platform.isWindows ? S.studioVuotoSubWin : S.studioVuotoSub, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.text2)),
           const SizedBox(height: 18),
           // the only button: every source opens from here
           Builder(
@@ -216,7 +226,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
               onPressed: () => _importMenu(anchorOf(bctx)),
               icon: const Icon(Icons.add_rounded),
-              label: const Text(S.importaIcone, style: TextStyle(fontSize: 16)),
+              label: Text(S.importaIcone, style: TextStyle(fontSize: 16)),
             ),
           ),
           const SizedBox(height: 18),
@@ -246,6 +256,16 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                   onPressed: c.batch.running ? null : _process,
                   icon: const Icon(Icons.play_arrow_rounded),
                   label: Text(c.batch.running ? S.elaborazione : S.elaboraTutte, style: const TextStyle(fontSize: 16)),
+                ),
+              ),
+        compactPrimaryAction: c.items.isEmpty
+            ? null
+            : ListenableBuilder(
+                listenable: c.batch,
+                builder: (context, _) => IconButton.filled(
+                  tooltip: S.elaboraTutte,
+                  onPressed: c.batch.running ? null : _process,
+                  icon: const Icon(Icons.play_arrow_rounded),
                 ),
               ),
         moreActions: [
@@ -282,7 +302,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                     color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                     border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
                   ),
-                  child: const Center(child: Text(S.rilasciaImportare, style: TextStyle(fontSize: 18))),
+                  child: Center(child: Text(S.rilasciaImportare, style: TextStyle(fontSize: 18))),
                 ),
               ),
             ),

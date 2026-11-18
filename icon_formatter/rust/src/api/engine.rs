@@ -61,18 +61,18 @@ pub struct TranslucentSettings {
 pub enum LucentShape {
     /// Silhouette of the source icon.
     Original,
-    /// Nothing Launcher / IconGen circle.
+    /// Circular plate.
     Circle,
     /// Reference squircle (0.93, n 4.25).
     Squircle,
 }
 
-/// Lucent (Nothing OS 5.0) plate, ported from Nothing IconGen.
+/// Lucent plate (see native/icon_core/src/lucent.rs).
 #[derive(Clone, Debug)]
 pub struct LucentSettings {
     /// Ink colour (ARGB) for the optional monochrome glyph.
     pub ink: u32,
-    /// Frosted backdrop (ARGB, alpha 0x66 on Nothing OS).
+    /// Frosted backdrop (ARGB, alpha 0x66 by default).
     pub backdrop: u32,
     pub shape: LucentShape,
     pub monochrome: bool,
@@ -80,7 +80,7 @@ pub struct LucentSettings {
     pub glyph_scale: f32,
     pub rim: f32,
     pub launcher_shadow: bool,
-    pub nothing_encode: bool,
+    pub launcher_encode: bool,
     /// How the symbol is taken from the original (per-app override).
     pub strategy: LucentStrategy,
 }
@@ -128,7 +128,7 @@ impl From<&LucentSettings> for lucent::LucentParams {
             rim: l.rim,
             lift_greys: true,
             launcher_shadow: l.launcher_shadow,
-            nothing_encode: l.nothing_encode,
+            launcher_encode: l.launcher_encode,
             strategy: match l.strategy {
                 LucentStrategy::Auto => lucent::GlyphStrategy::Auto,
                 LucentStrategy::PlateColor => lucent::GlyphStrategy::PlateColor,
@@ -335,7 +335,7 @@ pub fn default_lucent_settings(dark: bool) -> LucentSettings {
         glyph_scale: d.glyph_scale,
         rim: d.rim,
         launcher_shadow: d.launcher_shadow,
-        nothing_encode: d.nothing_encode,
+        launcher_encode: d.launcher_encode,
         strategy: LucentStrategy::Auto,
     }
 }
@@ -410,7 +410,7 @@ pub fn preview_bytes(bytes: Vec<u8>, settings: ProcessSettings) -> Result<Previe
     preview_image(&img, &settings)
 }
 
-/// Renders only the background (live preview of Nothing Translucent / base).
+/// Renders only the background (live preview of Translucent / base).
 pub fn render_background_png(background: BackgroundSettings, size: u32) -> Result<Vec<u8>> {
     let size = check_size(size)?;
     Ok(imageops::encode_png(&background_image(&background, size)?)?)
@@ -918,6 +918,11 @@ fn candidates(v: Vec<MatchInput>) -> Vec<matching::Candidate> {
 }
 
 /// Associates originals with generated icons (name, package, file, visual).
+/// File where the matching signatures are kept between launches.
+pub fn set_match_cache_file(path: String) {
+    matching::set_signature_cache_file(std::path::Path::new(&path));
+}
+
 pub fn match_icons(originals: Vec<MatchInput>, generated: Vec<MatchInput>) -> Result<Vec<MatchOutput>> {
     let r = matching::match_icons(&candidates(originals), &candidates(generated));
     Ok(r.into_iter()

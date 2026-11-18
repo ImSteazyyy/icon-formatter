@@ -264,7 +264,7 @@ pub fn flatten_edge_color(img: &RgbaImage) -> (RgbaImage, bool) {
 }
 
 /// Width (px) of the light rim drawn along the outline of an icon that is
-/// already a frosted tile (Contacts, NoMoreBackground): neutral bands near
+/// already a frosted tile (contacts-style tiles): neutral bands near
 /// the edge clearly lighter than the plate further in. 0 when there is none.
 pub fn light_rim_width(img: &RgbaImage) -> u32 {
     let (w, h) = img.dimensions();
@@ -353,7 +353,7 @@ pub fn crop_to_content(img: &RgbaImage) -> RgbaImage {
 }
 
 /// Round launcher icon on a light, neutral background whose artwork reaches
-/// the circle's edge (NoMoreBackground: a green robot on an off-white disc
+/// the circle's edge (e.g. a green robot on an off-white disc
 /// with a grey cloud). Nothing separates from such a disc, so it would be
 /// shrunk whole into the new plate. Here the light background is removed,
 /// together with the light grey shapes painted on it (the cloud), and the

@@ -1,12 +1,11 @@
 # Icon Formatter
 
-App per Windows e Android (Flutter + Rust) che compone, stilizza e ripulisce le icone dei launcher: Composizione originale, Nothing Translucent, Preset personalizzati, Tema icone AI, Pulizia pack, Icon Pack Builder e App installate (Android). Su Android installa e applica il pack in Nothing Launcher con Shizuku, senza PC e senza root.
+App per Android e Windows che trasforma le icone delle app in uno stile uniforme e crea icon pack pronti da installare. Su Android installa e applica il pack nel launcher con Shizuku, senza PC e senza root.
 
-- Sorgente, architettura, benchmark e limiti: [icon_formatter/README.md](icon_formatter/README.md)
+- Come funziona, requisiti e limiti: [icon_formatter/README.md](icon_formatter/README.md)
 - Novità di ogni versione: [CHANGELOG.md](CHANGELOG.md)
-- Icona base vuota per la calibrazione: `base/` (le icone di app di terzi usate per i test restano solo in locale)
-- Build per Windows e APK: nelle Release della repository
+- APK e build per Windows: nelle Release della repository
 
-Progetto indipendente, non affiliato a Nothing Technology. Licenza AGPL-3.0; componenti di terze parti e marchi: [icon_formatter/README.md](icon_formatter/README.md#licenza).
+Progetto indipendente con licenza AGPL-3.0. Componenti di terze parti: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 **Sviluppato con Claude** (Anthropic), tramite Claude Code: Claude è co-autore dei commit.

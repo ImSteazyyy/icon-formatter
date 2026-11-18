@@ -99,7 +99,7 @@ class _CaptionButtonState extends State<_CaptionButton> {
   Widget build(BuildContext context) {
     final bg = widget.danger
         ? (hover ? const Color(0xFFC42B1C).withValues(alpha: down ? 0.8 : 1) : Colors.transparent)
-        : Colors.white.withValues(alpha: hover ? (down ? 0.05 : 0.09) : 0);
+        : Palette.fg.withValues(alpha: hover ? (down ? 0.05 : 0.09) : 0);
     return Tooltip(
       message: widget.tooltip,
       waitDuration: const Duration(milliseconds: 800),

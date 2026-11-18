@@ -57,18 +57,17 @@ class BasesScreen extends StatelessWidget {
         final content = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (!embedded) Text(S.baseIcons, style: Theme.of(context).textTheme.headlineSmall),
           if (!embedded) const SizedBox(height: 4),
-          const Text(
-            S.ogniBaseHaCalibrazioneIndipendente,
-            style: TextStyle(color: Palette.text2, fontSize: 12),
-          ),
-          const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            FilledButton.icon(onPressed: () => _import(context), icon: const Icon(Icons.add), label: const Text(S.importaBase)),
-            OutlinedButton.icon(onPressed: () => _fromPreset(context), icon: const Icon(Icons.blur_on), label: Text(S.creaPreset(st.activePreset.name))),
-          ]),
+          Text(S.ogniBaseHaCalibrazioneIndipendente, style: TextStyle(color: Palette.text2, fontSize: 13)),
           const SizedBox(height: 14),
+          // two equal actions side by side
+          Row(children: [
+            Expanded(child: ToolButton(icon: Icons.add_rounded, label: S.importaBase, onTap: () => _import(context))),
+            const SizedBox(width: 10),
+            Expanded(child: ToolButton(icon: Icons.blur_on_rounded, label: S.creaDaPreset, onTap: () => _fromPreset(context))),
+          ]),
+          const SizedBox(height: 16),
           for (final b in st.bases) _BaseTile(b: b, selected: st.selectedBase?.id == b.id),
-          if (st.bases.isEmpty) const Text(S.nessunBaseIcon, style: TextStyle(color: Palette.text3)),
+          if (st.bases.isEmpty) Text(S.nessunBaseIcon, style: TextStyle(color: Palette.text3)),
         ]);
         if (embedded) return content;
         return SingleChildScrollView(padding: const EdgeInsets.all(20), child: content);
@@ -87,56 +86,55 @@ class _BaseTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final cal = b.calibration;
-    final info = b.calibrationInfo;
+    // tap = use it; the menu holds calibration, rename and delete
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Glass(
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          SizedBox(width: 64, height: 64, child: Checkerboard(cell: 6, child: IconImage(path: b.path))),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Flexible(child: Text(b.name, style: Theme.of(context).textTheme.titleMedium, overflow: TextOverflow.ellipsis)),
-                if (selected) ...[
-                  const SizedBox(width: 8),
-                  Icon(Icons.check_circle, size: 16, color: Theme.of(context).colorScheme.primary),
-                ],
+        padding: EdgeInsets.zero,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
+            onTap: () => st.update(() => st.selectedBaseId = b.id),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+              child: Row(children: [
+                SizedBox(width: 56, height: 56, child: IconImage(path: b.path)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(b.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Palette.text)),
+                    const SizedBox(height: 2),
+                    Text(
+                      selected ? S.inUso : (cal == null ? S.daCalibrare : S.calibrata),
+                      style: TextStyle(fontSize: 12.5, color: cal == null && !selected ? Palette.warn : Palette.text2),
+                    ),
+                  ]),
+                ),
+                if (selected) Icon(Icons.check_circle_rounded, size: 22, color: Theme.of(context).colorScheme.primary),
+                PopupMenuButton<String>(
+                  onSelected: (v) async {
+                    if (v == 'cal') {
+                      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => CalibrationPage(base: b)));
+                    } else if (v == 'rename') {
+                      final n = await askText(context, S.rinomina, initial: b.name);
+                      if (n != null && n.isNotEmpty) st.renameBase(b, n);
+                    } else if (v == 'delete') {
+                      if (await confirm(context, S.eliminare(b.label), S.vieneRimossaCopiaInternaSua, ok: S.elimina)) {
+                        await st.deleteBase(b);
+                      }
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: 'cal', child: Text(cal == null ? S.calibra : S.ricalibra)),
+                    if (!b.builtIn) PopupMenuItem(value: 'rename', child: Text(S.rinomina)),
+                    if (!b.builtIn) PopupMenuItem(value: 'delete', child: Text(S.elimina)),
+                  ],
+                ),
               ]),
-              Text(S.px(b.width, b.height), style: const TextStyle(fontSize: 12, color: Palette.text2)),
-              Text(
-                cal == null
-                    ? S.nonCalibrato
-                    : S.calibratoEsempiValidiGlyph(info?['samples'] ?? '?', info?['inliers'] ?? '?', (cal.glyphRatio * 100).toStringAsFixed(1)),
-                style: TextStyle(fontSize: 12, color: cal == null ? Palette.warn : Palette.text2),
-              ),
-            ]),
+            ),
           ),
-          Wrap(children: [
-            if (!selected) TextButton(onPressed: () => st.update(() => st.selectedBaseId = b.id), child: const Text(S.usa)),
-            TextButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CalibrationPage(base: b))),
-              child: Text(cal == null ? S.calibra : S.ricalibra),
-            ),
-            PopupMenuButton<String>(
-              onSelected: (v) async {
-                if (v == 'rename') {
-                  final n = await askText(context, S.rinomina, initial: b.name);
-                  if (n != null && n.isNotEmpty) st.renameBase(b, n);
-                } else if (v == 'delete') {
-                  if (await confirm(context, S.eliminare(b.name), S.vieneRimossaCopiaInternaSua, ok: S.elimina)) {
-                    await st.deleteBase(b);
-                  }
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'rename', child: Text(S.rinomina)),
-                PopupMenuItem(value: 'delete', child: Text(S.elimina)),
-              ],
-            ),
-          ]),
-        ]),
+        ),
       ),
     );
   }
@@ -224,7 +222,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       'date': DateTime.now().toIso8601String(),
       'manual': edit!.glyphRatio != o.placement.glyphRatio || edit!.centerX != o.placement.centerX || edit!.centerY != o.placement.centerY,
     });
-    showMsg(context, S.calibrazioneSalvata(widget.base.name));
+    showMsg(context, S.calibrazioneSalvata(widget.base.label));
     Navigator.pop(context);
   }
 
@@ -234,28 +232,28 @@ class _CalibrationPageState extends State<CalibrationPage> {
     final e = edit;
     final wide = MediaQuery.of(context).size.width > 900;
     final left = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle(S.esempiCorrettamenteComposti),
+      SectionTitle(S.esempiCorrettamenteComposti),
       Text(
         S.esempiSelezionatiConsigliatiCirca20(samples.length),
         style: TextStyle(fontSize: 12, color: samples.length < 10 ? Palette.warn : Palette.text2),
       ),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFiles), icon: const Icon(Icons.image_outlined), label: const Text(S.file)),
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFolderImages), icon: const Icon(Icons.folder_open_outlined), label: const Text(S.cartella)),
-        OutlinedButton.icon(onPressed: () => _add(ImportService.pickZip), icon: const Icon(Icons.folder_zip_outlined), label: const Text(S.zipOApk)),
-        if (samples.isNotEmpty) TextButton(onPressed: () => setState(() => samples = []), child: const Text(S.svuota)),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFiles), icon: const Icon(Icons.image_outlined), label: Text(S.file)),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickFolderImages), icon: const Icon(Icons.folder_open_outlined), label: Text(S.cartella)),
+        OutlinedButton.icon(onPressed: () => _add(ImportService.pickZip), icon: const Icon(Icons.folder_zip_outlined), label: Text(S.zipOApk)),
+        if (samples.isNotEmpty) TextButton(onPressed: () => setState(() => samples = []), child: Text(S.svuota)),
       ]),
       const SizedBox(height: 12),
       FilledButton.icon(
         onPressed: samples.isEmpty || running ? null : _run,
         icon: running ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.analytics_outlined),
-        label: const Text(S.analizzaCalibra),
+        label: Text(S.analizzaCalibra),
       ),
-      if (error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: const TextStyle(color: Palette.danger))),
+      if (error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: TextStyle(color: Palette.danger))),
       if (o != null) ...[
         const SizedBox(height: 18),
-        const SectionTitle(S.risultatiMedianaOutlierEsclusi),
+        SectionTitle(S.risultatiMedianaOutlierEsclusi),
         _kv(S.esempiValidi, '${o.inliers} / ${o.samples.length}'),
         _kv(S.latoGlyph, S.mad((o.placement.glyphRatio * 100).toStringAsFixed(2), (o.maxSideMad * 100).toStringAsFixed(2))),
         _kv(S.areaOttica, '${(o.placement.areaRatio * 100).toStringAsFixed(2)}%'),
@@ -263,26 +261,26 @@ class _CalibrationPageState extends State<CalibrationPage> {
         _kv(S.marginiLTRB, o.margins.map((m) => '${(m * 100).toStringAsFixed(1)}%').join(' / ')),
         _kv(S.proporzioneMedia, o.medianAspect.toStringAsFixed(2)),
         const SizedBox(height: 14),
-        const SectionTitle(S.correzioneManuale),
+        SectionTitle(S.correzioneManuale),
         SliderRow(label: S.latoGlyph, value: e!.glyphRatio, min: 0.3, max: 0.95, format: (v) => '${(v * 100).toStringAsFixed(1)}%', onChanged: (v) => _setEdit(copyPlacement(e, glyphRatio: v))),
         SliderRow(label: S.centroX, value: e.centerX, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerX: v))),
         SliderRow(label: S.centroY, value: e.centerY, min: 0.35, max: 0.65, format: (v) => v.toStringAsFixed(3), onChanged: (v) => _setEdit(copyPlacement(e, centerY: v))),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: const Text(S.dimensioneOtticaArea),
+          title: Text(S.dimensioneOtticaArea),
           value: e.areaFit,
           onChanged: (v) => _setEdit(copyPlacement(e, areaFit: v)),
         ),
         Row(children: [
-          TextButton(onPressed: () => _setEdit(o.placement), child: const Text(S.ripristinaMisurati)),
+          TextButton(onPressed: () => _setEdit(o.placement), child: Text(S.ripristinaMisurati)),
           const Spacer(),
-          FilledButton(onPressed: _save, child: const Text(S.salvaCalibrazione)),
+          FilledButton(onPressed: _save, child: Text(S.salvaCalibrazione)),
         ]),
       ],
     ]);
     final right = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle(S.areaUtileSulBase),
+      SectionTitle(S.areaUtileSulBase),
       AspectRatio(
         aspectRatio: 1,
         child: ClipRRect(
@@ -298,7 +296,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       if (o != null) ...[
         const SizedBox(height: 12),
         Row(children: [
-          const Expanded(child: SectionTitle(S.verificaEsempio)),
+          Expanded(child: SectionTitle(S.verificaEsempio)),
           IconButton(
             onPressed: () {
               testIndex++;
@@ -310,7 +308,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
         if (testPng != null)
           AspectRatio(aspectRatio: 1, child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Checkerboard(child: IconImage(bytes: testPng)))),
         const SizedBox(height: 12),
-        const SectionTitle(S.esempi),
+        SectionTitle(S.esempi),
         for (final s in o.samples)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
@@ -320,14 +318,14 @@ class _CalibrationPageState extends State<CalibrationPage> {
               Expanded(child: Text(s.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))),
               Text(
                 s.error ?? '${(s.maxSideRatio * 100).toStringAsFixed(1)}% · ${s.method}${s.outlier ? ' · escluso' : ''}',
-                style: const TextStyle(fontSize: 11, color: Palette.text2),
+                style: TextStyle(fontSize: 11, color: Palette.text2),
               ),
             ]),
           ),
       ],
     ]);
     return Scaffold(
-      appBar: AppBar(title: Text(S.calibrazione(widget.base.name)), backgroundColor: Colors.transparent),
+      appBar: AppBar(title: Text(S.calibrazione(widget.base.label)), backgroundColor: Colors.transparent),
       body: SafeArea(
         child: wide
             ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -342,7 +340,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
   Widget _kv(String k, String v) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(children: [
-          SizedBox(width: 150, child: Text(k, style: const TextStyle(fontSize: 12, color: Palette.text2))),
+          SizedBox(width: 150, child: Text(k, style: TextStyle(fontSize: 12, color: Palette.text2))),
           Expanded(child: Text(v, style: const TextStyle(fontSize: 13))),
         ]),
       );
@@ -360,7 +358,7 @@ class _CalPainter extends CustomPainter {
     final thin = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: 0.18);
+      ..color = Palette.fg.withValues(alpha: 0.18);
     for (final s in o.samples) {
       if (s.outlier || s.error != null) continue;
       final b = s.bbox;

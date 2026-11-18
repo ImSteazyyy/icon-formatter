@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../src/rust/api/engine.dart';
@@ -158,7 +159,7 @@ class StylePreset {
 
 /// Built-in presets. Values tuned on the reference pack.
 List<StylePreset> builtInPresets(TranslucentSettings d) => [
-      StylePreset(id: 'nothing', name: S.nothingTranslucent, builtIn: true, params: d),
+      StylePreset(id: 'nothing', name: S.traslucido, builtIn: true, params: d),
       StylePreset(
         id: 'liquid',
         name: S.liquidGlass,
@@ -197,6 +198,14 @@ class BaseIcon {
   final String path;
   final int width;
   final int height;
+
+  /// Built-in bases (circle, squircle) are named in the app language.
+  bool get builtIn => id == 'squircle' || id == 'circle';
+  String get label => switch (id) {
+        'squircle' => S.baseSquircle,
+        'circle' => S.baseCerchio,
+        _ => name,
+      };
   PlacementSettings? calibration;
 
   /// Summary of the last calibration (samples, inliers, MAD, margins).
@@ -226,8 +235,29 @@ class BaseIcon {
 }
 
 /// UI appearance settings.
+/// Look of the whole app: "Stile Nothing" (default) or "Vetro".
+enum UiStyle { nothing, glass }
+
 class Appearance {
   double radius = 18;
+
+  UiStyle style = UiStyle.nothing;
+
+  /// Light mode (both styles).
+  bool light = false;
+
+  /// App language code ('' = the phone's language, English when not available).
+  String language = '';
+
+  /// The language actually used.
+  String get languageCode {
+    if (language.isNotEmpty && appLanguages.containsKey(language)) return language;
+    final sys = ui.PlatformDispatcher.instance.locale.languageCode;
+    return appLanguages.containsKey(sys) ? sys : 'en';
+  }
+
+  /// Red of the Nothing style (fixed: the accent picker belongs to "Vetro").
+  static const nothingRed = 0xFFEC232B;
   /// Default accent: pink sampled from the user's Windows Start icon.
   static const defaultAccent = 0xFFBA4CD4;
   static const legacyAccent = 0xFFB9A96E;
@@ -235,13 +265,16 @@ class Appearance {
   bool animations = true;
   bool compact = false;
 
-  Color get accentColor => Color(accent);
+  Color get accentColor => Color(style == UiStyle.nothing ? nothingRed : accent);
 
   Map<String, dynamic> toJson() => {
         'radius': radius,
         'accent': accent,
         'animations': animations,
         'compact': compact,
+        'style': style.name,
+        'light': light,
+        'language': language,
       };
 
   void load(Map<String, dynamic> j) {
@@ -249,6 +282,9 @@ class Appearance {
     accent = (j['accent'] as num?)?.toInt() ?? accent;
     animations = j['animations'] as bool? ?? animations;
     compact = j['compact'] as bool? ?? compact;
+    style = UiStyle.values.firstWhere((v) => v.name == j['style'], orElse: () => style);
+    language = j['language'] as String? ?? language;
+    light = j['light'] as bool? ?? light;
   }
 }
 
@@ -288,31 +324,12 @@ class ExportSettings {
       };
 }
 
-enum AiProviderKind { openai, gemini, openaiCompatible }
-
-class AiConfig {
-  AiProviderKind provider = AiProviderKind.openai;
-  String model = 'gpt-image-1';
-  String baseUrl = 'https://api.openai.com';
-  String quality = 'medium';
-
-  Map<String, dynamic> toJson() => {'provider': provider.name, 'model': model, 'baseUrl': baseUrl, 'quality': quality};
-
-  void load(Map<String, dynamic> j) {
-    provider = AiProviderKind.values.firstWhere((p) => p.name == j['provider'], orElse: () => provider);
-    model = j['model'] as String? ?? model;
-    baseUrl = j['baseUrl'] as String? ?? baseUrl;
-    quality = j['quality'] as String? ?? quality;
-  }
-}
-
-
 enum GlassQualityLevel { fast, balanced, quality }
 
 /// Liquid glass material (liquid_glass_widgets) used by bars, panels and lens.
 /// One instance (AppState.I.glass) drives every glass surface of the app.
 class GlassConfig {
-  // defaults = the look chosen by the user on the Nothing Phone (2a) Plus
+  // defaults = the look chosen by the user on their phone
   double blur = 22.6;
   double thickness = 0;
   double chromatic = 0.012;
@@ -328,6 +345,25 @@ class GlassConfig {
   /// Render tier: fast (blur only, no shader), balanced (light shader),
   /// quality (full shader with refraction and chromatic aberration).
   GlassQualityLevel quality = GlassQualityLevel.balanced;
+
+  /// Native dark material (the glass package preset, premium renderer):
+  /// replaces the sliders of Materiale, Bordo e Luce where supported.
+  bool native = true;
+
+  // "Vetro nativo" controls (Materiale, Colore, Bordi)
+  bool nFrostOn = true;
+  double nFrost = 2;
+  double nColour = 0.6;
+  double nFilm = 0.5;
+  double nActiveTab = 0.26;
+  double nEdgeLight = 0.55;
+  double nEdgeDepth = 19;
+  double nBend = 29;
+  bool nSplit = false;
+
+  /// Native style: cards are solid like the rest of the page and the glass
+  /// stays on what floats (bar, buttons); on = glass cards too.
+  bool nPanels = true;
 
   /// Glass tint colour (ARGB without alpha meaning); 0 = neutral (white/black).
   int tintColor = 0;
@@ -364,6 +400,17 @@ class GlassConfig {
         'rimLight': rimLight,
         'lensDarkness': lensDarkness,
         'quality': quality.name,
+        'native': native,
+        'nFrostOn': nFrostOn,
+        'nFrost': nFrost,
+        'nColour': nColour,
+        'nFilm': nFilm,
+        'nActiveTab': nActiveTab,
+        'nEdgeLight': nEdgeLight,
+        'nEdgeDepth': nEdgeDepth,
+        'nBend': nBend,
+        'nSplit': nSplit,
+        'nPanels': nPanels,
         'tintColor': tintColor,
         'depth': depth,
         'useNav': useNav,
@@ -392,6 +439,17 @@ class GlassConfig {
     if (j['premium'] == true) quality = GlassQualityLevel.quality;
     quality = GlassQualityLevel.values.firstWhere((q) => q.name == j['quality'], orElse: () => quality);
     tintColor = (j['tintColor'] as num?)?.toInt() ?? tintColor;
+    native = j['native'] as bool? ?? native;
+    nFrostOn = j['nFrostOn'] as bool? ?? nFrostOn;
+    nFrost = _d(j['nFrost'], nFrost);
+    nColour = _d(j['nColour'], nColour);
+    nFilm = _d(j['nFilm'], nFilm);
+    nActiveTab = _d(j['nActiveTab'], nActiveTab);
+    nEdgeLight = _d(j['nEdgeLight'], nEdgeLight);
+    nEdgeDepth = _d(j['nEdgeDepth'], nEdgeDepth);
+    nBend = _d(j['nBend'], nBend);
+    nSplit = j['nSplit'] as bool? ?? nSplit;
+    nPanels = j['nPanels'] as bool? ?? nPanels;
     depth = j['depth'] as bool? ?? depth;
     useNav = j['useNav'] as bool? ?? useNav;
     usePanels = j['usePanels'] as bool? ?? usePanels;
@@ -407,7 +465,7 @@ class GlassConfig {
 }
 
 
-/// Lucent (Nothing OS 5.0) plate settings, ported from Nothing IconGen.
+/// Lucent plate settings (see native/icon_core/src/lucent.rs).
 /// The glyph keeps its own colours unless [monochrome] is on.
 class LucentConfig {
   bool dark = true;
@@ -417,9 +475,9 @@ class LucentConfig {
   double glyphScale = 1.0;
   double rim = 0.0;
   bool launcherShadow = false;
-  bool nothingEncode = false;
+  bool launcherEncode = false;
 
-  /// Backdrop alpha (Nothing OS: 0x66 = 0.4).
+  /// Backdrop alpha (0x66 = 0.4).
   double backdropAlpha = 0x66 / 255;
 
   LucentSettings toSettings() {
@@ -433,8 +491,8 @@ class LucentConfig {
       keepComposition: keepComposition,
       glyphScale: glyphScale,
       rim: rim,
-      launcherShadow: launcherShadow && !nothingEncode,
-      nothingEncode: nothingEncode,
+      launcherShadow: launcherShadow && !launcherEncode,
+      launcherEncode: launcherEncode,
       strategy: LucentStrategy.auto,
     );
   }
@@ -447,7 +505,7 @@ class LucentConfig {
     glyphScale = (j['glyphScale'] as num?)?.toDouble() ?? glyphScale;
     rim = (j['rim'] as num?)?.toDouble() ?? rim;
     launcherShadow = j['launcherShadow'] as bool? ?? launcherShadow;
-    nothingEncode = j['nothingEncode'] as bool? ?? nothingEncode;
+    launcherEncode = j['launcherEncode'] as bool? ?? launcherEncode;
     backdropAlpha = (j['backdropAlpha'] as num?)?.toDouble() ?? backdropAlpha;
   }
 
@@ -459,7 +517,7 @@ class LucentConfig {
         'glyphScale': glyphScale,
         'rim': rim,
         'launcherShadow': launcherShadow,
-        'nothingEncode': nothingEncode,
+        'launcherEncode': launcherEncode,
         'backdropAlpha': backdropAlpha,
       };
 
@@ -470,7 +528,7 @@ class LucentConfig {
 class AiModelInfo {
   const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note, {this.phone = true, this.desktop = true});
 
-  /// Runs smoothly on a phone (Nothing Phone (2a) Plus class) / on Windows.
+  /// Runs smoothly on a phone (mid-range class) / on Windows.
   final bool phone;
   final bool desktop;
   final String id;
@@ -486,7 +544,7 @@ class AiModelInfo {
 /// Only models measured as usable on CPU with tract are offered: U²-Net-p
 /// runs in ~0.8 s per icon; Silueta took ~93 s per icon (tract, i5-13500H),
 /// so it is not listed.
-const aiModels = [
+final aiModels = [
   AiModelInfo('u2netp', AiModelKind.u2Netp, 'U²-Net-p', 4574861, 350, S.aiModelU2netpNote),
   // 1024 px input: ~7,5 s/icona su un PC (misurato), decine di secondi su telefono
   AiModelInfo('isnet-general-use', AiModelKind.isnetGeneral, 'ISNet General', 178648008, 1400, S.aiModelIsnetNote, phone: false),

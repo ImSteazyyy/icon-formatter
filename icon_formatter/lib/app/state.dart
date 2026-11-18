@@ -9,7 +9,6 @@ import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
 import 'models.dart';
 import 'storage.dart';
-import '../l10n/strings.dart';
 
 enum StudioMode { original, translucent, preset }
 
@@ -25,7 +24,6 @@ class AppState extends ChangeNotifier {
 
   final Appearance appearance = Appearance();
   final ExportSettings export = ExportSettings();
-  final AiConfig ai = AiConfig();
   final GlassConfig glass = GlassConfig();
   final LucentConfig lucent = LucentConfig();
   final LocalAiConfig localAi = LocalAiConfig();
@@ -49,6 +47,9 @@ class AppState extends ChangeNotifier {
 
   /// Studio: after "Elabora tutte" the results go to the Pack builder.
   bool autoSendToPack = false;
+
+  /// First-launch setup done (Android).
+  bool setupDone = false;
 
   // Pack cleanup
   late SegmentSettings packSegment;
@@ -95,7 +96,6 @@ class AppState extends ChangeNotifier {
       appearance.accent = Appearance.defaultAccent;
     }
     export.load((j['export'] as Map?)?.cast() ?? {});
-    ai.load((j['ai'] as Map?)?.cast() ?? {});
     glass.load((j['glass'] as Map?)?.cast() ?? {});
     lucent.load((j['lucent'] as Map?)?.cast() ?? {});
     // v3: the Lucent plate is the reference squircle (the clipping edge)
@@ -123,6 +123,7 @@ class AppState extends ChangeNotifier {
     threads = (j['threads'] as num?)?.toInt() ?? threads;
     bgProvider = BgProvider.values.firstWhere((b) => b.name == j['bgProvider'], orElse: () => BgProvider.local);
     autoSendToPack = j['autoSendToPack'] as bool? ?? false;
+    setupDone = j['setupDone'] as bool? ?? false;
     packMode = StudioMode.values.firstWhere((m) => m.name == j['packMode'], orElse: () => packMode);
     packPresetId = j['packPresetId'] as String? ?? packPresetId;
     processedPackages = ((j['processedPackages'] as List?) ?? []).cast<String>().toSet();
@@ -135,7 +136,6 @@ class AppState extends ChangeNotifier {
         'version': 3,
         'appearance': appearance.toJson(),
         'export': export.toJson(),
-        'ai': ai.toJson(),
         'glass': glass.toJson(),
         'lucent': lucent.toJson(),
         'localAi': localAi.toJson(),
@@ -153,6 +153,7 @@ class AppState extends ChangeNotifier {
         'threads': threads,
         'bgProvider': bgProvider.name,
         'autoSendToPack': autoSendToPack,
+      'setupDone': setupDone,
         'packMode': packMode.name,
         'packPresetId': packPresetId,
         'processedPackages': processedPackages.toList(),
@@ -186,7 +187,6 @@ class AppState extends ChangeNotifier {
     if (await f.exists()) await f.delete();
     appearance.load(Appearance().toJson());
     export.load(ExportSettings().toJson());
-    ai.load(AiConfig().toJson());
     glass.reset();
     lucent.reset();
     localAi.load(LocalAiConfig().toJson());
@@ -290,28 +290,45 @@ class AppState extends ChangeNotifier {
         b.calibrationInfo = info;
       });
 
-  /// First run: install the base extracted from the reference pack, with the
-  /// calibration measured on it (base-difference method, 26 samples).
+  /// Built-in bases, drawn by the app (tool/make_bases.py): a squircle and a
+  /// circle plate with the reference proportions and calibration. The old
+  /// "reference" base is replaced by the squircle.
   Future<void> _ensureReferenceBase() async {
-    if (bases.any((b) => b.id == 'reference')) return;
-    final dest = p.join(AppPaths.I.bases, 'reference.png');
-    final data = await rootBundle.load('assets/bases/reference_translucent.png');
-    await File(dest).writeAsBytes(data.buffer.asUint8List());
     final cal = jsonDecode(await rootBundle.loadString('assets/bases/reference_calibration.json')) as Map<String, dynamic>;
-    bases.insert(
-      0,
-      BaseIcon(
-        id: 'reference',
-        name: S.referenceTranslucent,
-        path: dest,
-        width: 192,
-        height: 192,
-        calibration: placementFromJson((cal['placement'] as Map).cast(), defaultPlacement),
-        calibrationInfo: (cal['info'] as Map).cast(),
-      ),
-    );
-    selectedBaseId ??= 'reference';
-    await save();
+    final squircleCal = placementFromJson((cal['placement'] as Map).cast(), defaultPlacement);
+    var changed = false;
+    for (final (id, asset, glyph) in const [('squircle', 'assets/bases/squircle.png', 0.0), ('circle', 'assets/bases/circle.png', 0.62)]) {
+      final dest = p.join(AppPaths.I.bases, '$id.png');
+      if (bases.any((b) => b.id == id) && File(dest).existsSync()) continue;
+      final data = await rootBundle.load(asset);
+      await File(dest).writeAsBytes(data.buffer.asUint8List());
+      bases.removeWhere((b) => b.id == id);
+      bases.insert(
+        id == 'squircle' ? 0 : 1,
+        BaseIcon(
+          id: id,
+          name: id,
+          path: dest,
+          width: 192,
+          height: 192,
+          // the circle keeps the squircle's centre with a smaller symbol, so
+          // square glyphs stay inside the round plate
+          calibration: glyph > 0 ? copyPlacement(squircleCal, glyphRatio: glyph, areaRatio: glyph * glyph * 1.4) : squircleCal,
+          calibrationInfo: (cal['info'] as Map).cast(),
+        ),
+      );
+      changed = true;
+    }
+    if (bases.any((b) => b.id == 'reference')) {
+      bases.removeWhere((b) => b.id == 'reference');
+      if (selectedBaseId == 'reference') selectedBaseId = 'squircle';
+      changed = true;
+    }
+    if (selectedBaseId == null || !bases.any((b) => b.id == selectedBaseId)) {
+      selectedBaseId = 'squircle';
+      changed = true;
+    }
+    if (changed) await save();
   }
 
   // ------------------------------------------------------------ settings builders

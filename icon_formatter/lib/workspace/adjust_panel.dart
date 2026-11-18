@@ -27,10 +27,10 @@ class AdjustPanel extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             if (showModes) ...[
-              const SectionTitle(S.modalita),
+              SectionTitle(S.modalita),
               SegmentedButton<StudioMode>(
                 showSelectedIcon: false,
-                segments: const [
+                segments: [
                   ButtonSegment(value: StudioMode.original, label: Text(S.original)),
                   ButtonSegment(value: StudioMode.translucent, label: Text(S.translucent)),
                   ButtonSegment(value: StudioMode.preset, label: Text(S.preset)),
@@ -59,9 +59,9 @@ class AdjustPanel extends StatelessWidget {
       case StudioMode.original:
         final b = st.selectedBase;
         return [
-          const SectionTitle(S.baseIcon),
+          SectionTitle(S.baseIcon),
           if (st.bases.isEmpty)
-            const Text(S.nessunBaseIconImportaneUno, style: TextStyle(color: Palette.text2))
+            Text(S.nessunBaseIconImportaneUno, style: TextStyle(color: Palette.text2))
           else
             DropdownButtonFormField<String>(
               key: ValueKey('base${b?.id}'),
@@ -75,19 +75,19 @@ class AdjustPanel extends StatelessWidget {
             Glass(
               padding: const EdgeInsets.all(12),
               child: Row(children: [
-                const Icon(Icons.info_outline, color: Palette.warn, size: 18),
+                Icon(Icons.info_outline, color: Palette.warn, size: 18),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(S.baseNonCalibratoUsoProporzioni,
                       style: TextStyle(fontSize: 12, color: Palette.text2)),
                 ),
-                if (onOpenBases != null) TextButton(onPressed: onOpenBases, child: const Text(S.calibra)),
+                if (onOpenBases != null) TextButton(onPressed: onOpenBases, child: Text(S.calibra)),
               ]),
             )
           else if (b?.calibration != null)
             Text(
               S.calibratoGlyphCentro((b!.calibration!.glyphRatio * 100).toStringAsFixed(1), b.calibration!.centerX.toStringAsFixed(3), b.calibration!.centerY.toStringAsFixed(3)),
-              style: const TextStyle(fontSize: 12, color: Palette.text2),
+              style: TextStyle(fontSize: 12, color: Palette.text2),
             ),
         ];
       case StudioMode.translucent:
@@ -96,7 +96,7 @@ class AdjustPanel extends StatelessWidget {
         final id = c.presetId ?? (c.packSettings ? st.packPresetId : st.activePresetId);
         final pr = st.presetById(id);
         return [
-          const SectionTitle(S.preset),
+          SectionTitle(S.preset),
           Row(children: [
             Expanded(
               child: DropdownButtonFormField<String>(
@@ -147,12 +147,12 @@ class AdjustPanel extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SectionTitle(S.composizione,
           trailing: it != null && it.hasOverride
-              ? TextButton(onPressed: () => c.clearOverrides(it), child: const Text(S.rimuoviCorrezioni))
+              ? TextButton(onPressed: () => c.clearOverrides(it), child: Text(S.rimuoviCorrezioni))
               : null),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: const Text(S.correggiSoloLIconaSelezionata, style: TextStyle(fontSize: 13)),
+        title: Text(S.correggiSoloLIconaSelezionata, style: TextStyle(fontSize: 13)),
         subtitle: Text(it == null ? S.nessunaIconaSelezionata : it.name, style: const TextStyle(fontSize: 11)),
         value: c.editSelectedOnly,
         onChanged: it == null
@@ -208,14 +208,14 @@ class AdjustPanel extends StatelessWidget {
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: const Text(S.dimensioneOtticaArea, style: TextStyle(fontSize: 13)),
-        subtitle: const Text(S.uniformaGlyphLarghiStrettiArea, style: TextStyle(fontSize: 11)),
+        title: Text(S.dimensioneOtticaArea, style: TextStyle(fontSize: 13)),
+        subtitle: Text(S.uniformaGlyphLarghiStrettiArea, style: TextStyle(fontSize: 11)),
         value: pl.areaFit,
         onChanged: c.editSelectedOnly ? (v) => c.setPlacement(copyPlacement(pl, areaFit: v)) : null,
       ),
       Text(
         S.areaUtileLatoGlyphCentro((pl.glyphRatio * pl.scaleMul * 100).toStringAsFixed(1), (pl.centerX + pl.offsetX).toStringAsFixed(3), (pl.centerY + pl.offsetY).toStringAsFixed(3)),
-        style: const TextStyle(fontSize: 11, color: Palette.text3),
+        style: TextStyle(fontSize: 11, color: Palette.text3),
       ),
     ];
   }
@@ -223,7 +223,7 @@ class AdjustPanel extends StatelessWidget {
   List<Widget> _segmentSection(BuildContext context) {
     final s = c.editSegment;
     return [
-      const SectionTitle(S.isolamentoGlyph),
+      SectionTitle(S.isolamentoGlyph),
       DropdownButtonFormField<SegMode>(
         key: ValueKey('seg${s.mode}${c.editSelectedOnly}'),
         initialValue: s.mode,
@@ -243,21 +243,21 @@ class AdjustPanel extends StatelessWidget {
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: const Text(S.rimuoviSfondoRacchiusoBuchi, style: TextStyle(fontSize: 13)),
+        title: Text(S.rimuoviSfondoRacchiusoBuchi, style: TextStyle(fontSize: 13)),
         value: s.removeHoles,
         onChanged: (v) => c.setSegment(copySegment(s, removeHoles: v)),
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: const Text(S.rifinisciBordiAntiAlias, style: TextStyle(fontSize: 13)),
+        title: Text(S.rifinisciBordiAntiAlias, style: TextStyle(fontSize: 13)),
         value: s.refineEdges,
         onChanged: (v) => c.setSegment(copySegment(s, refineEdges: v)),
       ),
       if (AppState.I.aiSettings != null && c.selected != null)
         OutlinedButton.icon(
           icon: const Icon(Icons.layers_outlined),
-          label: const Text(S.aiAnteprimaMascheraSelezionata),
+          label: Text(S.aiAnteprimaMascheraSelezionata),
           onPressed: () => showAiMaskDialog(context, path: c.selected!.path, bytes: c.selected!.bytes),
         ),
     ];
@@ -269,11 +269,11 @@ class AdjustPanel extends StatelessWidget {
         ? S.dimensioneDelBasePx(st.selectedBase!.size)
         : '${st.translucentSize}px';
     return [
-      const SectionTitle(S.risoluzione),
+      SectionTitle(S.risoluzione),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: const Text(S.risoluzionePersonalizzata, style: TextStyle(fontSize: 13)),
+        title: Text(S.risoluzionePersonalizzata, style: TextStyle(fontSize: 13)),
         subtitle: Text(ex.customSize ? '${ex.size}px' : S.predefinita(auto), style: const TextStyle(fontSize: 11)),
         value: ex.customSize,
         onChanged: (v) => st.update(() => ex.customSize = v),
@@ -336,18 +336,18 @@ List<Widget> translucentSliders(TranslucentSettings t, ValueChanged<TranslucentS
     ];
 
 
-/// Lucent (Nothing OS 5.0) controls. Changes go through AppState, so the
+/// Lucent controls. Changes go through AppState, so the
 /// preview re-renders with the same Rust function used by the export.
 List<Widget> lucentControls(AppState st) {
   final l = st.lucent;
   void set(VoidCallback f) => st.update(f);
   return [
-    SectionTitle(S.lucentTitle, trailing: TextButton(onPressed: () => set(l.reset), child: const Text(S.ripristina))),
-    const Text(S.lucentInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
+    SectionTitle(S.lucentTitle, trailing: TextButton(onPressed: () => set(l.reset), child: Text(S.ripristina))),
+    Text(S.lucentInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
     const SizedBox(height: 10),
     SegmentedButton<bool>(
       showSelectedIcon: false,
-      segments: const [
+      segments: [
         ButtonSegment(value: true, label: Text(S.lucentScuro), icon: Icon(Icons.dark_mode_outlined)),
         ButtonSegment(value: false, label: Text(S.lucentChiaro), icon: Icon(Icons.light_mode_outlined)),
       ],
@@ -358,8 +358,8 @@ List<Widget> lucentControls(AppState st) {
     DropdownButtonFormField<LucentShape>(
       key: ValueKey('lshape${l.shape}'),
       initialValue: l.shape,
-      decoration: const InputDecoration(labelText: S.lucentForma, isDense: true),
-      items: const [
+      decoration: InputDecoration(labelText: S.lucentForma, isDense: true),
+      items: [
         DropdownMenuItem(value: LucentShape.squircle, child: Text(S.lucentFormaSquircle)),
         DropdownMenuItem(value: LucentShape.circle, child: Text(S.lucentFormaCerchio)),
         DropdownMenuItem(value: LucentShape.original, child: Text(S.lucentFormaOriginale)),
@@ -373,33 +373,33 @@ List<Widget> lucentControls(AppState st) {
     SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: const Text(S.lucentMantieniComposizione, style: TextStyle(fontSize: 13)),
-      subtitle: const Text(S.lucentMantieniComposizioneSub, style: TextStyle(fontSize: 11)),
+      title: Text(S.lucentMantieniComposizione, style: TextStyle(fontSize: 13)),
+      subtitle: Text(S.lucentMantieniComposizioneSub, style: TextStyle(fontSize: 11)),
       value: l.keepComposition,
       onChanged: (v) => set(() => l.keepComposition = v),
     ),
     SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: const Text(S.lucentMonocromatico, style: TextStyle(fontSize: 13)),
-      subtitle: const Text(S.lucentMonocromaticoSub, style: TextStyle(fontSize: 11)),
+      title: Text(S.lucentMonocromatico, style: TextStyle(fontSize: 13)),
+      subtitle: Text(S.lucentMonocromaticoSub, style: TextStyle(fontSize: 11)),
       value: l.monochrome,
       onChanged: (v) => set(() => l.monochrome = v),
     ),
     SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: const Text(S.lucentOmbraLauncher, style: TextStyle(fontSize: 13)),
-      value: l.launcherShadow && !l.nothingEncode,
-      onChanged: l.nothingEncode ? null : (v) => set(() => l.launcherShadow = v),
+      title: Text(S.lucentOmbraLauncher, style: TextStyle(fontSize: 13)),
+      value: l.launcherShadow && !l.launcherEncode,
+      onChanged: l.launcherEncode ? null : (v) => set(() => l.launcherShadow = v),
     ),
     SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: const Text(S.lucentCodificaNothing, style: TextStyle(fontSize: 13)),
-      subtitle: const Text(S.lucentCodificaNothingSub, style: TextStyle(fontSize: 11)),
-      value: l.nothingEncode,
-      onChanged: (v) => set(() => l.nothingEncode = v),
+      title: Text(S.lucentCodificaLauncher, style: TextStyle(fontSize: 13)),
+      subtitle: Text(S.lucentCodificaLauncherSub, style: TextStyle(fontSize: 11)),
+      value: l.launcherEncode,
+      onChanged: (v) => set(() => l.launcherEncode = v),
     ),
   ];
 }

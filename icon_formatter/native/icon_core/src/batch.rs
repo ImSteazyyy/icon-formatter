@@ -234,7 +234,7 @@ pub fn set_global_threads(n: usize) -> bool {
 /// On Android the workers are spawned from a thread of the app's top-app
 /// group and inherit its nice -10, above Flutter's raster thread (-5): during
 /// a batch they won the CPU over drawing and scrolling stuttered (p90 190 ms
-/// on the Phone (2a) Plus). At nice 10 they still use every idle cycle but
+/// on the test phone). At nice 10 they still use every idle cycle but
 /// yield to the UI.
 fn worker_pool(n: usize) -> rayon::ThreadPoolBuilder {
     rayon::ThreadPoolBuilder::new()

@@ -243,7 +243,7 @@ fn flood(
             }
             let dm = nearest(lab, alpha, j, models);
             // drift follows shading (lightness) of a background, never into
-            // another hue: a light colour next to white (Google's yellow)
+            // another hue: a light colour next to white (a yellow segment of a multicolour logo)
             // is reached through the soft edge in small steps otherwise
             let same_hue = || {
                 models.iter().any(|m| {
@@ -303,7 +303,7 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
 
     // already cut out (transparent surroundings): there is no background to
     // remove, also with "always remove background" — removing colours similar
-    // to a guessed background would erase white/coloured glyphs (Camera, Chrome)
+    // to a guessed background would erase white/coloured glyphs (camera, multicolour logos)
     if transparent_border > 0.6 {
         if opt.mode == SegmentMode::RemoveBackground {
             notes.push("sfondo già trasparente: rimozione saltata".into());
@@ -356,7 +356,7 @@ pub fn isolate(img: &RgbaImage, opt: &SegmentOptions) -> SegmentResult {
         let model = median_model(&lab, &alpha, &ring);
         // a plate is one flat colour: judged with a strict tolerance, not the
         // (possibly high) background sensitivity, or a multicolour logo ring
-        // (Chrome) passes as "uniform" and the whole logo is erased
+        // (a multicolour ring) passes as "uniform" and the whole logo is erased
         let ptol = tol.min(0.10);
         let uniform = ring.iter().filter(|&&i| dist(&lab, &alpha, i, &model) <= ptol).count() as f32
             / ring.len() as f32;

@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -808499180;
+  int get rustContentHash => -1802838885;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -179,6 +179,8 @@ abstract class RustLibApi extends BaseApi {
   });
 
   String crateApiEngineSanitizeDrawableName({required String name});
+
+  Future<void> crateApiEngineSetMatchCacheFile({required String path});
 
   bool crateApiEngineSetWorkerThreads({required int n});
 
@@ -1027,13 +1029,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiEngineSetMatchCacheFile({required String path}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEngineSetMatchCacheFileConstMeta,
+        argValues: [path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEngineSetMatchCacheFileConstMeta =>
+      const TaskConstMeta(
+        debugName: "set_match_cache_file",
+        argNames: ["path"],
+      );
+
+  @override
   bool crateApiEngineSetWorkerThreads({required int n}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_32(n, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,
@@ -1063,7 +1096,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1097,7 +1130,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1131,7 +1164,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1165,7 +1198,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1595,7 +1628,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       glyphScale: dco_decode_f_32(arr[5]),
       rim: dco_decode_f_32(arr[6]),
       launcherShadow: dco_decode_bool(arr[7]),
-      nothingEncode: dco_decode_bool(arr[8]),
+      launcherEncode: dco_decode_bool(arr[8]),
       strategy: dco_decode_lucent_strategy(arr[9]),
     );
   }
@@ -2356,7 +2389,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_glyphScale = sse_decode_f_32(deserializer);
     var var_rim = sse_decode_f_32(deserializer);
     var var_launcherShadow = sse_decode_bool(deserializer);
-    var var_nothingEncode = sse_decode_bool(deserializer);
+    var var_launcherEncode = sse_decode_bool(deserializer);
     var var_strategy = sse_decode_lucent_strategy(deserializer);
     return LucentSettings(
       ink: var_ink,
@@ -2367,7 +2400,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       glyphScale: var_glyphScale,
       rim: var_rim,
       launcherShadow: var_launcherShadow,
-      nothingEncode: var_nothingEncode,
+      launcherEncode: var_launcherEncode,
       strategy: var_strategy,
     );
   }
@@ -3143,7 +3176,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_32(self.glyphScale, serializer);
     sse_encode_f_32(self.rim, serializer);
     sse_encode_bool(self.launcherShadow, serializer);
-    sse_encode_bool(self.nothingEncode, serializer);
+    sse_encode_bool(self.launcherEncode, serializer);
     sse_encode_lucent_strategy(self.strategy, serializer);
   }
 

@@ -5,20 +5,20 @@ import '../app/models.dart';
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
-import '../services/ai_service.dart';
 import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/ai_mask.dart';
 import '../widgets/color_picker.dart';
 import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/theme_reveal.dart';
 import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
 import '../l10n/strings.dart';
 
-const appVersion = '1.5.0';
+const appVersion = '1.0.0';
 
-enum SettingsCat { appearance, glass, processing, bases, ai, pack, export, system }
+enum SettingsCat { appearance, glass, processing, bases, pack, export, system }
 
 extension on SettingsCat {
   String get label => switch (this) {
@@ -26,21 +26,9 @@ extension on SettingsCat {
         SettingsCat.glass => S.vetro,
         SettingsCat.processing => S.processing,
         SettingsCat.bases => S.baseIcons,
-        SettingsCat.ai => S.aiProvider,
         SettingsCat.pack => S.packCleanup,
         SettingsCat.export => S.export,
         SettingsCat.system => S.system,
-      };
-
-  String get description => switch (this) {
-        SettingsCat.appearance => S.catAspettoDesc,
-        SettingsCat.glass => S.catVetroDesc,
-        SettingsCat.processing => S.catElaborazioneDesc,
-        SettingsCat.bases => S.catBaseDesc,
-        SettingsCat.ai => S.catAiDesc,
-        SettingsCat.pack => S.catPackDesc,
-        SettingsCat.export => S.catExportDesc,
-        SettingsCat.system => S.catSistemaDesc,
       };
 
   IconData get icon => switch (this) {
@@ -48,7 +36,6 @@ extension on SettingsCat {
         SettingsCat.glass => Icons.blur_on_rounded,
         SettingsCat.processing => Icons.tune_rounded,
         SettingsCat.bases => Icons.crop_square_rounded,
-        SettingsCat.ai => Icons.auto_awesome_outlined,
         SettingsCat.pack => Icons.cleaning_services_outlined,
         SettingsCat.export => Icons.ios_share_rounded,
         SettingsCat.system => Icons.memory_outlined,
@@ -108,32 +95,28 @@ class _SettingsHome extends StatelessWidget {
       type: MaterialType.transparency,
       child: ListenableBuilder(
         listenable: AppState.I,
-        builder: (context, _) => LayoutBuilder(builder: (context, box) {
-          final cols = box.maxWidth >= 1100 ? 4 : (box.maxWidth >= 720 ? 3 : 2);
-          return CustomScrollView(slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              sliver: SliverList.list(children: [
-                const LargeHeader(S.impostazioni),
-                const _ProfileCard(),
-                const SizedBox(height: 18),
-              ]),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + GlassInsets.of(context)),
-              sliver: SliverGrid.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: cols,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  mainAxisExtent: 150,
-                ),
-                itemCount: SettingsCat.values.length,
-                itemBuilder: (context, i) => _CatTile(cat: SettingsCat.values[i], onTap: () => onOpen(SettingsCat.values[i])),
-              ),
-            ),
-          ]);
-        }),
+        builder: (context, _) {
+          // grouped rows, like a phone's settings: what the app looks like,
+          // how the icons are made, then the system
+          final groups = <(String, List<SettingsCat>)>[
+            (S.interfaccia, [SettingsCat.appearance]),
+            (S.icone, [SettingsCat.processing, SettingsCat.bases, SettingsCat.pack, SettingsCat.export]),
+            (S.system, [SettingsCat.system]),
+          ];
+          return ListView(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 24 + GlassInsets.of(context)),
+            children: [
+              LargeHeader(S.impostazioni),
+              for (final (title, cats) in groups) ...[
+                Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(title)),
+                _CatGroup(cats: cats, onOpen: onOpen),
+                const SizedBox(height: 14),
+              ],
+              Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(S.info)),
+              const _ProfileCard(),
+            ],
+          );
+        },
       ),
     );
   }
@@ -146,7 +129,7 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final st = AppState.I;
-    final base = st.selectedBase;
+    // app icon, name and version: nothing else
     return Glass(
       key: const ValueKey('settings-profile'),
       radius: st.appearance.radius + 8,
@@ -159,55 +142,54 @@ class _ProfileCard extends StatelessWidget {
         const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text(S.iconFormatter, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.text)),
+            Text(S.iconFormatter, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.text)),
             const SizedBox(height: 2),
-            Text(S.versioneBreve(appVersion), style: const TextStyle(fontSize: 12.5, color: Palette.text2)),
-            const SizedBox(height: 6),
-            Row(children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(color: st.appearance.accentColor, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text('${S.baseAttivo}: ${base?.name ?? '—'}',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-              ),
-            ]),
+            Text(S.versioneBreve(appVersion), style: TextStyle(fontSize: 13, color: Palette.text2)),
           ]),
         ),
-        if (base != null) SizedBox(width: 44, height: 44, child: IconImage(path: base.path)),
       ]),
     );
   }
 }
 
-class _CatTile extends StatelessWidget {
-  const _CatTile({required this.cat, required this.onTap});
+/// One group of categories: a single card, one row per category (icon,
+/// name, chevron), thin lines between the rows.
+class _CatGroup extends StatelessWidget {
+  const _CatGroup({required this.cats, required this.onOpen});
 
-  final SettingsCat cat;
-  final VoidCallback onTap;
+  final List<SettingsCat> cats;
+  final ValueChanged<SettingsCat> onOpen;
 
   @override
   Widget build(BuildContext context) {
     final r = AppState.I.appearance.radius + 6;
+    final accent = Theme.of(context).colorScheme.primary;
     return Glass(
       radius: r,
       padding: EdgeInsets.zero,
       child: Material(
         type: MaterialType.transparency,
-        child: InkWell(
-          key: ValueKey('cat-${cat.name}'),
-          borderRadius: BorderRadius.circular(r),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              IconChip(icon: cat.icon, size: 40),
-              const Spacer(),
-              Text(cat.label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
-              const SizedBox(height: 3),
-              Text(cat.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3, color: Palette.text2)),
-            ]),
-          ),
-        ),
+        child: Column(children: [
+          for (var i = 0; i < cats.length; i++) ...[
+            if (i > 0) Divider(height: 1, indent: 60, endIndent: 16, color: Palette.fg.withValues(alpha: 0.07)),
+            InkWell(
+              key: ValueKey('cat-${cats[i].name}'),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(i == 0 ? r : 0), bottom: Radius.circular(i == cats.length - 1 ? r : 0)),
+              onTap: () => onOpen(cats[i]),
+              child: SizedBox(
+                height: 58,
+                child: Row(children: [
+                  const SizedBox(width: 18),
+                  Icon(cats[i].icon, size: 22, color: nothingStyle ? Palette.text : accent),
+                  const SizedBox(width: 18),
+                  Expanded(child: Text(cats[i].label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 16, color: Palette.text))),
+                  Icon(Icons.chevron_right_rounded, color: Palette.text3),
+                  const SizedBox(width: 12),
+                ]),
+              ),
+            ),
+          ],
+        ]),
       ),
     );
   }
@@ -230,7 +212,7 @@ class _CatPage extends StatelessWidget {
             cat.label,
             onBack: () => Navigator.of(context).maybePop(),
             trailing: cat == SettingsCat.glass
-                ? TextButton(onPressed: () => AppState.I.update(AppState.I.glass.reset), child: const Text(S.ripristina))
+                ? TextButton(onPressed: () => AppState.I.update(AppState.I.glass.reset), child: Text(S.ripristina))
                 : null,
           ),
         ),
@@ -256,7 +238,6 @@ class _Page extends StatelessWidget {
         SettingsCat.glass => SettingsList(header: const GlassPreview(), children: glassControls(context)),
         SettingsCat.processing => _ProcessingPage(),
         SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
-        SettingsCat.ai => _AiPage(),
         SettingsCat.pack => _PackPage(),
         SettingsCat.export => _ExportPage(),
         SettingsCat.system => _SystemPage(),
@@ -274,23 +255,36 @@ class _AppearancePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final a = st.appearance;
-    return SettingsList(children: [
-      const SectionTitle(S.accento),
-      const _AccentPicker(),
-      const SectionTitle(S.interfaccia),
+    final glass = a.style == UiStyle.glass;
+    // Glass style: the live preview stays at the top while the glass
+    // settings scroll under it
+    return SettingsList(header: glass ? const GlassPreview() : null, children: [
+      SectionTitle(S.stileApp),
+      ChoiceRows<UiStyle>(
+        options: [(UiStyle.nothing, S.stileNothing), (UiStyle.glass, S.stileVetro)],
+        value: a.style,
+        onChanged: (v) => ThemeReveal.run(() => st.update(() => a.style = v)),
+      ),
+      // light or dark, in both styles; the new look spreads from the switch
+      SettingSwitch(icon: Icons.light_mode_outlined, title: S.modalitaChiara, value: a.light, onChanged: (v) => ThemeReveal.run(() => st.update(() => a.light = v))),
+      Text(a.style == UiStyle.nothing ? S.stileNothingSub : S.stileVetroSub, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
+      if (a.style == UiStyle.glass) ...[
+        SectionTitle(S.accento),
+        const _AccentPicker(),
+      ],
+      SectionTitle(S.lingua),
+      ChoiceRows<String>(
+        options: [('', S.linguaSistema), for (final e in appLanguages.entries) (e.key, e.value)],
+        value: a.language,
+        onChanged: (v) => st.update(() => a.language = v),
+      ),
+      SectionTitle(S.interfaccia),
       SettingSwitch(icon: Icons.animation_rounded, title: S.animazioni, value: a.animations, onChanged: (v) => st.update(() => a.animations = v)),
-      SettingSwitch(icon: Icons.density_medium_rounded, title: S.densitaCompatta, value: a.compact, onChanged: (v) => st.update(() => a.compact = v)),
-      SettingsCard(children: [
-        Row(children: [
-          const IconChip(icon: Icons.blur_on_rounded),
-          const SizedBox(width: 12),
-          const Expanded(child: Text(S.catVetroDesc, style: TextStyle(fontSize: 13, color: Palette.text2))),
-          TextButton(
-            onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const _CatPage(cat: SettingsCat.glass))),
-            child: const Text(S.apri),
-          ),
-        ]),
-      ]),
+      // only with the Glass style: its material, colour, edges and where it is used
+      if (glass) ...[
+        ...glassControls(context),
+        Center(child: TextButton(onPressed: () => st.update(st.glass.reset), child: Text(S.ripristina))),
+      ],
     ]);
   }
 }
@@ -303,20 +297,20 @@ class _ProcessingPage extends StatelessWidget {
     final st = AppState.I;
     final s = st.segment;
     return SettingsList(children: [
-      const SectionTitle(S.dimensioni),
-      Text(S.originalCompositionUsaDimensioneDel, style: const TextStyle(fontSize: 12, color: Palette.text2)),
+      SectionTitle(S.dimensioni),
+      Text(S.originalCompositionUsaDimensioneDel, style: TextStyle(fontSize: 12, color: Palette.text2)),
       Wrap(spacing: 8, children: [
         for (final v in [192, 256, 432, 512, 1024])
           ChoiceChip(label: Text('$v px'), selected: st.translucentSize == v, onSelected: (_) => st.update(() => st.translucentSize = v)),
       ]),
       const SizedBox(height: 14),
-      const SectionTitle(S.scalaPosizionePredefinite),
+      SectionTitle(S.scalaPosizionePredefinite),
       SliderRow(label: S.scala, value: st.scaleMul, min: 0.5, max: 1.6, format: (v) => '${(v * 100).round()}%', onChanged: (v) => st.update(() => st.scaleMul = v)),
       SliderRow(label: S.posizioneX, value: st.offsetX, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetX = v)),
       SliderRow(label: S.posizioneY, value: st.offsetY, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetY = v)),
-      const Text(S.marginiDerivanoDallaCalibrazioneDel, style: TextStyle(fontSize: 11, color: Palette.text3)),
+      Text(S.marginiDerivanoDallaCalibrazioneDel, style: TextStyle(fontSize: 11, color: Palette.text3)),
       const SizedBox(height: 14),
-      const SectionTitle(S.rimozioneSfondoIsolamento),
+      SectionTitle(S.rimozioneSfondoIsolamento),
       const _BgProviderBox(),
       const SizedBox(height: 10),
       DropdownButtonFormField<SegMode>(
@@ -326,16 +320,16 @@ class _ProcessingPage extends StatelessWidget {
         onChanged: (v) => st.update(() => st.segment = copySegment(s, mode: v)),
       ),
       SliderRow(label: S.sensibilita, value: s.tolerance, min: 0.03, max: 0.3, format: (v) => v.toStringAsFixed(2), onChanged: (v) => st.update(() => st.segment = copySegment(s, tolerance: v))),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.rimuoviSfondoRacchiusoBuchi), value: s.removeHoles, onChanged: (v) => st.update(() => st.segment = copySegment(s, removeHoles: v))),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.rimuoviSfondoRacchiusoBuchi), value: s.removeHoles, onChanged: (v) => st.update(() => st.segment = copySegment(s, removeHoles: v))),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text(S.qualitaRifinituraBordiAntiAlias),
-        subtitle: const Text(S.separaPixelBordoDalloSfondo),
+        title: Text(S.qualitaRifinituraBordiAntiAlias),
+        subtitle: Text(S.separaPixelBordoDalloSfondo),
         value: s.refineEdges,
         onChanged: (v) => st.update(() => st.segment = copySegment(s, refineEdges: v)),
       ),
       const SizedBox(height: 14),
-      const SectionTitle(S.batch),
+      SectionTitle(S.batch),
       SettingSwitch(
         icon: Icons.dashboard_customize_outlined,
         title: S.autoMandaAlPack,
@@ -353,7 +347,7 @@ class _ProcessingPage extends StatelessWidget {
         onChanged: (v) => st.update(() => st.threads = v.round()),
       ),
       const SizedBox(height: 14),
-      const SectionTitle(S.presetStile),
+      SectionTitle(S.presetStile),
       for (final pr in st.presets)
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -363,7 +357,7 @@ class _ProcessingPage extends StatelessWidget {
             IconButton(
               tooltip: S.modifica,
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () => showModalBottomSheet(
+              onPressed: () => showAppSheet(
                 context: context,
                 isScrollControlled: true,
                 builder: (ctx) => SizedBox(
@@ -389,171 +383,6 @@ class _ProcessingPage extends StatelessWidget {
   }
 }
 
-class _AiPage extends StatefulWidget {
-  const _AiPage();
-
-  @override
-  State<_AiPage> createState() => _AiPageState();
-}
-
-class _AiPageState extends State<_AiPage> {
-  final key = TextEditingController();
-  bool hasKey = false;
-  bool obscure = true;
-  String? status;
-  bool testing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final k = await AiService.readKey(AppState.I.ai.provider);
-    setState(() {
-      hasKey = k != null && k.isNotEmpty;
-      key.text = '';
-      status = null;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final st = AppState.I;
-    final ai = st.ai;
-    final info = aiProviders[ai.provider]!;
-    return SettingsList(children: [
-      // the online AI needs an API key; the local AI does not
-      Text(S.aiOnlineSpiega, style: const TextStyle(fontSize: 12.5, color: Palette.text2)),
-      const SizedBox(height: 6),
-      const SectionTitle(S.aiModelliLocali),
-      const Text(S.aiLocaleSpiega, style: TextStyle(fontSize: 12, color: Palette.text2)),
-      ListenableBuilder(
-        listenable: st,
-        builder: (context, _) => SettingSwitch(
-          title: S.aiUsaLocale,
-          subtitle: st.modelReady(st.localAi.model) ? S.aiUsaLocaleSub : S.aiModelloMancante,
-          value: st.bgProvider == BgProvider.localAi,
-          onChanged: st.modelReady(st.localAi.model) || st.bgProvider == BgProvider.localAi
-              ? (v) => st.update(() => st.bgProvider = v ? BgProvider.localAi : BgProvider.local)
-              : null,
-        ),
-      ),
-      const LocalAiBox(),
-      const SizedBox(height: 10),
-      const SectionTitle(S.aiOnlineTitolo),
-      const SectionTitle(S.provider),
-      DropdownButtonFormField<AiProviderKind>(
-        key: ValueKey(ai.provider),
-        initialValue: ai.provider,
-        items: [for (final e in aiProviders.entries) DropdownMenuItem(value: e.key, child: Text(e.value.name))],
-        onChanged: (v) {
-          st.update(() {
-            ai.provider = v!;
-            ai.model = aiProviders[v]!.defaultModel;
-            ai.baseUrl = aiProviders[v]!.defaultBaseUrl;
-          });
-          _load();
-        },
-      ),
-      const SizedBox(height: 10),
-      TextFormField(
-        key: ValueKey('model${ai.provider}'),
-        initialValue: ai.model,
-        decoration: const InputDecoration(labelText: S.modello2),
-        onChanged: (v) => st.update(() => ai.model = v.trim()),
-      ),
-      const SizedBox(height: 10),
-      if (ai.provider == AiProviderKind.openaiCompatible)
-        TextFormField(
-          initialValue: ai.baseUrl,
-          decoration: const InputDecoration(labelText: S.baseUrlEsHttpsApi),
-          onChanged: (v) => st.update(() => ai.baseUrl = v.trim()),
-        ),
-      if (ai.provider != AiProviderKind.gemini) ...[
-        const SizedBox(height: 10),
-        DropdownButtonFormField<String>(
-          initialValue: ai.quality,
-          decoration: const InputDecoration(labelText: S.qualitaGptImage),
-          items: const [
-            DropdownMenuItem(value: 'low', child: Text('low')),
-            DropdownMenuItem(value: 'medium', child: Text('medium')),
-            DropdownMenuItem(value: 'high', child: Text('high')),
-          ],
-          onChanged: (v) => st.update(() => ai.quality = v!),
-        ),
-      ],
-      const SizedBox(height: 18),
-      const SectionTitle(S.apiKey),
-      Text(hasKey ? S.chiaveESalvataNellArchivio : S.nessunaChiaveSalvata, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-      const SizedBox(height: 8),
-      TextField(
-        controller: key,
-        obscureText: obscure,
-        decoration: InputDecoration(
-          hintText: hasKey ? S.inserisciSostituire : S.incollaApiKey,
-          suffixIcon: IconButton(icon: Icon(obscure ? Icons.visibility : Icons.visibility_off), onPressed: () => setState(() => obscure = !obscure)),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        FilledButton(
-          onPressed: () async {
-            await AiService.writeKey(ai.provider, key.text.trim());
-            await _load();
-            st.update();
-            if (context.mounted) showMsg(context, S.apiKeySalvata);
-          },
-          child: const Text(S.salvaChiave),
-        ),
-        if (hasKey)
-          OutlinedButton(
-            onPressed: () async {
-              await AiService.writeKey(ai.provider, null);
-              await _load();
-              st.update();
-            },
-            child: const Text(S.rimuovi),
-          ),
-        OutlinedButton.icon(
-          onPressed: testing
-              ? null
-              : () async {
-                  setState(() {
-                    testing = true;
-                    status = null;
-                  });
-                  try {
-                    final s = await AiService.testConnection();
-                    setState(() => status = s);
-                  } catch (e) {
-                    setState(() => status = S.errore(e));
-                  } finally {
-                    setState(() => testing = false);
-                  }
-                },
-          icon: testing ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wifi_tethering),
-          label: const Text(S.testConnessione),
-        ),
-      ]),
-      if (status != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(status!, style: TextStyle(color: status!.startsWith('Errore') ? Palette.danger : Palette.ok))),
-      const SizedBox(height: 18),
-      const SectionTitle(S.costiLimiti),
-      Text(info.costNote, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-      if (info.pricingUrl.isNotEmpty)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => launchUrl(Uri.parse(info.pricingUrl), mode: LaunchMode.externalApplication),
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text(S.listinoUfficiale),
-          ),
-        ),
-    ]);
-  }
-}
-
 class _PackPage extends StatelessWidget {
   const _PackPage();
 
@@ -562,7 +391,7 @@ class _PackPage extends StatelessWidget {
     final st = AppState.I;
     final s = st.packSegment;
     return SettingsList(children: [
-      const SectionTitle(S.segmentazionePackCleanup),
+      SectionTitle(S.segmentazionePackCleanup),
       DropdownButtonFormField<SegMode>(
         key: ValueKey(s.mode),
         initialValue: s.mode,
@@ -570,16 +399,16 @@ class _PackPage extends StatelessWidget {
         onChanged: (v) => st.update(() => st.packSegment = copySegment(s, mode: v)),
       ),
       SliderRow(label: S.sensibilita, value: s.tolerance, min: 0.03, max: 0.3, format: (v) => v.toStringAsFixed(2), onChanged: (v) => st.update(() => st.packSegment = copySegment(s, tolerance: v))),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.rimuoviSfondoRacchiuso), value: s.removeHoles, onChanged: (v) => st.update(() => st.packSegment = copySegment(s, removeHoles: v))),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.rifinisciBordi), value: s.refineEdges, onChanged: (v) => st.update(() => st.packSegment = copySegment(s, refineEdges: v))),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.rimuoviSfondoRacchiuso), value: s.removeHoles, onChanged: (v) => st.update(() => st.packSegment = copySegment(s, removeHoles: v))),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.rifinisciBordi), value: s.refineEdges, onChanged: (v) => st.update(() => st.packSegment = copySegment(s, refineEdges: v))),
       const SizedBox(height: 14),
-      const SectionTitle(S.stileDestinazione),
+      SectionTitle(S.stileDestinazione),
       DropdownButtonFormField<StudioMode>(
         key: ValueKey(st.packMode),
         initialValue: st.packMode,
-        items: const [
+        items: [
           DropdownMenuItem(value: StudioMode.original, child: Text(S.originalCompositionBaseSelezionato)),
-          DropdownMenuItem(value: StudioMode.translucent, child: Text(S.nothingTranslucent)),
+          DropdownMenuItem(value: StudioMode.translucent, child: Text(S.traslucido)),
           DropdownMenuItem(value: StudioMode.preset, child: Text(S.preset)),
         ],
         onChanged: (v) => st.update(() => st.packMode = v!),
@@ -588,12 +417,12 @@ class _PackPage extends StatelessWidget {
       DropdownButtonFormField<String>(
         key: ValueKey('pp${st.packPresetId}${st.presets.length}'),
         initialValue: st.packPresetId,
-        decoration: const InputDecoration(labelText: S.presetModalitaPreset),
+        decoration: InputDecoration(labelText: S.presetModalitaPreset),
         items: [for (final p in st.presets) DropdownMenuItem(value: p.id, child: Text(p.name))],
         onChanged: (v) => st.update(() => st.packPresetId = v!),
       ),
       const SizedBox(height: 10),
-      const Text(
+      Text(
         S.risultatiAmbiguiGlyphSimileAllo,
         style: TextStyle(fontSize: 12, color: Palette.text2),
       ),
@@ -609,22 +438,22 @@ class _ExportPage extends StatelessWidget {
     final st = AppState.I;
     final ex = st.export;
     return SettingsList(children: [
-      const SectionTitle(S.formato),
-      const Text(S.pngRgbaTrasparenzaReale8, style: TextStyle(fontSize: 12, color: Palette.text2)),
+      SectionTitle(S.formato),
+      Text(S.pngRgbaTrasparenzaReale8, style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
-      const SectionTitle(S.risoluzione),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.risoluzionePersonalizzata), value: ex.customSize, onChanged: (v) => st.update(() => ex.customSize = v)),
+      SectionTitle(S.risoluzione),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.risoluzionePersonalizzata), value: ex.customSize, onChanged: (v) => st.update(() => ex.customSize = v)),
       if (ex.customSize)
         Wrap(spacing: 8, children: [
           for (final v in [128, 192, 256, 432, 512, 1024])
             ChoiceChip(label: Text('$v px'), selected: ex.size == v, onSelected: (_) => st.update(() => ex.size = v)),
         ]),
       const SizedBox(height: 14),
-      const SectionTitle(S.nomiFile),
+      SectionTitle(S.nomiFile),
       DropdownButtonFormField<ExportNaming>(
         key: ValueKey(ex.naming),
         initialValue: ex.naming,
-        items: const [
+        items: [
           DropdownMenuItem(value: ExportNaming.original, child: Text(S.nomeOriginale)),
           DropdownMenuItem(value: ExportNaming.withSize, child: Text(S.nomeDimensione)),
           DropdownMenuItem(value: ExportNaming.prefixed, child: Text(S.prefissoNome)),
@@ -634,18 +463,18 @@ class _ExportPage extends StatelessWidget {
       if (ex.naming == ExportNaming.prefixed)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: TextFormField(initialValue: ex.prefix, decoration: const InputDecoration(labelText: S.prefisso), onChanged: (v) => st.update(() => ex.prefix = v)),
+          child: TextFormField(initialValue: ex.prefix, decoration: InputDecoration(labelText: S.prefisso), onChanged: (v) => st.update(() => ex.prefix = v)),
         ),
       Padding(
         padding: const EdgeInsets.only(top: 6),
-        child: Text(S.esempio(ex.fileName('whatsapp', ex.size)), style: const TextStyle(fontSize: 12, color: Palette.text3)),
+        child: Text(S.esempio(ex.fileName('calendar', ex.size)), style: TextStyle(fontSize: 12, color: Palette.text3)),
       ),
       const SizedBox(height: 14),
-      const SectionTitle(S.destinazione),
-      Text(ex.destination ?? S.sceltaOgniEsportazione, style: const TextStyle(fontSize: 12, color: Palette.text2)),
-      const Text(S.windowsDialogNativoAndroidStorage,
+      SectionTitle(S.destinazione),
+      Text(ex.destination ?? S.sceltaOgniEsportazione, style: TextStyle(fontSize: 12, color: Palette.text2)),
+      Text(S.windowsDialogNativoAndroidStorage,
           style: TextStyle(fontSize: 11, color: Palette.text3)),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text(S.preferisciZip), value: ex.zip, onChanged: (v) => st.update(() => ex.zip = v)),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.preferisciZip), value: ex.zip, onChanged: (v) => st.update(() => ex.zip = v)),
     ]);
   }
 }
@@ -681,22 +510,22 @@ class _SystemPageState extends State<_SystemPage> {
   @override
   Widget build(BuildContext context) {
     return SettingsList(children: [
-      const SectionTitle(S.cache),
+      SectionTitle(S.cache),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text(S.fileTemporaneiImportZipEstratti),
+        title: Text(S.fileTemporaneiImportZipEstratti),
         subtitle: Text(cache == null ? '…' : formatBytes(cache!)),
         trailing: OutlinedButton(
           onPressed: () async {
             await AppPaths.I.clearCache();
             _refresh();
           },
-          child: const Text(S.svuota),
+          child: Text(S.svuota),
         ),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text(S.risultatiDelleSessioni),
+        title: Text(S.risultatiDelleSessioni),
         subtitle: Text(outputs == null ? '…' : formatBytes(outputs!)),
         trailing: OutlinedButton(
           onPressed: () async {
@@ -705,27 +534,27 @@ class _SystemPageState extends State<_SystemPage> {
               _refresh();
             }
           },
-          child: const Text(S.svuota),
+          child: Text(S.svuota),
         ),
       ),
       const SizedBox(height: 14),
-      const SectionTitle(S.performance),
+      SectionTitle(S.performance),
       Text(S.coreRustElaborazioneParallelaRayon(AppState.I.threads == 0 ? 'automatici' : AppState.I.threads),
-          style: const TextStyle(fontSize: 12, color: Palette.text2)),
+          style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
-      const SectionTitle(S.ripristino),
+      SectionTitle(S.ripristino),
       OutlinedButton(
         onPressed: () async {
           if (await confirm(context, S.ripristinareImpostazioni, S.presetAspettoEdExportTornano, ok: S.ripristina)) {
             await AppState.I.resetAll();
           }
         },
-        child: const Text(S.ripristinaImpostazioniPredefinite),
+        child: Text(S.ripristinaImpostazioniPredefinite),
       ),
       const SizedBox(height: 14),
-      const SectionTitle(S.versione),
-      Text(S.iconFormatterCore(appVersion, coreVersion()), style: const TextStyle(fontSize: 12, color: Palette.text2)),
-      Text(S.datiApp(AppPaths.I.root.path), style: const TextStyle(fontSize: 11, color: Palette.text3)),
+      SectionTitle(S.versione),
+      Text(S.iconFormatterCore(appVersion, coreVersion()), style: TextStyle(fontSize: 12, color: Palette.text2)),
+      Text(S.datiApp(AppPaths.I.root.path), style: TextStyle(fontSize: 11, color: Palette.text3)),
     ]);
   }
 }
@@ -760,11 +589,11 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
   Widget build(BuildContext context) {
     final st = AppState.I;
     return ListenableBuilder(listenable: st, builder: (context, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text(S.providerRimozioneSfondo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.text)),
+      Text(S.providerRimozioneSfondo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Palette.text)),
       const SizedBox(height: 4),
       // every option visible with what it means (no hidden dropdown)
       ChoiceRows<BgProvider>(
-        options: const [
+        options: [
           (BgProvider.local, S.scontornoClassico),
           (BgProvider.localAi, S.scontornoAiLocale),
           (BgProvider.removeBg, S.scontornoRemoveBg),
@@ -775,7 +604,7 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
       if (st.bgProvider == BgProvider.localAi) const LocalAiBox(),
       if (st.bgProvider == BgProvider.removeBg) ...[
         const SizedBox(height: 8),
-        const Text(
+        Text(
           S.ogniImmagineVieneInviataRemove,
           style: TextStyle(fontSize: 11, color: Palette.text3),
         ),
@@ -794,7 +623,7 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
               await _load();
               if (context.mounted) showMsg(context, S.apiKeyRemoveBgSalvata);
             },
-            child: const Text(S.salvaChiave),
+            child: Text(S.salvaChiave),
           ),
           if (hasKey)
             OutlinedButton(
@@ -802,7 +631,7 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
                 await BgRemovalService.writeKey(null);
                 await _load();
               },
-              child: const Text(S.rimuovi),
+              child: Text(S.rimuovi),
             ),
           OutlinedButton(
             onPressed: testing
@@ -821,20 +650,20 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
                       setState(() => testing = false);
                     }
                   },
-            child: const Text(S.testCrediti),
+            child: Text(S.testCrediti),
           ),
           TextButton(
             onPressed: () => launchUrl(Uri.parse(BgRemovalService.pricingUrl), mode: LaunchMode.externalApplication),
-            child: const Text(S.listino),
+            child: Text(S.listino),
           ),
         ]),
         if (status != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text(status!, style: TextStyle(fontSize: 12, color: status!.startsWith('Errore') ? Palette.danger : Palette.ok)),
+            child: Text(status!, style: TextStyle(fontSize: 12, color: status!.startsWith(S.errore4) ? Palette.danger : Palette.ok)),
           ),
         const SizedBox(height: 4),
-        const Text(BgRemovalService.costNote, style: TextStyle(fontSize: 11, color: Palette.text3)),
+        Text(BgRemovalService.costNote, style: TextStyle(fontSize: 11, color: Palette.text3)),
       ],
     ]));
   }
@@ -866,7 +695,7 @@ class _AccentPickerState extends State<_AccentPicker> {
             decoration: BoxDecoration(
               color: Color(c),
               shape: BoxShape.circle,
-              border: Border.all(color: a.accent == c ? Colors.white : Colors.transparent, width: 2.5),
+              border: Border.all(color: a.accent == c ? Palette.fg : Colors.transparent, width: 2.5),
             ),
           ),
         ),
@@ -879,8 +708,15 @@ class _AccentPickerState extends State<_AccentPicker> {
   }
 }
 
-class GlassPreview extends StatelessWidget {
+class GlassPreview extends StatefulWidget {
   const GlassPreview({super.key});
+
+  @override
+  State<GlassPreview> createState() => _GlassPreviewState();
+}
+
+class _GlassPreviewState extends State<GlassPreview> {
+  int index = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -889,7 +725,7 @@ class GlassPreview extends StatelessWidget {
       key: const ValueKey('glass-preview'),
       borderRadius: BorderRadius.circular(AppState.I.appearance.radius + 10),
       child: SizedBox(
-        height: 146,
+        height: 160,
         child: Stack(children: [
           Positioned.fill(
             child: DecoratedBox(
@@ -949,35 +785,17 @@ class GlassPreview extends StatelessWidget {
               ]),
             ),
           ),
+          // the real bottom bar, so the preview behaves like it
           Positioned(
-            left: 12,
-            right: 12,
-            bottom: 10,
-            height: 62,
-            child: LiquidGlass(
-              radius: 31,
-              role: GlassRole.nav,
-              live: true,
-              child: Row(children: [
-                const SizedBox(width: 5),
-                SizedBox(
-                  width: 74,
-                  height: 52,
-                  child: LiquidGlass(
-                    radius: 26,
-                    dark: true,
-                    chromatic: 1,
-                    role: GlassRole.lens,
-                    live: true,
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Icon(Icons.auto_awesome_mosaic_outlined, color: Colors.white, size: 20),
-                      Text(S.studio, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white, shadows: glassTextShadows())),
-                    ]),
-                  ),
-                ),
-                for (final i in const [Icons.auto_awesome_outlined, Icons.dashboard_customize_outlined, Icons.apps_rounded, Icons.settings_outlined])
-                  Expanded(child: Icon(i, color: Colors.white70, size: 20, shadows: glassTextShadows())),
-              ]),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 88,
+            child: appGlassTabBar(
+              icons: const [Icons.auto_awesome_mosaic_outlined, Icons.dashboard_customize_outlined, Icons.apps_rounded, Icons.settings_outlined],
+              labels: [S.studio, S.pbTitolo, S.app, S.impostazioni],
+              index: index,
+              onSelect: (i) => setState(() => index = i),
             ),
           ),
         ]),
@@ -986,7 +804,7 @@ class GlassPreview extends StatelessWidget {
   }
 }
 
-/// Liquid Glass controls (Impostazioni › Vetro). Every value is read by
+/// Glass controls (Impostazioni › Vetro). Every value is read by
 /// [appGlassSettings], [LiquidGlass], the bottom bar, dialogs and the theme.
 List<Widget> glassControls(BuildContext context) {
   final st = AppState.I;
@@ -994,9 +812,9 @@ List<Widget> glassControls(BuildContext context) {
   final a = st.appearance;
   void set(VoidCallback f) => st.update(f);
   return [
-    const SectionTitle(S.materiale),
+    SectionTitle(S.materiale),
     ChoiceRows<GlassQualityLevel>(
-      options: const [
+      options: [
         (GlassQualityLevel.fast, S.vetroVeloce),
         (GlassQualityLevel.balanced, S.vetroBilanciato),
         (GlassQualityLevel.quality, S.qualita),
@@ -1004,33 +822,54 @@ List<Widget> glassControls(BuildContext context) {
       value: g.quality,
       onChanged: (v) => set(() => g.quality = v),
     ),
-    SliderRow(icon: Icons.blur_on_rounded, label: S.blur, value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
-    SliderRow(icon: Icons.ac_unit_rounded, label: S.frost, value: g.frost, onChanged: (v) => set(() => g.frost = v)),
-    SliderRow(icon: Icons.invert_colors_rounded, label: S.saturazione, value: g.saturation, min: 0.5, max: 2.5, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.saturation = v)),
-    const SectionTitle(S.colore),
-    _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
-    SliderRow(icon: Icons.water_drop_outlined, label: S.tintaVetro, value: g.tint, max: 0.5, onChanged: (v) => set(() => g.tint = v)),
-    const SectionTitle(S.bordoProfondita),
-    SliderRow(icon: Icons.layers_outlined, label: S.spessore, value: g.thickness, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.thickness = v)),
-    SliderRow(icon: Icons.rounded_corner_rounded, label: S.curvatura, value: a.radius, min: 4, max: 32, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => a.radius = v)),
-    SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
-    SliderRow(icon: Icons.gradient_rounded, label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
-    SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, subtitle: S.profonditaSub, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
-    if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) const Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
-    if (g.quality != GlassQualityLevel.quality) const Text(S.vetroNotaQualita, style: TextStyle(fontSize: 11.5, color: Palette.text3)),
-    const SectionTitle(S.luce),
-    SliderRow(icon: Icons.light_mode_outlined, label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),
-    SliderRow(icon: Icons.explore_outlined, label: S.angoloLuce, value: g.lightAngle, min: 0, max: 360, format: (v) => '${v.round()}°', onChanged: (v) => set(() => g.lightAngle = v)),
-    SliderRow(icon: Icons.highlight_rounded, label: S.rimLight, value: g.rimLight, onChanged: (v) => set(() => g.rimLight = v)),
-    SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.bordoLucido, subtitle: S.riflessoSpeculareSulBordoPiu, value: g.gloss, onChanged: (v) => set(() => g.gloss = v)),
-    if (g.gloss) SliderRow(icon: Icons.flare_rounded, label: S.lucentezza, value: g.glossIntensity, onChanged: (v) => set(() => g.glossIntensity = v)),
-    const SectionTitle(S.leggibilita),
-    SliderRow(icon: Icons.text_fields_rounded, label: S.ombraTesto, value: g.textShadow, onChanged: (v) => set(() => g.textShadow = v)),
-    SliderRow(icon: Icons.blur_linear_rounded, label: S.sfocaturaOmbra, value: g.textShadowBlur, min: 0, max: 16, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.textShadowBlur = v)),
-    SliderRow(icon: Icons.contrast_rounded, label: S.scurezzaLente, value: g.lensDarkness, max: 0.8, onChanged: (v) => set(() => g.lensDarkness = v)),
-    const SectionTitle(S.doveUsarlo),
+    if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
+    SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.vetroNativo, subtitle: S.vetroNativoSub, value: g.native, onChanged: (v) => set(() => g.native = v)),
+    if (nativeGlass) ...[
+      SettingSwitch(icon: Icons.ac_unit_rounded, title: S.smerigliatura, value: g.nFrostOn, onChanged: (v) => set(() => g.nFrostOn = v)),
+      SliderRow(icon: Icons.water_drop_outlined, label: S.colore, value: g.nColour, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nColour = v)),
+      SliderRow(icon: Icons.camera_rounded, label: S.smerigliatura, value: g.nFrost, min: 0, max: 12, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nFrost = v)),
+      SectionTitle(S.colore),
+      _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
+      SliderRow(icon: Icons.layers_outlined, label: S.pellicola, value: g.nFilm, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nFilm = v)),
+      SliderRow(icon: Icons.tab_rounded, label: S.schedaAttiva, value: g.nActiveTab, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nActiveTab = v)),
+      SectionTitle(S.bordi),
+      SliderRow(icon: Icons.highlight_rounded, label: S.luceBordo, value: g.nEdgeLight, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nEdgeLight = v)),
+      SliderRow(icon: Icons.line_weight_rounded, label: S.spessoreBordo, value: g.nEdgeDepth, min: 0, max: 40, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nEdgeDepth = v)),
+      SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.nBend, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nBend = v)),
+      SettingSwitch(icon: Icons.gradient_rounded, title: S.separazioneColori, value: g.nSplit, onChanged: (v) => set(() => g.nSplit = v)),
+      // native: Depth deepens the edge, no drop shadow
+      SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
+    ] else ...[
+      SliderRow(icon: Icons.blur_on_rounded, label: S.blur, value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
+      SliderRow(icon: Icons.ac_unit_rounded, label: S.frost, value: g.frost, onChanged: (v) => set(() => g.frost = v)),
+      SliderRow(icon: Icons.invert_colors_rounded, label: S.saturazione, value: g.saturation, min: 0.5, max: 2.5, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.saturation = v)),
+      SectionTitle(S.colore),
+      _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
+      SliderRow(icon: Icons.water_drop_outlined, label: S.tintaVetro, value: g.tint, max: 0.5, onChanged: (v) => set(() => g.tint = v)),
+      SectionTitle(S.bordoProfondita),
+      SliderRow(icon: Icons.layers_outlined, label: S.spessore, value: g.thickness, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.thickness = v)),
+      SliderRow(icon: Icons.rounded_corner_rounded, label: S.curvatura, value: a.radius, min: 4, max: 32, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => a.radius = v)),
+      SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
+      SliderRow(icon: Icons.gradient_rounded, label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
+      SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, subtitle: S.profonditaSub, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
+      if (g.quality != GlassQualityLevel.quality) Text(S.vetroNotaQualita, style: TextStyle(fontSize: 11.5, color: Palette.text3)),
+      SectionTitle(S.luce),
+      SliderRow(icon: Icons.light_mode_outlined, label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),
+      SliderRow(icon: Icons.explore_outlined, label: S.angoloLuce, value: g.lightAngle, min: 0, max: 360, format: (v) => '${v.round()}°', onChanged: (v) => set(() => g.lightAngle = v)),
+      SliderRow(icon: Icons.highlight_rounded, label: S.rimLight, value: g.rimLight, onChanged: (v) => set(() => g.rimLight = v)),
+      SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.bordoLucido, subtitle: S.riflessoSpeculareSulBordoPiu, value: g.gloss, onChanged: (v) => set(() => g.gloss = v)),
+      if (g.gloss) SliderRow(icon: Icons.flare_rounded, label: S.lucentezza, value: g.glossIntensity, onChanged: (v) => set(() => g.glossIntensity = v)),
+      SectionTitle(S.leggibilita),
+      SliderRow(icon: Icons.text_fields_rounded, label: S.ombraTesto, value: g.textShadow, onChanged: (v) => set(() => g.textShadow = v)),
+      SliderRow(icon: Icons.blur_linear_rounded, label: S.sfocaturaOmbra, value: g.textShadowBlur, min: 0, max: 16, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.textShadowBlur = v)),
+      SliderRow(icon: Icons.contrast_rounded, label: S.scurezzaLente, value: g.lensDarkness, max: 0.8, onChanged: (v) => set(() => g.lensDarkness = v)),
+    ],
+    SectionTitle(S.doveUsarlo),
     SettingSwitch(icon: Icons.view_agenda_outlined, title: S.vetroBarra, value: g.useNav, onChanged: (v) => set(() => g.useNav = v)),
-    SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroPannelli, value: g.usePanels, onChanged: (v) => set(() => g.usePanels = v)),
+    if (nativeGlass)
+      SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroNeiPannelliNativo, value: g.nPanels, onChanged: (v) => set(() => g.nPanels = v))
+    else
+      SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroPannelli, value: g.usePanels, onChanged: (v) => set(() => g.usePanels = v)),
     SettingSwitch(icon: Icons.smart_button_outlined, title: S.vetroPulsanti, value: g.useButtons, onChanged: (v) => set(() => g.useButtons = v)),
     SettingSwitch(icon: Icons.web_asset_rounded, title: S.vetroDialoghi, value: g.useDialogs, onChanged: (v) => set(() => g.useDialogs = v)),
   ];
@@ -1051,7 +890,7 @@ class _TintPicker extends StatelessWidget {
       Row(children: [
         const IconChip(icon: Icons.palette_outlined),
         const SizedBox(width: 12),
-        const Expanded(child: Text(S.tinta, style: TextStyle(fontSize: 15, color: Palette.text))),
+        Expanded(child: Text(S.tinta, style: TextStyle(fontSize: 15, color: Palette.text))),
         TextButton(onPressed: value == 0 ? null : () => onChanged(0), child: Text(value == 0 ? S.nessuna : S.rimuovi)),
       ]),
       const SizedBox(height: 8),
@@ -1071,7 +910,7 @@ class _TintPicker extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Color(c),
                 shape: BoxShape.circle,
-                border: Border.all(color: (value | 0xFF000000) == c ? Colors.white : Colors.transparent, width: 2.5),
+                border: Border.all(color: (value | 0xFF000000) == c ? Palette.fg : Colors.transparent, width: 2.5),
               ),
             ),
           ),

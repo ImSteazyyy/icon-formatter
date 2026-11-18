@@ -141,8 +141,8 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
                 _stat(S.iconeNonMappate, '${pi.unmappedIcons.length}'),
                 _stat(S.altriFilePreservati, '${pi.otherFiles}'),
                 if (pi.missingDrawables.isNotEmpty || pi.notes.isNotEmpty)
-                  TextButton(onPressed: () => _details(pi), child: const Text(S.dettagli)),
-                TextButton.icon(onPressed: _nextAmbiguous, icon: const Icon(Icons.flag_outlined, size: 16), label: const Text(S.prossimaVerificare)),
+                  TextButton(onPressed: () => _details(pi), child: Text(S.dettagli)),
+                TextButton.icon(onPressed: _nextAmbiguous, icon: const Icon(Icons.flag_outlined, size: 16), label: Text(S.prossimaVerificare)),
               ]),
             ),
           );
@@ -159,7 +159,7 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
         ],
         emptyHint: opening
             ? const CircularProgressIndicator()
-            : const Text(
+            : Text(
                 S.apriIconPackCartellaO,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Palette.text2),
@@ -176,19 +176,19 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
           OutlinedButton.icon(
             onPressed: c.items.isEmpty ? null : () => c.process(only: c.items.where((i) => i.hasOverride || i.result?.ok == false)),
             icon: const Icon(Icons.refresh),
-            label: const Text(S.rielaboraCorretteErrori),
+            label: Text(S.rielaboraCorretteErrori),
           ),
-          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: const Text(S.esportaCartella)),
-          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: const Text(S.esportaZip)),
+          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: Text(S.esportaCartella)),
+          OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: Text(S.esportaZip)),
           if (Platform.isAndroid)
-            OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: const Text(S.condividi)),
+            OutlinedButton.icon(onPressed: pi == null ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: Text(S.condividi)),
         ],
       ),
     );
   }
 
   Widget _stat(String k, String v, {bool warn = false}) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Text('$k ', style: const TextStyle(fontSize: 12, color: Palette.text3)),
+        Text('$k ', style: TextStyle(fontSize: 12, color: Palette.text3)),
         Text(v, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: warn ? Palette.warn : Palette.text)),
       ]);
 
@@ -196,25 +196,25 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
     showAppDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(S.dettagliMapping),
+        title: Text(S.dettagliMapping),
         content: SizedBox(
           width: 520,
           height: 420,
           child: ListView(children: [
-            if (pi.notes.isNotEmpty) ...[const SectionTitle(S.note), for (final n in pi.notes) Text('• $n')],
+            if (pi.notes.isNotEmpty) ...[SectionTitle(S.note), for (final n in pi.notes) Text('• $n')],
             if (pi.missingDrawables.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const SectionTitle(S.drawableAppfilterXmlSenzaIcona),
+              SectionTitle(S.drawableAppfilterXmlSenzaIcona),
               for (final d in pi.missingDrawables) Text(d, style: const TextStyle(fontFamily: 'Consolas', fontSize: 12)),
             ],
             if (pi.unmappedIcons.isNotEmpty) ...[
               const SizedBox(height: 10),
-              const SectionTitle(S.iconeNonReferenziate),
-              Text(pi.unmappedIcons.join(', '), style: const TextStyle(fontSize: 12, color: Palette.text2)),
+              SectionTitle(S.iconeNonReferenziate),
+              Text(pi.unmappedIcons.join(', '), style: TextStyle(fontSize: 12, color: Palette.text2)),
             ],
           ]),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text(S.chiudi))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(S.chiudi))],
       ),
     );
   }

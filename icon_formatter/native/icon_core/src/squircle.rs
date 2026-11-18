@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct Shape {
     /// Shape width as a fraction of the canvas (reference pack: 0.93).
     pub size_ratio: f32,
-    /// Superellipse exponent (reference pack fit: 4.25; iOS-like ~5).
+    /// Superellipse exponent (reference pack fit: 4.25; rounder ~5).
     pub exponent: f32,
 }
 

@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../app/state.dart';
+import '../l10n/strings.dart';
+
 /// App installed on the device (Android only).
 class InstalledApp {
   InstalledApp({
@@ -83,7 +86,7 @@ class PlatformService {
   }
 
   /// The icon pack the launcher uses now ({package, label}), or null when
-  /// the launcher shows stock icons or does not tell (non-Nothing launchers).
+  /// the launcher shows stock icons or does not tell (launchers without that setting).
   static Future<Map<String, dynamic>?> activeIconPack() async {
     final r = await _ch.invokeMapMethod<String, dynamic>('activeIconPack');
     return r;
@@ -120,17 +123,31 @@ class PlatformService {
   static Future<bool> openHomeSettings() async => (await _ch.invokeMethod<bool>('openHomeSettings')) ?? false;
 
   // --- icon pack on the phone + Shizuku (DevicePack.kt) ---
+  /// Language of the Android-side texts (notifications, pack errors).
+  static Future<void> setLanguage(String code) => _ch.invokeMethod('setLanguage', {'code': code});
+
   static Future<String> shizukuState() async => (await _ch.invokeMethod<String>('shizukuState')) ?? 'missing';
   static Future<bool> shizukuRequest() async => (await _ch.invokeMethod<bool>('shizukuRequest')) ?? false;
   static Future<bool> openShizuku() async => (await _ch.invokeMethod<bool>('openShizuku')) ?? false;
   static Future<Map<String, dynamic>> devicePackInfo() async =>
       Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackInfo') ?? {});
   static Future<Map<String, dynamic>> devicePackBuild(String packDir, String name, String accent) async =>
-      Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackBuild', {'packDir': packDir, 'name': name, 'accent': accent}) ?? {});
+      Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackBuild', {
+            'packDir': packDir,
+            'name': name,
+            'accent': accent,
+            // the viewer inside the pack follows the app's style and language
+            'meta': {
+              'style': AppState.I.appearance.style.name,
+              'sub': S.packViewerSub('%1\$d', '%2\$d'),
+              'search': S.packViewerSearch,
+            },
+          }) ??
+          {});
   static Future<Object?> devicePackInstall(String apk, {required bool shizuku}) =>
       _ch.invokeMethod('devicePackInstall', {'apk': apk, 'shizuku': shizuku});
   static Future<Map<String, dynamic>> devicePackApply() async =>
       Map<String, dynamic>.from(await _ch.invokeMethod<Map>('devicePackApply') ?? {});
   static Future<String?> devicePackRestore() => _ch.invokeMethod<String>('devicePackRestore');
-  static Future<bool> openNothingPicker() async => (await _ch.invokeMethod<bool>('openNothingPicker')) ?? false;
+  static Future<bool> openLauncherPicker() async => (await _ch.invokeMethod<bool>('openLauncherPicker')) ?? false;
 }
