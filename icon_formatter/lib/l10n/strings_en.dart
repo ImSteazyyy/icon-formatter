@@ -995,6 +995,8 @@ class StringsEn extends Strings {
   @override
   String get calGiornaliero => 'Calendar day';
   @override
+  String get calAggiornamentoGiornaliero => 'Daily update';
+  @override
   String get calGiornalieroInfo => 'Every morning in the pack (needs Shizuku)';
   @override
   String get calAggiornaOra => 'Update day';
@@ -1026,6 +1028,10 @@ class StringsEn extends Strings {
   String get pbCercaGenerate => 'Search the new icons';
   @override
   String get asTitolo => 'Automatic pack update';
+  @override
+  String get asSezione => 'Automatic update';
+  @override
+  String get asControlloAuto => 'Automatic check';
   @override
   String get asMai => 'No check run yet';
   @override
@@ -1328,6 +1334,8 @@ class StringsEn extends Strings {
   String presetCondividiImportati(Object? n) => 'Presets imported: $n';
   @override
   String get comodoOrarioGiorno => 'Update the day at';
+  @override
+  String get comodoOrarioBreve => 'Time';
   @override
   String get comodoAllaPrimaOccasione => 'At the first chance';
   @override

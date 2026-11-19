@@ -484,8 +484,9 @@ class ProgressStrip extends StatelessWidget {
         // lifted from the content under it, like the notices; Nothing style: the frosted bar colour
         color: nothingStyle ? NothingColors.navPill : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
         borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
-        border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.75), width: 1.4),
-        boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
+        // a hairline like the toasts (the old red outline and the heavy shadow made it shout)
+        border: Border.all(color: Palette.fg.withValues(alpha: 0.14)),
+        boxShadow: nothingStyle ? null : const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
       ),
       child: Row(
         children: [
@@ -494,11 +495,11 @@ class ProgressStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(S.completateRimanentiErrori(label ?? (running ? S.batchElaborazione : S.batchCompletato), done, total, total - done, errors), style: TextStyle(fontSize: 12, color: Palette.text2)),
-                const SizedBox(height: 6),
+                Text(S.completateRimanentiErrori(label ?? (running ? S.batchElaborazione : S.batchCompletato), done, total, total - done, errors), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Palette.text)),
+                const SizedBox(height: 8),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: LinearProgressIndicator(value: v, minHeight: 4, backgroundColor: Palette.fg.withValues(alpha: 0.06)),
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(value: v, minHeight: 3, backgroundColor: Palette.fg.withValues(alpha: 0.10)),
                 ),
               ],
             ),
@@ -742,14 +743,17 @@ class GlassIconButton extends StatelessWidget {
 
 /// Accent icon in a soft rounded tile (settings rows, cards, headers).
 class IconChip extends StatelessWidget {
-  const IconChip({super.key, required this.icon, this.size = 36});
+  const IconChip({super.key, required this.icon, this.size = 36, this.color});
 
   final IconData icon;
   final double size;
 
+  /// Status tint (ok, warning); the accent when null.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final accent = color ?? Theme.of(context).colorScheme.primary;
     return Container(
       width: size,
       height: size,
@@ -1242,18 +1246,28 @@ class _PinnedSearchDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final solid = (padding.vertical + kButtonHeight) / maxExtent;
-    // the page colour itself, so no band shows under the field
-    final bg = nothingStyle ? NothingColors.bg : Palette.bg;
-    return DecoratedBox(
-      // always there (a fixed-height pinned header gets no scroll signal);
-      // a plain gradient, no blur: cheap at 120 Hz. Solid behind the field,
-      // then a short fade below it
-      decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [bg, bg, bg.withValues(alpha: 0)], stops: [0.0, solid, 1.0]),
-      ),
-      child: Padding(padding: padding.copyWith(bottom: padding.bottom + _tail), child: glassPill(Material(type: MaterialType.transparency, child: child))),
-    );
+    // only the pill floats over the content: no backing band behind it. In the
+    // Nothing style it is frosted like the bottom bar (blur + translucent grey);
+    // in Glass the liquid glass pill does the same job.
+    if (glassCards) {
+      return Padding(
+        padding: padding.copyWith(bottom: padding.bottom + _tail),
+        child: glassPill(Material(type: MaterialType.transparency, child: child)),
+      );
+    }
+    // also Glass with the glass effects off (power saving): a frosted pill, never a bare one
+    {
+      return Padding(
+        padding: padding.copyWith(bottom: padding.bottom + _tail),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(kButtonHeight / 2),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+            child: ColoredBox(color: nothingStyle ? NothingColors.navPill : Palette.bg.withValues(alpha: 0.6), child: Material(type: MaterialType.transparency, child: child)),
+          ),
+        ),
+      );
+    }
   }
 
   @override

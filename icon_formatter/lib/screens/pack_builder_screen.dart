@@ -36,6 +36,7 @@ import '../src/rust/api/engine.dart';
 import '../widgets/ignored_apps_sheet.dart';
 import '../widgets/refresh_time_row.dart';
 import '../widgets/common.dart';
+import '../widgets/pack_rows.dart';
 import '../widgets/glass_menu.dart';
 import '../widgets/home_preview.dart';
 import '../widgets/liquid_glass.dart';
@@ -3182,111 +3183,145 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
     }
   }
 
+  /// "Controlla ogni": the check interval, picked from a short list.
+  Future<void> _pickInterval() async {
+    final current = (st['intervalHours'] as num?)?.toInt() ?? 6;
+    final h = await showAppSheet<int>(
+      context: context,
+      builder: (ctx) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 4, 22, 8),
+              child: Align(alignment: Alignment.centerLeft, child: Text(S.asOgni, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text))),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: ChoiceRows<int>(options: [for (final v in const [6, 12, 24]) (v, S.asOre(v))], value: current, onChanged: (v) => Navigator.pop(ctx, v)),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (h == null || !mounted) return;
+    await _load(() => PlatformService.autoSyncScheduleSet(h, st['onlyCharging'] == true));
+  }
+
   @override
   Widget build(BuildContext context) {
     final pending = ((st['pending'] as List?) ?? []).cast<Map>();
     final last = (st['lastCheck'] as num?)?.toInt() ?? 0;
     final hasCal = (st['calendar'] as Map?)?['has'] == true;
     final ignored = ((st['ignored'] as List?) ?? const []).cast<String>();
-    return Tile(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SwitchListTile(
-            key: const ValueKey('autosync-switch'),
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(S.asTitolo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            subtitle: Text(last == 0 ? S.asMai : S.asUltimo(DateTime.fromMillisecondsSinceEpoch(last).toLocal().toString().substring(0, 16)), style: const TextStyle(fontSize: 11)),
-            value: st['enabled'] == true,
-            onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v)),
-          ),
-          // the pack has calendar apps: today's day, every morning (same layout as the row above)
-          if (hasCal)
-            SwitchListTile(
-              key: const ValueKey('calendar-daily-switch'),
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(S.calGiornaliero, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              subtitle: Text(S.calGiornalieroInfo, style: const TextStyle(fontSize: 11)),
-              value: st['calendarDaily'] != false,
-              onChanged: busy ? null : (v) => _load(() => PlatformService.calendarDailySet(v)),
+    final enabled = st['enabled'] == true;
+    final daily = st['calendarDaily'] != false;
+    final charging = st['onlyCharging'] == true;
+    final interval = (st['intervalHours'] as num?)?.toInt() ?? 6;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(S.asSezione)),
+        SettingsCard(
+          children: [
+            PackRow(
+              icon: Icons.sync_rounded,
+              title: S.asControlloAuto,
+              subtitle: last == 0 ? S.asMai : S.asUltimo(DateTime.fromMillisecondsSinceEpoch(last).toLocal().toString().substring(0, 16)),
+              onTap: busy ? null : () => _load(() => PlatformService.autoSyncSetEnabled(!enabled)),
+              trailing: Switch(key: const ValueKey('autosync-switch'), value: enabled, onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v))),
             ),
-          if (hasCal) RefreshTimeRow(status: st, busy: busy, load: _load),
-          ListTile(
-            key: const ValueKey('autosync-interval'),
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(S.asOgni, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            trailing: DropdownButton<int>(
-              value: ((st['intervalHours'] as num?)?.toInt() ?? 6),
-              underline: const SizedBox.shrink(),
-              items: [for (final h in const [6, 12, 24]) DropdownMenuItem(value: h, child: Text(S.asOre(h)))],
-              onChanged: busy ? null : (h) => _load(() => PlatformService.autoSyncScheduleSet(h ?? 6, st['onlyCharging'] == true)),
+            PackRow(
+              key: const ValueKey('autosync-interval'),
+              icon: Icons.timer_outlined,
+              title: S.asOgni,
+              onTap: busy ? null : _pickInterval,
+              trailing: PackValue(S.asOre(interval), chevron: true),
             ),
-          ),
-          SwitchListTile(
-            key: const ValueKey('autosync-charging'),
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(S.asSoloInCarica, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            value: st['onlyCharging'] == true,
-            onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncScheduleSet(((st['intervalHours'] as num?)?.toInt() ?? 6), v)),
-          ),
-          const SizedBox(height: 8),
-          // the same buttons as the cards above: two to a row, equal
-          ButtonRows(
+            PackRow(
+              icon: Icons.battery_charging_full_rounded,
+              title: S.asSoloInCarica,
+              onTap: busy ? null : () => _load(() => PlatformService.autoSyncScheduleSet(interval, !charging)),
+              trailing: Switch(key: const ValueKey('autosync-charging'), value: charging, onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncScheduleSet(interval, v))),
+            ),
+          ],
+        ),
+        // the pack has calendar apps: today's day, every morning
+        if (hasCal) ...[
+          const SizedBox(height: 22),
+          Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(S.calGiornaliero)),
+          SettingsCard(
             children: [
-              if (hasCal) ToolButton(key: const ValueKey('calendar-refresh-now'), icon: Icons.today_rounded, label: S.calAggiornaOra, onTap: busy ? null : _refreshCalendar),
-              ToolButton(key: const ValueKey('autosync-check'), icon: Icons.refresh_rounded, label: S.asControllaOra, onTap: busy ? null : () => _load(PlatformService.autoSyncCheckNow)),
-              ToolButton(
-                key: const ValueKey('autosync-ignored'),
-                icon: Icons.visibility_off_outlined,
-                label: ignored.isEmpty ? S.wireAppIgnorate : S.wireAppIgnorateN(ignored.length),
-                onTap: busy ? null : _editIgnored,
+              PackRow(
+                icon: Icons.today_rounded,
+                title: S.calAggiornamentoGiornaliero,
+                subtitle: S.calGiornalieroInfo,
+                onTap: busy ? null : () => _load(() => PlatformService.calendarDailySet(!daily)),
+                trailing: Switch(key: const ValueKey('calendar-daily-switch'), value: daily, onChanged: busy ? null : (v) => _load(() => PlatformService.calendarDailySet(v))),
               ),
-              if (pending.isNotEmpty && pending.every((m) => m['change'] == 'disinstallata'))
-                ToolButton(
-                  icon: Icons.done_all_rounded,
-                  label: S.asSegnaViste,
-                  onTap: busy
-                      ? null
-                      : () async {
-                          await PlatformService.autoSyncClear();
-                          await _load(PlatformService.autoSyncStatus);
-                        },
-                ),
-              if (pending.any((m) => m['change'] != 'disinstallata'))
-                ToolButton(
-                  icon: Icons.auto_fix_high_outlined,
-                  label: S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length),
-                  onTap: busy || widget.builder.busy
-                      ? null
-                      : () async {
-                          final comps = pending.where((m) => m['change'] != 'disinstallata').map((m) => m['component'] as String).toSet();
-                          await widget.builder.addInstalledComponents(comps);
-                          // only the apps the change check named are rendered again
-                          await widget.builder.generateFromOriginals(only: widget.builder.rowsOfComponents(comps));
-                          await PlatformService.autoSyncClear(pending.map((m) => m['component'] as String).toList());
-                          await _load(PlatformService.autoSyncStatus);
-                          // with Shizuku the refreshed pack is re-applied right away
-                          final info = await PlatformService.devicePackInfo();
-                          if (info['shizuku'] == 'granted' && info['installed'] == true) {
-                            final msg = await widget.builder.applyOnDevice();
-                            if (context.mounted && msg != null) showMsg(context, msg);
-                          }
-                        },
-                ),
+              RefreshTimeRow(status: st, busy: busy, load: _load),
             ],
           ),
-          if (pending.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: TextStyle(fontSize: 12, color: Palette.text2)),
-            if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: TextStyle(fontSize: 11, color: Palette.text3)),
-          ],
         ],
-      ),
+        const SizedBox(height: 12),
+        // actions: two to a row, equal; the quiet row of ignored apps below
+        ButtonRows(
+          children: [
+            if (hasCal) ToolButton(key: const ValueKey('calendar-refresh-now'), icon: Icons.today_rounded, label: S.calAggiornaOra, onTap: busy ? null : _refreshCalendar),
+            ToolButton(key: const ValueKey('autosync-check'), icon: Icons.refresh_rounded, label: S.asControllaOra, onTap: busy ? null : () => _load(PlatformService.autoSyncCheckNow)),
+            if (pending.isNotEmpty && pending.every((m) => m['change'] == 'disinstallata'))
+              ToolButton(
+                icon: Icons.done_all_rounded,
+                label: S.asSegnaViste,
+                onTap: busy
+                    ? null
+                    : () async {
+                        await PlatformService.autoSyncClear();
+                        await _load(PlatformService.autoSyncStatus);
+                      },
+              ),
+            if (pending.any((m) => m['change'] != 'disinstallata'))
+              ToolButton(
+                icon: Icons.auto_fix_high_outlined,
+                label: S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length),
+                onTap: busy || widget.builder.busy
+                    ? null
+                    : () async {
+                        final comps = pending.where((m) => m['change'] != 'disinstallata').map((m) => m['component'] as String).toSet();
+                        await widget.builder.addInstalledComponents(comps);
+                        // only the apps the change check named are rendered again
+                        await widget.builder.generateFromOriginals(only: widget.builder.rowsOfComponents(comps));
+                        await PlatformService.autoSyncClear(pending.map((m) => m['component'] as String).toList());
+                        await _load(PlatformService.autoSyncStatus);
+                        // with Shizuku the refreshed pack is re-applied right away
+                        final info = await PlatformService.devicePackInfo();
+                        if (info['shizuku'] == 'granted' && info['installed'] == true) {
+                          final msg = await widget.builder.applyOnDevice();
+                          if (context.mounted && msg != null) showMsg(context, msg);
+                        }
+                      },
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SettingsCard(
+          children: [
+            PackRow(
+              key: const ValueKey('autosync-ignored'),
+              icon: Icons.visibility_off_outlined,
+              title: ignored.isEmpty ? S.wireAppIgnorate : S.wireAppIgnorateN(ignored.length),
+              onTap: busy ? null : _editIgnored,
+              trailing: Icon(Icons.chevron_right_rounded, color: Palette.text3),
+            ),
+          ],
+        ),
+        if (pending.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: TextStyle(fontSize: 12, color: Palette.text2)),
+          if (pending.length > 6) Text(S.asAltre(pending.length - 6), style: TextStyle(fontSize: 11, color: Palette.text3)),
+        ],
+      ],
     );
   }
 }
@@ -3347,25 +3382,17 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
     }
   }
 
-  /// One fact per line: label on the left, value on the right.
-  Widget _infoRow(String k, String v) => Row(
-    children: [
-      Text(k, style: TextStyle(fontSize: 13, color: Palette.text3)),
-      const SizedBox(width: 12),
-      Expanded(child: Text(v, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Palette.text2))),
-    ],
-  );
-
   @override
   Widget build(BuildContext context) {
     final sh = info['shizuku'] as String? ?? 'missing';
     final launcher = info['launcher'];
-    final (stateText, stateColor) = switch (sh) {
-      'granted' => (S.dpShizukuOk, Palette.ok),
-      'denied' => (S.dpShizukuNegato, Palette.warn),
-      'stopped' => (S.dpShizukuFermo, Palette.warn),
-      'old' => (S.dpShizukuVecchio, Palette.danger),
-      _ => (S.dpShizukuMancante, Palette.text2),
+    final installed = info['version'] != null;
+    final (stateText, stateColor, stateIcon) = switch (sh) {
+      'granted' => (S.dpShizukuOk, Palette.ok, Icons.check_circle_outline_rounded),
+      'denied' => (S.dpShizukuNegato, Palette.warn, Icons.warning_amber_rounded),
+      'stopped' => (S.dpShizukuFermo, Palette.warn, Icons.warning_amber_rounded),
+      'old' => (S.dpShizukuVecchio, Palette.danger, Icons.warning_amber_rounded),
+      _ => (S.dpShizukuMancante, Palette.text2, Icons.info_outline_rounded),
     };
     final hasRows = widget.builder.rows.any((r) => !r.excluded && r.generatedId != null);
     final working = busy || widget.builder.busy;
@@ -3394,30 +3421,31 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
               ],
             ),
             const SizedBox(height: 14),
-            // the state as a quiet status row: an icon in the state's colour, no dot
+            // status rows: Shizuku, pack, launcher; the icon says ok or attention
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(color: Palette.fg.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14)),
-              child: Row(
+              child: Column(
                 children: [
-                  Icon(stateColor == Palette.ok ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded, size: 20, color: stateColor),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(stateText, key: const ValueKey('shizuku-state'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: Palette.text))),
+                  PackRow(key: const ValueKey('shizuku-state'), icon: stateIcon, iconColor: stateColor, title: stateText),
+                  Divider(height: 1, thickness: 1, color: Palette.fg.withValues(alpha: 0.06)),
+                  PackRow(
+                    icon: installed ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+                    iconColor: installed ? Palette.ok : Palette.text2,
+                    title: S.dpInfoPack,
+                    trailing: PackMuted(installed ? S.dpInfoVersione(info['version']) : S.dpInfoNonInstallato),
+                  ),
+                  Divider(height: 1, thickness: 1, color: Palette.fg.withValues(alpha: 0.06)),
+                  PackRow(
+                    icon: launcher != null ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
+                    iconColor: launcher != null ? Palette.ok : Palette.warn,
+                    title: S.dpInfoLauncher,
+                    trailing: PackMuted(launcher ?? S.dpInfoNonTrovato),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            // what is installed, one fact per line: label left, value right
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Column(
-                children: [
-                  _infoRow(S.dpInfoPack, info['version'] != null ? S.dpInfoVersione(info['version']) : S.dpInfoNonInstallato),
-                  const SizedBox(height: 8),
-                  _infoRow(S.dpInfoLauncher, launcher ?? S.dpInfoNonTrovato),
-                ],
-              ),
-            ),
             if (info['state'] == 'residual') ...[
               const SizedBox(height: 6),
               Text(

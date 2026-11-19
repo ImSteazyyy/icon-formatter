@@ -629,6 +629,7 @@ class S {
   static const sfondoGiaUguale = 'Lo sfondo ha già la trasparenza del pack';
   static String sfondoUniformato(Object? n, Object? pct) => 'Sfondo uniformato su $n icone (trasparenza $pct%)';
   static const calGiornaliero = 'Giorno del calendario';
+  static const calAggiornamentoGiornaliero = 'Aggiornamento giornaliero';
   static const calGiornalieroInfo = 'Ogni mattina nel pack (serve Shizuku)';
   static const calAggiornaOra = 'Aggiorna';
   static String calAggiornato(Object? n) => 'Giorno aggiornato su $n icone';
@@ -648,6 +649,8 @@ class S {
 
   // Automazione Android
   static const asTitolo = 'Aggiornamento automatico del pack';
+  static const asSezione = 'Aggiornamento automatico';
+  static const asControlloAuto = 'Controllo automatico';
   static const asMai = 'Nessun controllo eseguito';
   static String asUltimo(Object? t) => 'Ultimo controllo: $t';
   static const asInfo =
@@ -833,6 +836,7 @@ class S {
   static const presetCondividiNonValido = 'File non valido: non contiene preset di Icon Formatter.';
   static String presetCondividiImportati(Object? n) => 'Preset importati: $n';
   static const comodoOrarioGiorno = 'Aggiorna il giorno alle';
+  static const comodoOrarioBreve = 'Orario';
   static const comodoAllaPrimaOccasione = 'Alla prima occasione';
   static const comodoOrarioGiornoAzzera = 'Azzera orario';
   static const extraSfondo = 'Sfondo';

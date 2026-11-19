@@ -7,7 +7,7 @@
 //     --dart-define=STRESS_BUDGET_MB=1536
 //
 // Results: printed (tag E2E_STRESS) and written to <app cache>/stress_results.txt.
-// On Android the file is also copied to /sdcard/Download/iconformatter_stress_results.txt.
+// Read it on Android with: adb shell run-as com.iconformatter.icon_formatter cat .../cache/IconFormatterCache/stress_results.txt
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -124,13 +124,6 @@ void main() {
           'frames=$allFrames janky=$janky janky_pct=${allFrames == 0 ? 0 : (janky * 100 / allFrames).toStringAsFixed(1)} '
           'errors=$errors allowed_flutter_errors=${allowedErrorHits.length} budget_mb=$_budgetMb', sinkFile);
 
-      if (Platform.isAndroid) {
-        try {
-          File('/sdcard/Download/iconformatter_stress_results.txt').writeAsStringSync(sinkFile.readAsStringSync());
-        } catch (e) {
-          debugPrint('E2E_STRESS could not copy results to Download: $e');
-        }
-      }
 
       expect(peakRss ~/ (1024 * 1024), lessThanOrEqualTo(_budgetMb), reason: 'Peak RSS exceeded the $_budgetMb MB budget');
       expect(errors, 0, reason: '$errors icons finished with an error');

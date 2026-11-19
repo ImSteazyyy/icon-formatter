@@ -510,6 +510,7 @@ class Strings {
   String get sfondoGiaUguale => 'Lo sfondo ha già la trasparenza del pack';
   String sfondoUniformato(Object? n, Object? pct) => 'Sfondo uniformato su $n icone (trasparenza $pct%)';
   String get calGiornaliero => 'Giorno del calendario';
+  String get calAggiornamentoGiornaliero => 'Aggiornamento giornaliero';
   String get calGiornalieroInfo => 'Ogni mattina nel pack (serve Shizuku)';
   String get calAggiornaOra => 'Aggiorna';
   String calAggiornato(Object? n) => 'Giorno aggiornato su $n icone';
@@ -526,6 +527,8 @@ class Strings {
   String get pbIncludi => 'Includi';
   String get pbCercaGenerate => 'Cerca tra le icone nuove';
   String get asTitolo => 'Aggiornamento automatico del pack';
+  String get asSezione => 'Aggiornamento automatico';
+  String get asControlloAuto => 'Controllo automatico';
   String get asMai => 'Nessun controllo eseguito';
   String asUltimo(Object? t) => 'Ultimo controllo: $t';
   String get asInfo => "Il controllo parte allo sblocco del telefono e ogni 6 ore, senza root e senza servizi sempre attivi. Se nessuna app è cambiata non fa niente; se qualcosa è cambiato ricevi una notifica silenziosa.";
@@ -678,6 +681,7 @@ class Strings {
   String get presetCondividiNonValido => 'File non valido: non contiene preset di Icon Formatter.';
   String presetCondividiImportati(Object? n) => 'Preset importati: $n';
   String get comodoOrarioGiorno => 'Aggiorna il giorno alle';
+  String get comodoOrarioBreve => 'Orario';
   String get comodoAllaPrimaOccasione => 'Alla prima occasione';
   String get comodoOrarioGiornoAzzera => 'Azzera orario';
   String get extraSfondo => 'Sfondo';

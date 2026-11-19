@@ -195,16 +195,9 @@ Future<int> writeSyntheticIcons(String dir, int n, {int size = 512}) async {
 }
 
 /// FlutterErrors the flows tolerate: a fragment of the message and where it is
-/// raised. Keep this list short; every entry is a known problem in lib/.
-/// TODO(lib): remove the entry once AutoSyncCard gets a Material ancestor
-/// (lib/screens/pack_builder_screen.dart:3116, its SwitchListTile and
-/// ListTile sit in a Tile = DecoratedBox, shown in the Pack tab).
-const allowedFlutterErrors = <(String, String)>[
-  (
-    'ListTile background color or ink splashes may be invisible',
-    'lib/screens/pack_builder_screen.dart:3116 AutoSyncCard (TODO: wrap in Material)',
-  ),
-];
+/// raised. Empty: the Pack tab rows are Material-backed, so no known problems
+/// are left in lib/. Add an entry only with a TODO naming the file and line.
+const allowedFlutterErrors = <(String, String)>[];
 
 /// Allowed errors seen in this process (printed by the tests, not failures).
 final List<String> allowedErrorHits = [];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
 import '../services/platform_service.dart';
+import 'pack_rows.dart';
 
 /// Row for the hour of the daily calendar-day refresh of the installed pack.
 /// `status` is the map from PlatformService.autoSyncStatus(); -1 means "at the first check".
@@ -20,27 +21,24 @@ class RefreshTimeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hour = (status['calendarHour'] as num?)?.toInt() ?? -1;
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        S.comodoOrarioGiorno,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      ),
+    return PackRow(
+      icon: Icons.schedule_rounded,
+      title: S.comodoOrarioBreve,
+      onTap: busy ? null : () => _pick(context, hour),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (hour >= 0)
             IconButton(
               tooltip: S.comodoOrarioGiornoAzzera,
-              icon: const Icon(Icons.close, size: 18),
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.close_rounded, size: 18),
               onPressed: busy ? null : () => load(() => PlatformService.calendarHourSet(-1)),
             ),
-          TextButton(
-            onPressed: busy ? null : () => _pick(context, hour),
-            child: Text(
-              hour < 0 ? S.comodoAllaPrimaOccasione : TimeOfDay(hour: hour, minute: 0).format(context),
-            ),
+          PackValue(
+            hour < 0 ? S.comodoAllaPrimaOccasione : TimeOfDay(hour: hour, minute: 0).format(context),
+            chevron: true,
           ),
         ],
       ),

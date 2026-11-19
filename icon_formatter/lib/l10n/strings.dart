@@ -538,6 +538,7 @@ class S {
   static String get sfondoGiaUguale => current.sfondoGiaUguale;
   static String sfondoUniformato(Object? n, Object? pct) => current.sfondoUniformato(n, pct);
   static String get calGiornaliero => current.calGiornaliero;
+  static String get calAggiornamentoGiornaliero => current.calAggiornamentoGiornaliero;
   static String get calGiornalieroInfo => current.calGiornalieroInfo;
   static String get calAggiornaOra => current.calAggiornaOra;
   static String calAggiornato(Object? n) => current.calAggiornato(n);
@@ -554,6 +555,8 @@ class S {
   static String get pbIncludi => current.pbIncludi;
   static String get pbCercaGenerate => current.pbCercaGenerate;
   static String get asTitolo => current.asTitolo;
+  static String get asSezione => current.asSezione;
+  static String get asControlloAuto => current.asControlloAuto;
   static String get asMai => current.asMai;
   static String asUltimo(Object? t) => current.asUltimo(t);
   static String get asInfo => current.asInfo;
@@ -706,6 +709,7 @@ class S {
   static String get presetCondividiNonValido => current.presetCondividiNonValido;
   static String presetCondividiImportati(Object? n) => current.presetCondividiImportati(n);
   static String get comodoOrarioGiorno => current.comodoOrarioGiorno;
+  static String get comodoOrarioBreve => current.comodoOrarioBreve;
   static String get comodoAllaPrimaOccasione => current.comodoAllaPrimaOccasione;
   static String get comodoOrarioGiornoAzzera => current.comodoOrarioGiornoAzzera;
   static String get extraSfondo => current.extraSfondo;
