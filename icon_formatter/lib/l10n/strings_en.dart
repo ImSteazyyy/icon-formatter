@@ -985,11 +985,11 @@ class StringsEn extends Strings {
   @override
   String sfondoUniformato(Object? n, Object? pct) => 'Background matched on $n icons (transparency $pct%)';
   @override
-  String get calGiornaliero => 'Calendar: today\'s day every morning';
+  String get calGiornaliero => 'Calendar day';
   @override
-  String get calGiornalieroInfo => 'If the launcher does not change the day by itself, the pack updates at the first unlock of the day (needs Shizuku).';
+  String get calGiornalieroInfo => 'Every morning in the pack (needs Shizuku)';
   @override
-  String get calAggiornaOra => 'Update the day now';
+  String get calAggiornaOra => 'Update day';
   @override
   String calAggiornato(Object? n) => 'Day updated on $n icons';
   @override
@@ -1205,7 +1205,7 @@ class StringsEn extends Strings {
   @override
   String get pbEsportaSub => 'Folder, ZIP or APK';
   @override
-  String dpVersioneInstallata(Object v) => 'Pack installed: version $v (it gets updated, not duplicated)';
+  String dpVersioneInstallata(Object v) => 'Pack installed: version $v';
   @override
   String get rigeneraConModalita => 'Make again another way…';
   @override

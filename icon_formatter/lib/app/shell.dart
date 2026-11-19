@@ -124,7 +124,20 @@ class _ShellState extends State<Shell> {
                             type: MaterialType.transparency,
                             child: InkWell(
                               onTap: () => _setFold(false),
-                              child: Center(child: Icon(dests[index].icon, color: Palette.fg, semanticLabel: dests[index].label)),
+                              // the open section in its own round blob, as in the open
+                              // pill (60 in 70 there, 43 in 50 here: same proportion)
+                              child: Center(
+                                child: Container(
+                                  width: 43,
+                                  height: 43,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppState.I.appearance.light ? NothingColors.control : NothingColors.card,
+                                  ),
+                                  child: Icon(dests[index].icon, size: 24, color: Palette.fg, semanticLabel: dests[index].label),
+                                ),
+                              ),
                             ),
                           )
                         : Padding(

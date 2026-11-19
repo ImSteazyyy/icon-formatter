@@ -1119,13 +1119,18 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                     LayoutBuilder(
                       builder: (context, box) {
                         final states = <PbState?>[null, ...PbState.values.where((s) => counts[s]! > 0 || s == PbState.missing || filter == s)];
-                        // compact pills, narrower only when they would not fit
-                        final w = ((box.maxWidth - 6 * (states.length - 1)) / states.length).clamp(48.0, 84.0).floorToDouble();
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        // wide enough for an icon and three digits, so no count is
+                        // shrunk: one row when they fit, else two balanced rows
+                        const minW = 76.0;
+                        final n = states.length;
+                        final perRow = n * minW + (n - 1) * 6 <= box.maxWidth ? n : (n / 2).ceil();
+                        final w = ((box.maxWidth - 6 * (perRow - 1)) / perRow).floorToDouble().clamp(minW, 130.0);
+                        return Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 6,
+                          runSpacing: 6,
                           children: [
-                            for (final (k, s) in states.indexed) ...[
-                              if (k > 0) const SizedBox(width: 6),
+                            for (final s in states)
                               SizedBox(
                                 width: w,
                                 child: IconFilterPill(
@@ -1138,7 +1143,6 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                                   onTap: () => setState(() => filter = filter == s || s == null ? null : s),
                                 ),
                               ),
-                            ],
                           ],
                         );
                       },
@@ -1186,8 +1190,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                       title: S.pbEsporta,
                       subtitle: S.pbEsportaSub,
                       children: [
-                        ToolButton(icon: Icons.drive_folder_upload_outlined, label: S.esportaCartella, onTap: c.busy ? null : () => _export(false)),
-                        ToolButton(icon: Icons.folder_zip_outlined, label: S.pbEsportaZip, onTap: c.busy ? null : () => _export(true)),
+                        ToolButton(icon: Icons.ios_share_rounded, label: S.pbEsporta, onTap: c.busy ? null : _exportChoose),
                         if (Platform.isAndroid) ToolButton(icon: Icons.share_outlined, label: S.pbCondividiApk, onTap: c.busy ? null : () => _run(c.shareApk)),
                         if (ApkPackService.available)
                           ToolButton(
@@ -1293,6 +1296,24 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
     if (path == null) return;
     final n = await c.openExistingPack(path);
     if (mounted && n > 0) showMsg(context, S.pbPackAperto(n));
+  }
+
+  /// "Esporta": folder or ZIP, asked when the button is tapped.
+  Future<void> _exportChoose() async {
+    final zip = await showAppSheet<bool>(
+      context: context,
+      builder: (ctx) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 22), leading: const Icon(Icons.drive_folder_upload_outlined), title: Text(S.esportaCartella), onTap: () => Navigator.pop(ctx, false)),
+            ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 22), leading: const Icon(Icons.folder_zip_outlined), title: Text(S.pbEsportaZip), onTap: () => Navigator.pop(ctx, true)),
+          ],
+        ),
+      ),
+    );
+    if (zip != null) await _export(zip);
   }
 
   Future<void> _export(bool zip) async {
@@ -1867,10 +1888,33 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
     }
   }
 
+  /// "Aggiorna giorno": today's day into the installed pack now.
+  Future<void> _refreshCalendar() async {
+    setState(() => busy = true);
+    try {
+      final r = await PlatformService.calendarRefreshNow();
+      if (!mounted) return;
+      final msg = switch (r['state']) {
+        'updated' => S.calAggiornato(r['changed'] ?? 0),
+        'current' => S.calGiaOggi,
+        'no_shizuku' => S.calServeShizuku,
+        'error' => S.errore(r['message'] ?? ''),
+        _ => S.calNessuno,
+      };
+      showMsg(context, msg, error: r['state'] == 'error' || r['state'] == 'no_shizuku');
+      await _load(PlatformService.autoSyncStatus);
+    } catch (e) {
+      if (mounted) showMsg(context, S.errore(e), error: true);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final pending = ((st['pending'] as List?) ?? []).cast<Map>();
     final last = (st['lastCheck'] as num?)?.toInt() ?? 0;
+    final hasCal = (st['calendar'] as Map?)?['has'] == true;
     return Tile(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
       child: Column(
@@ -1880,14 +1924,13 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
             key: const ValueKey('autosync-switch'),
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: Text(S.asTitolo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            title: Text(S.asTitolo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             subtitle: Text(last == 0 ? S.asMai : S.asUltimo(DateTime.fromMillisecondsSinceEpoch(last).toLocal().toString().substring(0, 16)), style: const TextStyle(fontSize: 11)),
             value: st['enabled'] == true,
             onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v)),
           ),
-          Text(S.asInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
-          // the pack has calendar apps: today's day, every morning
-          if ((st['calendar'] as Map?)?['has'] == true) ...[
+          // the pack has calendar apps: today's day, every morning (same layout as the row above)
+          if (hasCal)
             SwitchListTile(
               key: const ValueKey('calendar-daily-switch'),
               contentPadding: EdgeInsets.zero,
@@ -1897,56 +1940,17 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
               value: st['calendarDaily'] != false,
               onChanged: busy ? null : (v) => _load(() => PlatformService.calendarDailySet(v)),
             ),
-            Align(
-              alignment: Alignment.center,
-              child: OutlinedButton.icon(
-                key: const ValueKey('calendar-refresh-now'),
-                icon: const Icon(Icons.today_rounded, size: 18),
-                label: Text(S.calAggiornaOra),
-                onPressed: busy
-                    ? null
-                    : () async {
-                        setState(() => busy = true);
-                        try {
-                          final r = await PlatformService.calendarRefreshNow();
-                          if (!mounted) return;
-                          final msg = switch (r['state']) {
-                            'updated' => S.calAggiornato(r['changed'] ?? 0),
-                            'current' => S.calGiaOggi,
-                            'no_shizuku' => S.calServeShizuku,
-                            'error' => S.errore(r['message'] ?? ''),
-                            _ => S.calNessuno,
-                          };
-                          showMsg(this.context, msg, error: r['state'] == 'error' || r['state'] == 'no_shizuku');
-                          await _load(PlatformService.autoSyncStatus);
-                        } catch (e) {
-                          if (mounted) showMsg(this.context, S.errore(e), error: true);
-                        } finally {
-                          if (mounted) setState(() => busy = false);
-                        }
-                      },
-              ),
-            ),
-          ],
-          const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
+          const SizedBox(height: 8),
+          // the same buttons as the cards above: two to a row, equal
+          ButtonRows(
             children: [
-              OutlinedButton.icon(
-                key: const ValueKey('autosync-check'),
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(S.asControllaOra),
-                onPressed: busy ? null : () => _load(PlatformService.autoSyncCheckNow),
-              ),
+              if (hasCal) ToolButton(key: const ValueKey('calendar-refresh-now'), icon: Icons.today_rounded, label: S.calAggiornaOra, onTap: busy ? null : _refreshCalendar),
+              ToolButton(key: const ValueKey('autosync-check'), icon: Icons.refresh_rounded, label: S.asControllaOra, onTap: busy ? null : () => _load(PlatformService.autoSyncCheckNow)),
               if (pending.isNotEmpty && pending.every((m) => m['change'] == 'disinstallata'))
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.done_all_rounded, size: 18),
-                  label: Text(S.asSegnaViste),
-                  onPressed: busy
+                ToolButton(
+                  icon: Icons.done_all_rounded,
+                  label: S.asSegnaViste,
+                  onTap: busy
                       ? null
                       : () async {
                           await PlatformService.autoSyncClear();
@@ -1954,10 +1958,10 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
                         },
                 ),
               if (pending.any((m) => m['change'] != 'disinstallata'))
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.auto_fix_high_outlined, size: 18),
-                  label: Text(S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length)),
-                  onPressed: busy || widget.builder.busy
+                ToolButton(
+                  icon: Icons.auto_fix_high_outlined,
+                  label: S.asRielabora(pending.where((m) => m['change'] != 'disinstallata').length),
+                  onTap: busy || widget.builder.busy
                       ? null
                       : () async {
                           final comps = pending.where((m) => m['change'] != 'disinstallata').map((m) => m['component'] as String).toSet();
@@ -1974,7 +1978,7 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
                         },
                 ),
             ],
-          )),
+          ),
           if (pending.isNotEmpty) ...[
             const SizedBox(height: 6),
             for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: TextStyle(fontSize: 12, color: Palette.text2)),
@@ -2108,7 +2112,6 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
               [
                 if (info['version'] != null) S.dpVersioneInstallata(info['version']),
                 launcher == null ? S.dpNoLauncher : S.dpLauncher(launcher),
-                if (sh == 'granted') S.dpSelettore(info['selector']),
               ].join(' · '),
               style: TextStyle(fontSize: 11, color: Palette.text3),
             ),
@@ -2120,13 +2123,8 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
                 style: TextStyle(fontSize: 12, color: Palette.warn),
               ),
             ],
-            const SizedBox(height: 4),
-            Text(S.dpInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
             const SizedBox(height: 10),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
+            WideColumn(
               children: [
                 if (sh == 'granted')
                   FilledButton.icon(

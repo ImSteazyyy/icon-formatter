@@ -30,7 +30,7 @@ class NothingColors {
   static Color get onOn => _light ? Colors.white : Colors.black;
 
   /// Blurred pill of the bottom bar.
-  static Color get navPill => _light ? const Color(0xC7FFFFFF) : const Color(0xB3292929);
+  static Color get navPill => _light ? const Color(0xF5FFFFFF) : const Color(0xF5282828);
 }
 
 /// Space at the bottom covered by floating glass bars (Android phone

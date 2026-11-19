@@ -787,8 +787,9 @@ class ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (compactPrimary != null && GlassInsets.foldedOf(context)) {
-      // folded: icons only, 50 dp like the folded tab button
-      Widget slot(Widget w) => SizedBox(width: 42, height: 42, child: w);
+      // folded: icons only, 50 dp like the folded tab button. The start
+      // button keeps its open look (same colour) and stays wide; "Altro" is
+      // the same outlined round button as in the open bar
       return LiquidGlass(
         key: const ValueKey('action-bar'),
         radius: 25,
@@ -796,17 +797,24 @@ class ActionBar extends StatelessWidget {
         child: _barButtons(context, SizedBox(
           height: 50,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              if (compactLeading != null) slot(compactLeading!),
-              slot(compactPrimary!),
+            // same proportions as the open bar (60 dp, 6 dp around 48 dp
+            // buttons, 8 dp apart): 50 dp, 5 dp around 40 dp buttons, 7 apart
+            padding: const EdgeInsets.all(5),
+            child: Row(children: [
+              if (compactLeading != null) ...[SizedBox(width: 40, height: 40, child: compactLeading!), const SizedBox(width: 7)],
+              Expanded(child: SizedBox(height: 40, child: compactPrimary!)),
+              const SizedBox(width: 7),
               Builder(
-                builder: (bctx) => slot(IconButton(
-                  key: const ValueKey('more-actions'),
-                  tooltip: S.altro,
-                  onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),
-                  icon: const Icon(Icons.keyboard_arrow_up_rounded),
-                )),
+                builder: (bctx) => SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: OutlinedButton(
+                    key: const ValueKey('more-actions'),
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, shape: const CircleBorder()),
+                    onPressed: more.isEmpty ? null : () => _open(context, anchorOf(bctx)),
+                    child: const Icon(Icons.keyboard_arrow_up_rounded),
+                  ),
+                ),
               ),
             ]),
           ),

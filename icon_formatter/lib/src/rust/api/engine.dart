@@ -91,16 +91,28 @@ Future<Uint32List> importAsPng({required String src, required String dest}) =>
     RustLib.instance.api.crateApiEngineImportAsPng(src: src, dest: dest);
 
 /// Brings the plate of every `targets` icon (PNG files, rewritten in place) to
-/// the transparency of the pack: the median plate alpha of `references`, or
-/// `fallback` (0..1, ignored when 0) when no reference can be measured.
+/// the transparency of the pack. `style` (0..1, 0 included) is the plate
+/// alpha the pack's icons are drawn with and wins when given; with a negative
+/// `style` the median plate alpha of the `references` icons is used instead.
 Future<PlateMatch> matchPlateAlpha({
   required List<String> targets,
   required List<String> references,
-  required double fallback,
+  required double style,
 }) => RustLib.instance.api.crateApiEngineMatchPlateAlpha(
   targets: targets,
   references: references,
-  fallback: fallback,
+  style: style,
+);
+
+/// [`match_plate_alpha`] for one PNG in memory (the Studio preview): its plate
+/// is brought to `reference` (0..1); the same bytes come back when there is
+/// nothing to change.
+Future<Uint8List> matchPlateAlphaPng({
+  required List<int> png,
+  required double reference,
+}) => RustLib.instance.api.crateApiEngineMatchPlateAlphaPng(
+  png: png,
+  reference: reference,
 );
 
 /// Processes all items in parallel, streaming one progress event per item.

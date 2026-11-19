@@ -262,10 +262,13 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
             ? null
             : ListenableBuilder(
                 listenable: c.batch,
-                builder: (context, _) => IconButton.filled(
-                  tooltip: S.elaboraTutte,
-                  onPressed: c.batch.running ? null : _process,
-                  icon: const Icon(Icons.play_arrow_rounded),
+                builder: (context, _) => Tooltip(
+                  message: S.elaboraTutte,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: Size.zero, padding: EdgeInsets.zero),
+                    onPressed: c.batch.running ? null : _process,
+                    child: const Icon(Icons.play_arrow_rounded, size: 26),
+                  ),
                 ),
               ),
         moreActions: [

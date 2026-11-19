@@ -177,6 +177,9 @@ class WorkspaceController extends ChangeNotifier {
       items.add(
         WorkItem(id: 'c${DateTime.now().microsecondsSinceEpoch}_${items.length}', name: uniqueStem(stem), rel: p.basename(d.path), path: d.path, label: 'Calendario ${d.day}', package: d.package, activity: d.activity)
           ..calendarDay = d.day
+          // the page of another pack has a tile of its own that would stack
+          // on the plate: its background takes the plate's transparency
+          ..matchPlate = true
           // pack icons are already cut out: the whole page (number included)
           // is the artwork, it is only trimmed and placed on the plate
           ..segOverride = SegmentSettings(mode: SegMode.keepAlpha, tolerance: 0.10, removeHoles: false, refineEdges: false)
@@ -360,7 +363,15 @@ class WorkspaceController extends ChangeNotifier {
         r = it.path != null ? await previewFile(path: it.path!, settings: s) : await previewBytes(bytes: it.bytes!, settings: s);
       }
       if (seq != _previewSeq) return;
-      previewPng = r.png;
+      var png = r.png;
+      final plate = _stylePlateAlpha;
+      if (it.matchPlate && plate != null) {
+        try {
+          png = await matchPlateAlphaPng(png: png, reference: plate);
+        } catch (_) {}
+        if (seq != _previewSeq) return;
+      }
+      previewPng = png;
       previewInfo = r;
       previewError = null;
     } catch (e) {
@@ -458,6 +469,13 @@ class WorkspaceController extends ChangeNotifier {
   /// The same for every calendar page of the list.
   Future<PlateMatch?> matchPlateAll() => matchPlateOf([for (final i in items) if (!i.excluded && i.calendarDay != null) i]);
 
+  /// Alpha (0..1) of the plate the current style draws, 0 included; null when
+  /// the style has no such plate.
+  double? get _stylePlateAlpha {
+    final bg = settings.background;
+    return bg is BackgroundSettings_Lucent ? ((bg.params.backdrop >> 24) & 0xFF) / 255.0 : null;
+  }
+
   Future<PlateMatch?> _applyPlateMatch(List<WorkItem> its) async {
     bool onDisk(WorkItem i) => i.outputPath != null && File(i.outputPath!).existsSync();
     final targets = [for (final i in its) if (onDisk(i)) i.outputPath!];
@@ -468,10 +486,8 @@ class WorkspaceController extends ChangeNotifier {
       for (final i in items)
         if (!i.excluded && !ids.contains(i.id) && !i.matchPlate && i.calendarDay == null && onDisk(i)) i.outputPath!,
     ];
-    final bg = settings.background;
-    final fallback = bg is BackgroundSettings_Lucent ? ((bg.params.backdrop >> 24) & 0xFF) / 255.0 : 0.0;
     try {
-      final r = await matchPlateAlpha(targets: targets, references: refs.take(40).toList(), fallback: fallback);
+      final r = await matchPlateAlpha(targets: targets, references: refs.take(40).toList(), style: _stylePlateAlpha ?? -1);
       notifyListeners();
       return r;
     } catch (_) {

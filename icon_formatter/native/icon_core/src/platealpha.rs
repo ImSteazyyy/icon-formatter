@@ -124,6 +124,17 @@ mod tests {
     }
 
     #[test]
+    fn plate_can_go_fully_clear() {
+        // a calendar tile of its own (alpha 0.6) on a style with no plate: the
+        // tile disappears, the artwork stays
+        let mut img = icon(153);
+        assert!(remap_plate_alpha(&mut img, 0.6, 0.0));
+        assert_eq!(img.get_pixel(20, 64)[3], 0);
+        assert_eq!(img.get_pixel(64, 64), &Rgba([255, 255, 255, 255]));
+        assert_eq!(img.get_pixel(10, 2), &Rgba([220, 40, 40, 255]));
+    }
+
+    #[test]
     fn opaque_plate_or_equal_plate_is_left_alone() {
         let mut opaque = icon(255);
         assert!(!remap_plate_alpha(&mut opaque, 1.0, 0.4));

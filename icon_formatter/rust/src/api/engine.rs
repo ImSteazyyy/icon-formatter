@@ -483,15 +483,20 @@ pub struct PlateMatch {
 }
 
 /// Brings the plate of every `targets` icon (PNG files, rewritten in place) to
-/// the transparency of the pack: the median plate alpha of `references`, or
-/// `fallback` (0..1, ignored when 0) when no reference can be measured.
-pub fn match_plate_alpha(targets: Vec<String>, references: Vec<String>, fallback: f32) -> Result<PlateMatch> {
-    let mut measured: Vec<f32> = references
-        .iter()
-        .filter_map(|r| imageops::decode_file(Path::new(r)).ok())
-        .filter_map(|img| platealpha::plate_alpha(&img))
-        .collect();
-    let reference = platealpha::median(&mut measured).or(if fallback > 0.0 { Some(fallback) } else { None }).ok_or_else(|| anyhow!("no reference icon to measure"))?;
+/// the transparency of the pack. `style` (0..1, 0 included) is the plate
+/// alpha the pack's icons are drawn with and wins when given; with a negative
+/// `style` the median plate alpha of the `references` icons is used instead.
+pub fn match_plate_alpha(targets: Vec<String>, references: Vec<String>, style: f32) -> Result<PlateMatch> {
+    let reference = if style >= 0.0 {
+        style.min(1.0)
+    } else {
+        let mut measured: Vec<f32> = references
+            .iter()
+            .filter_map(|r| imageops::decode_file(Path::new(r)).ok())
+            .filter_map(|img| platealpha::plate_alpha(&img))
+            .collect();
+        platealpha::median(&mut measured).ok_or_else(|| anyhow!("no reference icon to measure"))?
+    };
     let (mut changed, mut unchanged) = (0u32, 0u32);
     for t in &targets {
         let path = Path::new(t);
@@ -506,6 +511,17 @@ pub fn match_plate_alpha(targets: Vec<String>, references: Vec<String>, fallback
         }
     }
     Ok(PlateMatch { reference, changed, unchanged })
+}
+
+/// [`match_plate_alpha`] for one PNG in memory (the Studio preview): its plate
+/// is brought to `reference` (0..1); the same bytes come back when there is
+/// nothing to change.
+pub fn match_plate_alpha_png(png: Vec<u8>, reference: f32) -> Result<Vec<u8>> {
+    let mut img = imageops::decode(&png)?;
+    match platealpha::plate_alpha(&img) {
+        Some(own) if platealpha::remap_plate_alpha(&mut img, own, reference.clamp(0.0, 1.0)) => Ok(imageops::encode_png(&img)?),
+        _ => Ok(png),
+    }
 }
 
 // ---------------------------------------------------------------- batch

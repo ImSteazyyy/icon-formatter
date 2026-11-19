@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1217906489;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1146500309;
 
 // Section: executor
 
@@ -786,7 +786,7 @@ fn wire__crate__api__engine__match_plate_alpha_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_targets = <Vec<String>>::sse_decode(&mut deserializer);
             let api_references = <Vec<String>>::sse_decode(&mut deserializer);
-            let api_fallback = <f32>::sse_decode(&mut deserializer);
+            let api_style = <f32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -794,8 +794,45 @@ fn wire__crate__api__engine__match_plate_alpha_impl(
                         let output_ok = crate::api::engine::match_plate_alpha(
                             api_targets,
                             api_references,
-                            api_fallback,
+                            api_style,
                         )?;
+                        std::result::Result::Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__engine__match_plate_alpha_png_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "match_plate_alpha_png",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_png = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_reference = <f32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::engine::match_plate_alpha_png(api_png, api_reference)?;
                         std::result::Result::Ok(output_ok)
                     })(),
                 )
@@ -2147,20 +2184,23 @@ fn pde_ffi_dispatcher_primary_impl(
         19 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
         20 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__engine__match_plate_alpha_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
-        25 => {
+        22 => {
+            wire__crate__api__engine__match_plate_alpha_png_impl(port, ptr, rust_vec_len, data_len)
+        }
+        23 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
+        26 => {
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
-        26 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        28 => {
+        27 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
+        29 => {
             wire__crate__api__engine__set_match_cache_file_impl(port, ptr, rust_vec_len, data_len)
         }
-        30 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2185,8 +2225,8 @@ fn pde_ffi_dispatcher_sync_impl(
         14 => {
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
-        27 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

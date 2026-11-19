@@ -985,11 +985,11 @@ class StringsEs extends Strings {
   @override
   String sfondoUniformato(Object? n, Object? pct) => 'Fondo igualado en $n iconos (transparencia $pct%)';
   @override
-  String get calGiornaliero => 'Calendario: el día de hoy cada mañana';
+  String get calGiornaliero => 'Día del calendario';
   @override
-  String get calGiornalieroInfo => 'Si el launcher no cambia el día por sí solo, el pack se actualiza en el primer desbloqueo del día (necesita Shizuku).';
+  String get calGiornalieroInfo => 'Cada mañana en el pack (necesita Shizuku)';
   @override
-  String get calAggiornaOra => 'Actualizar el día ahora';
+  String get calAggiornaOra => 'Actualizar día';
   @override
   String calAggiornato(Object? n) => 'Día actualizado en $n iconos';
   @override
@@ -1205,7 +1205,7 @@ class StringsEs extends Strings {
   @override
   String get pbEsportaSub => 'Carpeta, ZIP o APK';
   @override
-  String dpVersioneInstallata(Object v) => 'Pack instalado: versión $v (se actualiza, no se duplica)';
+  String dpVersioneInstallata(Object v) => 'Pack instalado: versión $v';
   @override
   String get rigeneraConModalita => 'Volver a crear de otra forma…';
   @override

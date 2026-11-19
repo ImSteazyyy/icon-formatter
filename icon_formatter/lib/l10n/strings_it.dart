@@ -505,9 +505,9 @@ class Strings {
   String get sfondoNientePack => 'Elabora prima le icone';
   String get sfondoGiaUguale => 'Lo sfondo ha già la trasparenza del pack';
   String sfondoUniformato(Object? n, Object? pct) => 'Sfondo uniformato su $n icone (trasparenza $pct%)';
-  String get calGiornaliero => 'Calendario: giorno di oggi ogni mattina';
-  String get calGiornalieroInfo => 'Se il launcher non cambia da solo il giorno, il pack si aggiorna al primo sblocco della giornata (serve Shizuku).';
-  String get calAggiornaOra => 'Aggiorna il giorno ora';
+  String get calGiornaliero => 'Giorno del calendario';
+  String get calGiornalieroInfo => 'Ogni mattina nel pack (serve Shizuku)';
+  String get calAggiornaOra => 'Aggiorna giorno';
   String calAggiornato(Object? n) => 'Giorno aggiornato su $n icone';
   String get calGiaOggi => 'Il pack mostra già il giorno di oggi';
   String get calServeShizuku => 'Serve Shizuku per aggiornare il pack da solo';
@@ -616,7 +616,7 @@ class Strings {
   String get pbPasso2Sub => 'Creale con lo Studio o importale, poi abbinale';
   String get pbEsporta => 'Esporta';
   String get pbEsportaSub => 'Cartella, ZIP o APK';
-  String dpVersioneInstallata(Object v) => 'Pack installato: versione $v (viene aggiornato, non duplicato)';
+  String dpVersioneInstallata(Object v) => 'Pack installato: versione $v';
   String get rigeneraConModalita => 'Rigenera in un altro modo…';
   String modalitaSimbolo(Object n) => 'Come prendere il simbolo · $n';
   String get modalitaSimboloInfo => "Se il riconoscimento automatico sbaglia, scegli tu come prendere il simbolo da questa icona (solo stile Lucent).";

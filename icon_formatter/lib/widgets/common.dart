@@ -641,9 +641,10 @@ class ToolButton extends StatelessWidget {
       // always one line; a label that does not fit shrinks a little
       label: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontSize: 13.5))),
     );
+    final fill = context.dependOnInheritedWidgetOfExactType<_FillButtons>() != null;
     return LayoutBuilder(
       builder: (context, box) => box.hasBoundedWidth
-          ? SizedBox(width: ((box.maxWidth - 8) / 2).floorToDouble(), height: kButtonHeight, child: button)
+          ? SizedBox(width: fill ? double.infinity : ((box.maxWidth - 8) / 2).floorToDouble(), height: kButtonHeight, child: button)
           : Padding(
               padding: const EdgeInsets.only(right: 8),
               child: SizedBox(height: kButtonHeight, child: button),
@@ -1068,8 +1069,8 @@ class StepCard extends StatelessWidget {
                 ),
               ],
             ),
-            // a lone or last button sits in the middle, not on the left
-            if (children.isNotEmpty) ...[const SizedBox(height: 10), Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: children)],
+            // two to a row, equal; a lone or last button spans the whole row
+            if (children.isNotEmpty) ...[const SizedBox(height: 10), ButtonRows(children: children)],
           ],
         ),
       ),
@@ -1183,7 +1184,7 @@ class IconFilterPill extends StatelessWidget {
                         Icon(icon, size: 20, color: fg),
                         if (count != null) ...[
                           const SizedBox(width: 5),
-                          Text('$count', maxLines: 1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
+                          Text('$count', maxLines: 1, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: fg)),
                         ],
                       ]),
                     ),
@@ -1319,6 +1320,60 @@ class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
       _btn(Icons.keyboard_double_arrow_down_rounded, S.vaiInFondo, canDown, () => _go(false)),
     ]);
   }
+}
+
+/// Marks the subtree where a [ToolButton] fills the width it is given.
+class _FillButtons extends InheritedWidget {
+  const _FillButtons({required super.child});
+
+  @override
+  bool updateShouldNotify(_FillButtons old) => false;
+}
+
+/// Buttons two to a row, equal; a lone or last button spans the whole row.
+class ButtonRows extends StatelessWidget {
+  const ButtonRows({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i += 2) {
+      rows.add(
+        Row(
+          children: [
+            Expanded(child: children[i]),
+            if (i + 1 < children.length) ...[const SizedBox(width: 8), Expanded(child: children[i + 1])],
+          ],
+        ),
+      );
+    }
+    return _FillButtons(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[if (i > 0) const SizedBox(height: 8), rows[i]],
+        ],
+      ),
+    );
+  }
+}
+
+/// Buttons one under the other, each as wide as the card.
+class WideColumn extends StatelessWidget {
+  const WideColumn({super.key, required this.children, this.gap = 8});
+
+  final List<Widget> children;
+  final double gap;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < children.length; i++) ...[if (i > 0) SizedBox(height: gap), children[i]],
+    ],
+  );
 }
 
 /// Search field shaped like the buttons: a [kButtonHeight] pill.

@@ -624,9 +624,9 @@ class S {
   static const sfondoNientePack = 'Elabora prima le icone';
   static const sfondoGiaUguale = 'Lo sfondo ha già la trasparenza del pack';
   static String sfondoUniformato(Object? n, Object? pct) => 'Sfondo uniformato su $n icone (trasparenza $pct%)';
-  static const calGiornaliero = 'Calendario: giorno di oggi ogni mattina';
-  static const calGiornalieroInfo = 'Se il launcher non cambia da solo il giorno, il pack si aggiorna al primo sblocco della giornata (serve Shizuku).';
-  static const calAggiornaOra = 'Aggiorna il giorno ora';
+  static const calGiornaliero = 'Giorno del calendario';
+  static const calGiornalieroInfo = 'Ogni mattina nel pack (serve Shizuku)';
+  static const calAggiornaOra = 'Aggiorna giorno';
   static String calAggiornato(Object? n) => 'Giorno aggiornato su $n icone';
   static const calGiaOggi = 'Il pack mostra già il giorno di oggi';
   static const calServeShizuku = 'Serve Shizuku per aggiornare il pack da solo';
@@ -762,7 +762,7 @@ class S {
   static const pbEsporta = 'Esporta';
   static const pbEsportaSub = 'Cartella, ZIP o APK';
   static String dpVersioneInstallata(Object v) =>
-      'Pack installato: versione $v (viene aggiornato, non duplicato)';
+      'Pack installato: versione $v';
   // Rigenera › Modalità del simbolo (per singola app)
   static const rigeneraConModalita = 'Rigenera in un altro modo…';
   static String modalitaSimbolo(Object n) => 'Come prendere il simbolo · $n';

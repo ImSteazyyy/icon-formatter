@@ -446,8 +446,11 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Palette.bg.withValues(alpha: 0.96), Palette.bg.withValues(alpha: 0.88), Palette.bg.withValues(alpha: 0)],
-                    stops: [0.0, 0.62, 1.0],
+                    // fully opaque from the screen top down to the pinned search
+                    // (translucent glass cells showed through the status bar), then
+                    // a short fade
+                    colors: [Palette.bg, Palette.bg, Palette.bg.withValues(alpha: 0)],
+                    stops: [0.0, statusBar / (statusBar + 28), 1.0],
                   ),
                 ),
               ),
@@ -512,22 +515,28 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                         ]),
                       ),
                     ),
-                    compactLeading: IconButton(
-                      tooltip: S.selezionaTutte,
-                      onPressed: list.isEmpty
-                          ? null
-                          : () => setState(() {
-                              final all = list.every((a) => selected.contains(a.key));
-                              all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
-                            }),
-                      icon: Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded),
+                    compactLeading: Tooltip(
+                      message: S.selezionaTutte,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, shape: const CircleBorder()),
+                        onPressed: list.isEmpty
+                            ? null
+                            : () => setState(() {
+                                final all = list.every((a) => selected.contains(a.key));
+                                all ? selected.removeAll(list.map((a) => a.key)) : selected.addAll(list.map((a) => a.key));
+                              }),
+                        child: Icon(list.isNotEmpty && list.every((a) => selected.contains(a.key)) ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 22),
+                      ),
                     ),
                     compactPrimary: ListenableBuilder(
                       listenable: c.batch,
-                      builder: (context, _) => IconButton.filled(
-                        tooltip: selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length),
-                        onPressed: c.batch.running || selected.isEmpty ? null : _process,
-                        icon: const Icon(Icons.play_arrow_rounded),
+                      builder: (context, _) => Tooltip(
+                        message: selected.isEmpty ? S.selezionaLeApp : S.elaboraApp(selected.length),
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(minimumSize: Size.zero, padding: EdgeInsets.zero),
+                          onPressed: c.batch.running || selected.isEmpty ? null : _process,
+                          child: const Icon(Icons.play_arrow_rounded, size: 26),
+                        ),
                       ),
                     ),
                     primary: ListenableBuilder(
