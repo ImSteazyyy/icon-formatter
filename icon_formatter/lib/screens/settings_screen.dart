@@ -16,6 +16,7 @@ import '../src/rust/api/engine.dart';
 import '../widgets/ai_mask.dart';
 import '../widgets/color_picker.dart';
 import '../widgets/common.dart';
+import '../widgets/fps_overlay.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/theme_reveal.dart';
 import '../workspace/adjust_panel.dart';
@@ -431,6 +432,7 @@ class _ProcessingPage extends StatelessWidget {
         value: s.refineEdges,
         onChanged: (v) => st.update(() => st.segment = copySegment(s, refineEdges: v)),
       ),
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.ritagliSalva), value: st.keepCutouts, onChanged: (v) => st.update(() => st.keepCutouts = v)),
       const SizedBox(height: 14),
       SectionTitle(S.batch),
       SettingSwitch(
@@ -627,6 +629,7 @@ class _SystemPage extends StatefulWidget {
 class _SystemPageState extends State<_SystemPage> {
   int? cache;
   int? outputs;
+  int? cutouts;
 
   @override
   void initState() {
@@ -652,10 +655,12 @@ class _SystemPageState extends State<_SystemPage> {
   Future<void> _refresh() async {
     final c = await AppPaths.I.cacheSize();
     final o = await AppPaths.I.outputsSize();
+    final k = (await cutoutCacheSize(dir: AppPaths.I.cutouts)).toInt();
     if (mounted) {
       setState(() {
         cache = c;
         outputs = o;
+        cutouts = k;
       });
     }
   }
@@ -697,6 +702,18 @@ class _SystemPageState extends State<_SystemPage> {
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
+        title: Text(S.ritagliSalvati),
+        subtitle: Text(cutouts == null ? '…' : formatBytes(cutouts!)),
+        trailing: OutlinedButton(
+          onPressed: () async {
+            await cutoutCacheClear(dir: AppPaths.I.cutouts);
+            _refresh();
+          },
+          child: Text(S.svuota),
+        ),
+      ),
+      ListTile(
+        contentPadding: EdgeInsets.zero,
         title: Text(S.risultatiDelleSessioni),
         subtitle: Text(outputs == null ? '…' : formatBytes(outputs!)),
         trailing: OutlinedButton(
@@ -729,6 +746,7 @@ class _SystemPageState extends State<_SystemPage> {
       Text(S.datiApp(AppPaths.I.root.path), style: TextStyle(fontSize: 11, color: Palette.text3)),
       const SizedBox(height: 14),
       const SettingsUpdateSwitch(),
+      const SettingsFpsSwitch(),
       SettingsDiagnosticsTile(version: appVersion),
       if (!Platform.isAndroid) const SettingsShortcutsTile(),
     ]);
@@ -1005,6 +1023,13 @@ List<Widget> glassControls(BuildContext context) {
           set(() => g.quality = v);
         }
       },
+    ),
+    // shown only when the frame monitor saw premium glass missing the budget
+    ValueListenableBuilder<bool>(
+      valueListenable: st.fpsStruggling,
+      builder: (context, struggling, _) => struggling && g.quality == GlassQualityLevel.quality
+          ? Text(S.fpsScatta, style: TextStyle(fontSize: 11.5, color: Palette.warn))
+          : const SizedBox.shrink(),
     ),
     if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
     SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.vetroNativo, subtitle: S.vetroNativoSub, value: g.native, onChanged: (v) => set(() => g.native = v)),

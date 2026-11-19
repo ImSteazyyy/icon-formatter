@@ -49,8 +49,13 @@ android {
 
     buildTypes {
         release {
-            // without key.properties (GitHub builds, other machines) the debug key keeps `flutter run --release` working
-            signingConfig = if (keystoreProps.containsKey("storeFile")) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // without key.properties the debug key keeps `flutter run --release` working locally;
+            // on CI (CI=true, set by GitHub Actions) a missing key is an error, never a debug-signed release
+            signingConfig = when {
+                keystoreProps.containsKey("storeFile") -> signingConfigs.getByName("release")
+                System.getenv("CI") == "true" -> throw GradleException("Release signing key missing: write android/key.properties from the ANDROID_* secrets")
+                else -> signingConfigs.getByName("debug")
+            }
         }
     }
 }

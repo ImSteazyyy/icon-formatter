@@ -179,6 +179,17 @@ pub fn build_with_fallback(
         }));
         count += 1;
     }
+    // the day icons of the first calendar app form one picker group; the other
+    // calendar apps keep their own days only through their <calendar> entry
+    if let Some(prefix) = calendars.values().next() {
+        let days: Vec<String> = (1..=31).map(|d| format!("{prefix}{d}")).filter(|n| used.contains(n)).collect();
+        if !days.is_empty() {
+            drawable.push_str("    <category title=\"Calendar\" />\n");
+            for n in days {
+                drawable.push_str(&format!("    <item drawable=\"{n}\" />\n"));
+            }
+        }
+    }
     if let Some(fb) = fallback {
         if !fb.backs.is_empty() {
             let imgs: String = fb
@@ -305,5 +316,9 @@ mod tests {
         assert!(xml.contains("<item component=\"ComponentInfo{com.cal/com.cal.Main}\""), "{xml}");
         assert!(xml.contains("<calendar component=\"ComponentInfo{com.cal/com.cal.Old}\" prefix=\"calendar_com_cal_\""));
         assert!(xml.contains("<calendar component=\"ComponentInfo{com.cal/com.cal.Main}\" prefix=\"calendar_com_cal_\""));
+        // the picker lists the days once, in one group (not per app)
+        let dx = fs::read_to_string(out.join("res/xml/drawable.xml")).unwrap();
+        assert_eq!(dx.matches("drawable=\"calendar_").count(), 2, "{dx}");
+        assert_eq!(dx.matches("<category title=\"Calendar\" />").count(), 1);
     }
 }

@@ -8,6 +8,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../app/models.dart';
 import '../app/state.dart';
 import '../app/theme.dart';
+import 'barfold_geometry.dart';
 import 'glassfix_premium_gate.dart';
 
 /// "Stile Nothing": solid black and grey surfaces, no glass.
@@ -38,19 +39,28 @@ class NothingColors {
 /// layout). Scrollable pages add it as bottom padding so content scrolls
 /// under the glass instead of being cut off.
 class GlassInsets extends InheritedWidget {
-  const GlassInsets({super.key, required this.bottom, this.folded = false, required super.child});
+  const GlassInsets({super.key, required this.bottom, this.folded = false, this.fold, required super.child});
 
   final double bottom;
 
   /// The bottom bar is folded into its round button (Glass style).
   final bool folded;
 
+  /// The shared fold progress (0 open, 1 folded), see barfold_geometry.dart.
+  final Animation<double>? fold;
+
   static double of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassInsets>()?.bottom ?? 0;
 
   static bool foldedOf(BuildContext context) => context.dependOnInheritedWidgetOfExactType<GlassInsets>()?.folded ?? false;
 
+  /// The fold progress for the slots; they rebuild per tick, not this widget.
+  static Animation<double> foldOf(BuildContext context) {
+    final w = context.getInheritedWidgetOfExactType<GlassInsets>();
+    return w?.fold ?? AlwaysStoppedAnimation(w?.folded ?? false ? 1.0 : 0.0);
+  }
+
   @override
-  bool updateShouldNotify(GlassInsets old) => old.bottom != bottom || old.folded != folded;
+  bool updateShouldNotify(GlassInsets old) => old.bottom != bottom || old.folded != folded || old.fold != fold;
 }
 
 /// Where a floating action bar sits over the bottom bar. With the bar open
@@ -67,19 +77,20 @@ class FloatingBarSlot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final under = GlassInsets.of(context);
-    final folded = GlassInsets.foldedOf(context);
     final inset = MediaQuery.of(context).viewPadding.bottom;
-    // folded button: 50 dp round, 12 dp from the left and bottom edges
-    // same start as the tab bar: rising faster than it opens, dropping a bit
-    // slower than it folds, so the two never cross
-    return AnimatedPositioned(
-      duration: Duration(milliseconds: folded ? 340 : 200),
-      curve: folded ? Curves.easeInOutCubic : Curves.easeOutCubic,
-      left: folded ? 12 + 50 + 8 : side,
-      right: side,
-      // centred on the folded button (measured on the emulator)
-      bottom: folded ? inset + 12 : under - 4, // the nav box includes 12dp of top padding
+    final fold = GlassInsets.foldOf(context);
+    // one timeline with the tab bar and the jump buttons (barfold_geometry.dart);
+    // the child is built once, only the position is rebuilt per tick
+    return AnimatedBuilder(
+      animation: fold,
       child: child,
+      builder: (context, child) => Positioned(
+        left: BarFold.actionLeft(fold.value, side, BarFold.actionFoldLeft),
+        right: side,
+        // folded: 12 dp from the bottom edge, next to the 50 dp round button
+        bottom: BarFold.actionBottom(fold.value, under - 4, inset + 12), // the nav box includes 12dp of top padding
+        child: child!,
+      ),
     );
   }
 }

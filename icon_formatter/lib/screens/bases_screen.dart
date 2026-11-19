@@ -195,6 +195,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
       background: BackgroundSettings.baseImage(path: widget.base.path),
       placement: edit!,
       segment: AppState.I.segment,
+      cutCacheDir: AppState.I.cutCacheDir,
     );
     try {
       final r = await previewFile(path: samples[testIndex % samples.length], settings: s);

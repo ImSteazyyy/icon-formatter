@@ -84,6 +84,8 @@ class S {
   static String get file => current.file;
   static String get cartella => current.cartella;
   static String get svuota => current.svuota;
+  static String get ritagliSalva => current.ritagliSalva;
+  static String get ritagliSalvati => current.ritagliSalvati;
   static String get analizzaCalibra => current.analizzaCalibra;
   static String get risultatiMedianaOutlierEsclusi => current.risultatiMedianaOutlierEsclusi;
   static String get esempiValidi => current.esempiValidi;
@@ -735,6 +737,7 @@ class S {
   static String get packRegistroCopia => current.packRegistroCopia;
   static String get packRegistroCopiato => current.packRegistroCopiato;
   static String packLogCreate(Object? n) => current.packLogCreate(n);
+  static String dbPackFallback(Object? r) => current.dbPackFallback(r);
   static String packLogRielabora(Object? n) => current.packLogRielabora(n);
   static String packLogEsportata(Object? n, Object? nuove, Object? cambiate, Object? rimosse) => current.packLogEsportata(n, nuove, cambiate, rimosse);
   static String packLogEsportataPrima(Object? n) => current.packLogEsportataPrima(n);
@@ -906,6 +909,9 @@ class S {
   static String wireNuovaVersione(Object? v) => current.wireNuovaVersione(v);
   static String get wireControllaAggiornamenti => current.wireControllaAggiornamenti;
   static String get wireControllaAggiornamentiSub => current.wireControllaAggiornamentiSub;
+  static String get fpsMostra => current.fpsMostra;
+  static String get fpsMostraSub => current.fpsMostraSub;
+  static String get fpsScatta => current.fpsScatta;
   static String get wireCartellaOsservata => current.wireCartellaOsservata;
   static String get wireCartellaOsservataSub => current.wireCartellaOsservataSub;
   static String get wireScegliCartella => current.wireScegliCartella;
@@ -913,4 +919,17 @@ class S {
   static String get wireRimuoviCartella => current.wireRimuoviCartella;
   static String get batchElaborazione => current.batchElaborazione;
   static String get batchCompletato => current.batchCompletato;
+  static String get btnRegistro => current.btnRegistro;
+  static String get btnScegliIcona => current.btnScegliIcona;
+  static String get btnRielabora => current.btnRielabora;
+  static String get btnSegnaVerificata => current.btnSegnaVerificata;
+  static String get btnEscludi => current.btnEscludi;
+  static String get dpInfoPack => current.dpInfoPack;
+  static String dpInfoVersione(Object? v) => current.dpInfoVersione(v);
+  static String get dpInfoNonInstallato => current.dpInfoNonInstallato;
+  static String get dpInfoLauncher => current.dpInfoLauncher;
+  static String get dpInfoNonTrovato => current.dpInfoNonTrovato;
+  static String get btnAnnulla => current.btnAnnulla;
+  static String get btnRipristina => current.btnRipristina;
+  static String get btnDuplicati => current.btnDuplicati;
 }

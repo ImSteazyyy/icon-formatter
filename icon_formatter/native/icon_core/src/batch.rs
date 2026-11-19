@@ -1,15 +1,16 @@
 //! Parallel batch engine with progress reporting and cooperative cancellation.
 
 use crate::compose::Placement;
+use crate::cutcache;
 use crate::effects::{self, Effects};
 use crate::error::{CoreError, Result};
 use crate::imageops::{clean_transparent, decode, decode_file, resize, write_png};
 use crate::lucent::{GlyphStrategy, PlateShape};
-use crate::segment::{isolate, SegmentOptions, SegmentResult};
+use crate::segment::{isolate, SegmentMode, SegmentOptions, SegmentResult};
 use image::RgbaImage;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -64,25 +65,62 @@ pub struct BatchConfig {
     pub ai: Option<(Arc<crate::ai::Model>, crate::ai::AiOptions)>,
     /// Global look options; `Effects::default()` changes nothing.
     pub effects: Effects,
+    /// Folder of the cutout cache (`cutcache`); None = isolate every time.
+    pub cut_cache: Option<PathBuf>,
+}
+
+/// Isolates the glyph, or reuses it from the cutout cache when the source
+/// pixels and every isolation input match (see `cutcache::key`). `keep_alpha`
+/// is the skip-isolation path (the glyph is already cut out). Errors come only
+/// from the AI model; nothing is stored for them.
+pub fn isolate_cached(
+    img: &RgbaImage,
+    cut_cache: Option<&Path>,
+    seg: &SegmentOptions,
+    ai: Option<(&crate::ai::Model, crate::ai::AiOptions)>,
+    keep_alpha: bool,
+) -> std::result::Result<SegmentResult, String> {
+    let eff = if keep_alpha { SegmentOptions { mode: SegmentMode::KeepAlpha, ..seg.clone() } } else { seg.clone() };
+    let key = cut_cache.map(|dir| {
+        let ai_key = ai.filter(|_| !keep_alpha).map(|(m, opt)| cutcache::AiKey {
+            model: m.kind.id(),
+            stamp: cutcache::model_stamp(&m.path),
+            opt,
+        });
+        let k = cutcache::key(&cutcache::Key { image: cutcache::image_hash(img), segment: &eff, ai: ai_key });
+        (dir, k)
+    });
+    if let Some((dir, k)) = &key {
+        if let Some(r) = cutcache::load(dir, k) {
+            return Ok(r);
+        }
+    }
+    let res = if keep_alpha {
+        isolate(img, &eff)
+    } else if let Some((model, opt)) = ai {
+        crate::ai::isolate_ai(img, model, opt)?.seg
+    } else {
+        isolate(img, &eff)
+    };
+    if let Some((dir, k)) = &key {
+        // a failed store only costs a future isolation
+        let _ = cutcache::store(dir, k, &res);
+    }
+    Ok(res)
 }
 
 pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage, JobResult) {
     let seg = job.segment.as_ref().unwrap_or(&cfg.segment);
     let pl = job.placement.as_ref().unwrap_or(&cfg.placement);
-    let mut res = if job.skip_isolation {
-        isolate(img, &SegmentOptions { mode: crate::segment::SegmentMode::KeepAlpha, ..seg.clone() })
-    } else if let Some((model, opt)) = &cfg.ai {
-        match crate::ai::isolate_ai(img, model, *opt) {
-            Ok(r) => r.seg,
-            Err(e) => {
-                let mut r = isolate(img, seg);
-                r.notes.push(format!("AI non disponibile ({e}): segmentazione classica"));
-                r.ambiguous = true;
-                r
-            }
+    let ai = cfg.ai.as_ref().map(|(m, o)| (&**m, *o));
+    let mut res = match isolate_cached(img, cfg.cut_cache.as_deref(), seg, ai, job.skip_isolation) {
+        Ok(r) => r,
+        Err(e) => {
+            let mut r = isolate(img, seg);
+            r.notes.push(format!("AI non disponibile ({e}): segmentazione classica"));
+            r.ambiguous = true;
+            r
         }
-    } else {
-        isolate(img, seg)
     };
     let (mut canvas, extra) = compose_canvas(img, &mut res, cfg, pl, job.shape, job.backdrop);
     clean_transparent(&mut canvas);
@@ -176,42 +214,72 @@ pub fn run(
 ) -> Vec<JobResult> {
     let total = jobs.len();
     let done = AtomicUsize::new(0);
-    let work = || {
-        jobs.par_iter()
-            .map(|job| {
-                let r = if cancel.load(Ordering::Relaxed) {
-                    JobResult {
-                        id: job.id.clone(),
-                        name: job.name.clone(),
-                        ok: false,
-                        error: Some(CoreError::Cancelled.to_string()),
-                        output: None,
-                        ambiguous: false,
-                        confidence: 0.0,
-                        method: String::new(),
-                        notes: vec![],
-                    }
-                } else {
-                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_job(job, cfg))) {
-                        Ok(Ok(r)) => r,
-                        Ok(Err(e)) => failed(job, e.to_string()),
-                        Err(_) => failed(job, "internal error while processing".into()),
-                    }
-                };
+    in_pool(cfg.threads, || {
+        run_jobs(jobs, cfg, cancel, &|r| {
+            let d = done.fetch_add(1, Ordering::SeqCst) + 1;
+            progress(r, d, total);
+        })
+    })
+}
+
+/// Jobs per parallel step of `run_chunked`.
+pub const CHUNK: usize = 64;
+
+/// Same output as `run`, but the jobs go through in chunks of `CHUNK`: the
+/// results of a finished chunk are dropped before the next one starts, so the
+/// memory held here does not grow with the number of icons. Nothing is
+/// returned: every result is reported through `progress`.
+pub fn run_chunked(jobs: &[Job], cfg: &BatchConfig, cancel: &AtomicBool, progress: &(dyn Fn(&JobResult, usize, usize) + Sync)) {
+    let total = jobs.len();
+    let done = AtomicUsize::new(0);
+    in_pool(cfg.threads, || {
+        for chunk in jobs.chunks(CHUNK) {
+            let _ = run_jobs(chunk, cfg, cancel, &|r| {
                 let d = done.fetch_add(1, Ordering::SeqCst) + 1;
-                progress(&r, d, total);
-                r
-            })
-            .collect::<Vec<_>>()
-    };
-    if cfg.threads > 0 {
-        match worker_pool(cfg.threads).build() {
+                progress(r, d, total);
+            });
+        }
+    })
+}
+
+/// Runs `work` in a pool of `threads` workers (0 = the shared pool).
+fn in_pool<T: Send>(threads: usize, work: impl FnOnce() -> T + Send) -> T {
+    if threads > 0 {
+        match worker_pool(threads).build() {
             Ok(pool) => pool.install(work),
             Err(_) => work(),
         }
     } else {
         work()
     }
+}
+
+fn run_jobs(jobs: &[Job], cfg: &BatchConfig, cancel: &AtomicBool, progress: &(dyn Fn(&JobResult) + Sync)) -> Vec<JobResult> {
+    jobs.par_iter()
+        .map(|job| {
+            let r = if cancel.load(Ordering::Relaxed) {
+                JobResult {
+                    id: job.id.clone(),
+                    name: job.name.clone(),
+                    ok: false,
+                    error: Some(CoreError::Cancelled.to_string()),
+                    output: None,
+                    ambiguous: false,
+                    confidence: 0.0,
+                    method: String::new(),
+                    notes: vec![],
+                }
+            } else {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_job(job, cfg))) {
+                    Ok(Ok(r)) => r,
+                    Ok(Err(e)) => failed(job, e.to_string()),
+                    Err(_) => failed(job, "internal error while processing".into()),
+                }
+            };
+            progress(&r);
+            r
+        })
+        .collect::<Vec<_>>()
 }
 
 fn failed(job: &Job, e: String) -> JobResult {
@@ -264,6 +332,7 @@ mod tests {
             lucent: None,
             ai: None,
             effects: Effects::default(),
+            cut_cache: None,
         };
         let cancel = AtomicBool::new(false);
         let r = run(&jobs, &cfg, &cancel, &|_, _, _| {});
@@ -272,6 +341,65 @@ mod tests {
         let cancel = AtomicBool::new(true);
         let r = run(&jobs, &cfg, &cancel, &|_, _, _| {});
         assert!(r.iter().all(|r| !r.ok));
+    }
+
+    #[test]
+    fn chunked_run_writes_the_same_pixels_as_one_shot() {
+        let t = tempfile::tempdir().unwrap();
+        let mut img = RgbaImage::from_pixel(48, 48, image::Rgba([255, 255, 255, 255]));
+        for y in 12..36 {
+            for x in 12..36 {
+                img.put_pixel(x, y, image::Rgba([30, 90, 200, 255]));
+            }
+        }
+        let bytes = Arc::new(crate::imageops::encode_png(&img).unwrap());
+        // more than one chunk, so the chunk boundary is crossed
+        let n = CHUNK + 5;
+        let mk = |dir: &str| -> Vec<Job> {
+            (0..n)
+                .map(|i| Job {
+                    id: i.to_string(),
+                    name: format!("i{i}"),
+                    source: Source::Bytes(bytes.clone()),
+                    output: t.path().join(dir).join(format!("o{i}.png")),
+                    segment: None,
+                    placement: None,
+                    skip_isolation: false,
+                    shape: None,
+                    backdrop: None,
+                })
+                .collect()
+        };
+        std::fs::create_dir_all(t.path().join("a")).unwrap();
+        std::fs::create_dir_all(t.path().join("b")).unwrap();
+        let cfg = BatchConfig {
+            size: 64,
+            background: Arc::new(RgbaImage::new(64, 64)),
+            placement: Placement::default(),
+            segment: SegmentOptions::default(),
+            threads: 2,
+            lucent: None,
+            ai: None,
+            effects: Effects::default(),
+            cut_cache: None,
+        };
+        let cancel = AtomicBool::new(false);
+        let one = run(&mk("a"), &cfg, &cancel, &|_, _, _| {});
+        let seen = AtomicUsize::new(0);
+        let last = AtomicUsize::new(0);
+        run_chunked(&mk("b"), &cfg, &cancel, &|_, d, tot| {
+            seen.fetch_add(1, Ordering::SeqCst);
+            assert_eq!(tot, n);
+            last.fetch_max(d, Ordering::SeqCst);
+        });
+        assert_eq!(seen.load(Ordering::SeqCst), n);
+        assert_eq!(last.load(Ordering::SeqCst), n);
+        assert!(one.iter().all(|r| r.ok));
+        for i in 0..n {
+            let a = std::fs::read(t.path().join("a").join(format!("o{i}.png"))).unwrap();
+            let b = std::fs::read(t.path().join("b").join(format!("o{i}.png"))).unwrap();
+            assert_eq!(a, b, "item {i} differs between one-shot and chunked");
+        }
     }
 
     #[test]
@@ -291,6 +419,7 @@ mod tests {
             lucent: Some(crate::lucent::LucentParams::dark()),
             ai: None,
             effects: Effects { recolor: Some([0, 255, 0]), ..Effects::default() },
+            cut_cache: None,
         };
         let job = Job {
             id: "a".into(),
@@ -307,6 +436,61 @@ mod tests {
         // the recoloured symbol keeps its alpha and gets the flat colour
         assert!(out.pixels().any(|p| p.0 == [0, 255, 0, 255]), "no recoloured pixel");
         assert!(!out.pixels().any(|p| p[0] > 150 && p[1] < 50 && p[3] > 200), "source colour left");
+    }
+    #[test]
+    fn cutout_cache_hits_skip_isolation_and_keep_output_identical() {
+        let t = tempfile::tempdir().unwrap();
+        let mut img = RgbaImage::from_pixel(64, 64, image::Rgba([255, 255, 255, 255]));
+        for y in 20..44 {
+            for x in 20..44 {
+                img.put_pixel(x, y, image::Rgba([200, 0, 0, 255]));
+            }
+        }
+        let cfg_for = |cache: Option<PathBuf>, size: u32| BatchConfig {
+            size,
+            background: Arc::new(RgbaImage::from_pixel(size, size, image::Rgba([0, 0, 255, 255]))),
+            placement: Placement::default(),
+            segment: SegmentOptions::default(),
+            threads: 1,
+            lucent: None,
+            ai: None,
+            effects: Effects::default(),
+            cut_cache: cache,
+        };
+        let job = Job {
+            id: "a".into(),
+            name: "a".into(),
+            source: Source::Bytes(Arc::new(Vec::new())),
+            output: PathBuf::new(),
+            segment: None,
+            placement: None,
+            skip_isolation: false,
+            shape: None,
+            backdrop: None,
+        };
+        let count = |d: &Path| std::fs::read_dir(d).map(|rd| rd.count()).unwrap_or(0);
+        let dir = t.path().join("cutouts");
+        let (plain, _) = process_one(&img, &cfg_for(None, 96), &job);
+        let (miss, r_miss) = process_one(&img, &cfg_for(Some(dir.clone()), 96), &job);
+        assert_eq!(count(&dir), 2, "one entry: png + json");
+        assert_eq!(miss.as_raw(), plain.as_raw(), "miss output differs from uncached");
+        let (hit, r_hit) = process_one(&img, &cfg_for(Some(dir.clone()), 96), &job);
+        assert_eq!(hit.as_raw(), plain.as_raw(), "hit output differs from uncached");
+        assert_eq!(r_hit.method, r_miss.method);
+        // a marked entry proves the next run reads the cache instead of isolating
+        let key = cutcache::key(&cutcache::Key { image: cutcache::image_hash(&img), segment: &SegmentOptions::default(), ai: None });
+        let mut marked = isolate(&img, &SegmentOptions::default());
+        marked.method = "marker".into();
+        cutcache::store(&dir, &key, &marked).unwrap();
+        // a size change is not an isolation input: same key, cache hit
+        let (_, r) = process_one(&img, &cfg_for(Some(dir.clone()), 128), &job);
+        assert_eq!(r.method, "marker", "size change must reuse the cutout");
+        // a tolerance change is an isolation input: new key, isolation runs
+        let mut j2 = job.clone();
+        j2.segment = Some(SegmentOptions { tolerance: 0.2, ..SegmentOptions::default() });
+        let (_, r) = process_one(&img, &cfg_for(Some(dir.clone()), 96), &j2);
+        assert_ne!(r.method, "marker", "tolerance change must not reuse the cutout");
+        assert_eq!(count(&dir), 4, "second key adds png + json");
     }
 }
 

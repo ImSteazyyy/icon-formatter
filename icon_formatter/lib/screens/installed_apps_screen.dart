@@ -408,7 +408,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
               ),
               // the search stays at the top while the icons scroll under it
               SliverPinnedSearch(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+                // the bars sit close together; the icons get a bit more air below them
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                 child: TextField(controller: _search, decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
               ),
               SliverToBoxAdapter(
@@ -417,7 +418,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   children: [
                     // filters fit on screen (nothing hidden off the edge)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                       // two equal toggles, edge to edge
                       child: Row(
                         children: [
@@ -449,7 +450,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                         // one lookup table per build (not a scan per cell)
                         final byId = {for (final x in c.items) x.id: x};
                         return SliverPadding(
-                          padding: EdgeInsets.fromLTRB(20, 8, 20, under + 200),
+                          padding: EdgeInsets.fromLTRB(20, 16, 20, under + 200),
                           sliver: SliverGrid.builder(
                             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 120, mainAxisExtent: 150, mainAxisSpacing: 8, crossAxisSpacing: 8),
                             itemCount: list.length,
@@ -572,7 +573,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
               ),
             ),
           ),
-          if (MediaQuery.viewInsetsOf(context).bottom == 0) JumpButtonsSlot(controller: _scroll, openBottom: under + 116, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 74),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) JumpButtonsSlot(controller: _scroll, openBottom: under + 76, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 74),
       // floating liquid-glass action bar (content scrolls underneath);
           // hidden while the keyboard is open, so it never covers the filters
           if (MediaQuery.viewInsetsOf(context).bottom == 0)

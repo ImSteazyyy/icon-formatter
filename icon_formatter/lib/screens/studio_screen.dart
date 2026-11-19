@@ -203,10 +203,10 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
   /// Undo, redo and duplicates, as toolbar buttons (desktop; enabled state
   /// read on each rebuild). The phone has them in "Altro".
   List<Widget> _studioTools() => [
-        ToolButton(key: const ValueKey('studio-undo'), icon: Icons.undo_rounded, label: S.studioAnnullaModifica, onTap: c.canUndo ? () => c.undo() : null),
-        ToolButton(key: const ValueKey('studio-redo'), icon: Icons.redo_rounded, label: S.studioRipristinaModifica, onTap: c.canRedo ? () => c.redo() : null),
+        ToolButton(key: const ValueKey('studio-undo'), icon: Icons.undo_rounded, label: S.btnAnnulla, onTap: c.canUndo ? () => c.undo() : null),
+        ToolButton(key: const ValueKey('studio-redo'), icon: Icons.redo_rounded, label: S.btnRipristina, onTap: c.canRedo ? () => c.redo() : null),
         if (c.duplicateCount > 0)
-          ToolButton(key: const ValueKey('studio-dup'), icon: Icons.content_copy_outlined, label: S.studioEscludiDuplicati, onTap: () => _excludeDuplicates()),
+          ToolButton(key: const ValueKey('studio-dup'), icon: Icons.content_copy_outlined, label: S.btnDuplicati, onTap: () => _excludeDuplicates()),
       ];
 
   void _excludeDuplicates() {

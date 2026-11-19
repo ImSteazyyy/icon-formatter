@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 
@@ -26,7 +27,10 @@ import '../services/pack_conflicts.dart';
 import '../services/pack_mapping_import.dart';
 import '../services/pack_naming.dart';
 import '../services/pack_quality.dart';
+import '../services/pack_source_filter.dart';
 import '../services/pack_suggest.dart';
+import '../services/packdb_db.dart';
+import '../services/packdb_store.dart';
 import '../services/platform_service.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/ignored_apps_sheet.dart';
@@ -76,6 +80,8 @@ class PbIcon {
       child: IconImage(bytes: bytes, path: path),
     );
   }
+
+  PbIcon withId(String newId) => PbIcon(id: newId, label: label, package: package, activity: activity, file: file, path: path, bytes: bytes, isSystem: isSystem, calendarDay: calendarDay);
 
   MatchInput toInput() => MatchInput(id: id, label: label, package: package, file: file, path: path, png: path == null ? bytes : null);
 
@@ -152,6 +158,7 @@ class PbMatch {
 class PackBuilderController extends ChangeNotifier {
   PackBuilderController() {
     _restore();
+    PackStore.onFallback.add(notifyListeners);
   }
 
   /// One builder for the app: the Studio sends its results here.
@@ -235,8 +242,9 @@ class PackBuilderController extends ChangeNotifier {
   }
 
   // ------------------------------------------------------------ persistence
+  // The lists live in PackStore (pack.db, or pack_builder.json as fallback):
+  // see services/packdb_store.dart.
 
-  String get _stateFile => p.join(AppPaths.I.root.path, 'pack_builder.json');
   String get _customDir => p.join(AppPaths.I.root.path, 'pack_custom');
   String get _catalogDir => p.join(AppPaths.I.root.path, 'catalog');
 
@@ -244,55 +252,50 @@ class PackBuilderController extends ChangeNotifier {
 
   bool _restored = false;
 
+  /// The saved sources were cleaned by the one-time pass (see [parsePackJson]).
+  bool _cleaned = false;
+
   void _restore() {
     try {
-      final f = File(_stateFile);
-      if (!f.existsSync()) return;
-      final j = jsonDecode(f.readAsStringSync()) as Map;
-      generated.addAll(((j['generated'] as List?) ?? []).cast<Map>().map(PbIcon.fromJson).whereType<PbIcon>());
-      calendars.addAll(((j['calendars'] as List?) ?? []).cast<Map>().map(PbIcon.fromJson).whereType<PbIcon>());
+      final c = PackStore.I.readAll();
+      generated.addAll(c.generated.map(_iconOf));
+      calendars.addAll(c.calendars.map(_iconOf));
       // file-based originals (Windows / imported packs); the Android
       // catalogue is read again from the system
-      originals.addAll(((j['originals'] as List?) ?? []).cast<Map>().map(PbIcon.fromJson).whereType<PbIcon>());
-      ((j['custom'] as Map?) ?? {}).forEach((k, v) {
-        final m = (v as Map).cast<String, String?>();
-        if (m['path'] != null && File(m['path']!).existsSync()) custom[k as String] = m;
-      });
+      originals.addAll(c.originals.map(_iconOf));
+      _cleaned = c.cleaned;
+      custom.addAll(c.custom);
       _reindex();
     } catch (_) {
-      // a damaged state file only loses the builder lists
+      // a damaged state only loses the builder lists
     } finally {
       _restored = true;
+      if (_cleaned) _persist();
     }
   }
 
+  static PbIcon _iconOf(PackRecord r) => PbIcon(id: r.id, label: r.label, package: r.package, activity: r.activity, file: r.file, path: r.path, isSystem: r.isSystem, calendarDay: r.calendarDay);
+
+  static PackRecord _recordOf(String kind, PbIcon i) => PackRecord(kind: kind, id: i.id, path: i.path!, label: i.label, package: i.package, activity: i.activity, file: i.file, calendarDay: i.calendarDay, isSystem: i.isSystem);
+
   Timer? _saveTimer;
 
+  /// Debounced: one write per burst of changes, and only the changed rows
+  /// reach pack.db (the JSON store rewrites its file).
   void _persist() {
     if (!_restored) return;
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 400), () async {
-      final j = {
-        'generated': [
-          for (final g in generated)
-            if (g.path != null) g.toJson(),
-        ],
-        'originals': [
-          for (final o in originals)
-            if (!o.id.startsWith('app:') && o.path != null) o.toJson(),
-        ],
-        'custom': custom,
-        'calendars': [
-          for (final g in calendars)
-            if (g.path != null) g.toJson(),
-        ],
-      };
-      final f = File(_stateFile);
-      final tmp = File('${f.path}.tmp');
-      await tmp.writeAsString(jsonEncode(j));
-      await tmp.rename(f.path);
+    _saveTimer = Timer(const Duration(milliseconds: 400), () {
+      unawaited(PackStore.I.writeIcons(_iconsSnapshot()).catchError((Object e) => debugPrint('pack save: $e')));
     });
   }
+
+  PackContent _iconsSnapshot() => PackContent(
+        generated: [for (final g in generated) if (g.path != null) _recordOf('generated', g)],
+        originals: [for (final o in originals) if (!o.id.startsWith('app:') && o.path != null) _recordOf('original', o)],
+        calendars: [for (final g in calendars) if (g.path != null) _recordOf('calendar', g)],
+        custom: custom,
+      );
 
   @override
   void notifyListeners() {
@@ -333,7 +336,11 @@ class PackBuilderController extends ChangeNotifier {
 
   /// Folder, ZIP or APK. Uses appfilter.xml (text or binary) when present to
   /// recover package and activity of each drawable.
-  Future<List<PbIcon>> _readSource(String input, String prefix) async {
+  /// The icons of [input]; the flag tells whether it is an icon pack (its
+  /// appfilter.xml links the images to apps, see [packIconIndexes]).
+  /// The icons of [input], the calendar days of its apps, and whether it is an
+  /// icon pack (its appfilter.xml links the images to apps, see [packIconIndexes]).
+  Future<(List<PbIcon>, bool, List<PbIcon>)> _readSource(String input, String prefix) async {
     final work = await AppPaths.I.workDir('builder');
     final info = await openPack(input: input, workDir: work);
     final comp = <String, (String, String)>{};
@@ -341,15 +348,67 @@ class PackBuilderController extends ChangeNotifier {
       final m = RegExp(r'ComponentInfo\{([^/}]+)/?([^}]*)\}').firstMatch(it.component);
       if (m != null) comp[it.drawable.toLowerCase()] = (m.group(1)!, m.group(2) ?? '');
     }
+    final rels = [for (final img in info.images) img.rel];
+    final keep = packIconIndexes(rels, comp);
     var k = 0;
-    return [
-      for (final img in info.images)
+    final list = [
+      for (final i in keep)
         () {
+          final img = info.images[i];
           final stem = p.basenameWithoutExtension(img.rel).toLowerCase();
           final c = comp[stem];
           return PbIcon(id: '$prefix${k++}', file: p.basename(img.rel), package: c?.$1 ?? '', activity: c?.$2 ?? '', path: img.abs);
         }(),
     ];
+    final days = [
+      for (final d in packCalendarDays(rels, comp))
+        PbIcon(id: '${prefix}d${d.day}_${d.index}', file: p.basename(info.images[d.index].rel), package: d.package, activity: d.activity, path: info.images[d.index].abs, calendarDay: d.day),
+    ];
+    return (list, comp.isNotEmpty, days);
+  }
+
+  /// Calendar days of a pack become the days of their app: they replace the
+  /// days this app had (the app's one row shows them as variants).
+  Future<void> _adoptDays(List<PbIcon> days, int stamp) async {
+    if (days.isEmpty) return;
+    final dir = Directory(p.join(AppPaths.I.root.path, 'pack_imported', '$stamp'));
+    await dir.create(recursive: true);
+    final copied = <PbIcon>[];
+    for (final d in days) {
+      if (d.path == null) continue;
+      final dest = p.join(dir.path, 'calendar_${sanitizeDrawableName(name: d.package)}_${d.calendarDay}_${d.id.hashCode.toUnsigned(32).toRadixString(16)}.png');
+      await File(d.path!).copy(dest);
+      copied.add(PbIcon(id: d.id, label: d.label, package: d.package, activity: d.activity, file: d.file, path: dest, calendarDay: d.calendarDay));
+    }
+    final apps = {for (final d in copied) d.package};
+    calendars.removeWhere((g) => apps.contains(g.package));
+    calendars.addAll(copied);
+  }
+
+  /// The days of the calendar app of [r] (empty for other apps), by day.
+  List<PbIcon> calendarDaysOf(PbRow r) {
+    final days = calendars.where((g) => g.path != null);
+    return groupCalendarDays(days, packageOf: (g) => g.package, dayOf: (g) => g.calendarDay)[r.original.package] ?? const [];
+  }
+
+  /// Rows of the apps named by the change check ("pkg/activity" or "pkg").
+  List<PbRow> rowsOfComponents(Set<String> comps) {
+    final pkgs = {for (final c in comps) c.split('/').first};
+    return [for (final r in rows) if (r.original.package.isNotEmpty && pkgs.contains(r.original.package)) r];
+  }
+
+  /// Empties the list of file originals; the installed apps and the icons
+  /// already made stay.
+  Future<void> clearFileOriginals() async {
+    originals.removeWhere((o) => !o.id.startsWith('app:'));
+    _reindex();
+    if (originals.isEmpty) {
+      rows.clear();
+      _recount();
+      notifyListeners();
+    } else {
+      await match();
+    }
   }
 
   Future<void> addSource({required bool original}) async {
@@ -366,7 +425,17 @@ class PackBuilderController extends ChangeNotifier {
     _set(S.pbLettura, running: true);
     try {
       final stamp = DateTime.now().millisecondsSinceEpoch;
-      final list = await _readSource(input, original ? 'o${stamp}_' : 'g${stamp}_');
+      final (list, isPack, days) = await _readSource(input, original ? 'o${stamp}_' : 'g${stamp}_');
+      // an icon pack, read next to the installed apps (Android), holds finished
+      // icons: they are adopted as they are, never rendered again as originals
+      // without the catalogue (Windows) the pack's icons are the rows instead:
+      // still finished, never rendered again
+      if (original && isPack) {
+        final catalogue = originals.any((o) => o.id.startsWith('app:'));
+        await _adoptPack([for (var i = 0; i < list.length; i++) list[i].withId('pk${stamp}_$i')], stamp, days: days, asOriginals: !catalogue);
+        return;
+      }
+      if (!original && isPack) await _adoptDays(days, stamp);
       (original ? originals : generated).addAll(list);
       _reindex();
       _set(original ? S.pbOriginaliCaricati(originals.length) : S.pbGenerateCaricate(generated.length), running: false);
@@ -445,33 +514,46 @@ class PackBuilderController extends ChangeNotifier {
         await PlatformService.devicePackArchiveInfo(path);
       }
       final stamp = DateTime.now().millisecondsSinceEpoch;
-      // only icons linked to an app (a phone pack also holds empty slots)
-      final list = (await _readSource(path, 'pk${stamp}_')).where((g) => g.package.isNotEmpty).toList();
-      if (list.isEmpty) {
-        _set(S.pbPackVuoto, running: false);
-        return 0;
-      }
-      // the extracted files live in the cache: keep a copy with the app data
-      final dir = Directory(p.join(AppPaths.I.root.path, 'pack_imported', '$stamp'));
-      await dir.create(recursive: true);
-      for (final g in list) {
-        if (g.path == null) continue;
-        final dest = p.join(dir.path, '${sanitizeDrawableName(name: g.package)}_${g.id.hashCode.toUnsigned(32).toRadixString(16)}.png');
-        await File(g.path!).copy(dest);
-        g.path = dest;
-      }
-      // a newer copy of the same apps replaces the older imported ones
-      final pkgs = list.map((g) => g.key).toSet();
-      generated.removeWhere((g) => g.id.startsWith('pk') && pkgs.contains(g.key));
-      generated.addAll(list);
-      _reindex();
-      _set(S.pbPackAperto(list.length), running: false);
-      await match();
-      return list.length;
+      final (list, _, days) = await _readSource(path, 'pk${stamp}_');
+      return await _adoptPack(list, stamp, days: days);
     } catch (e) {
       _set(S.errore(e), running: false);
       rethrow;
     }
+  }
+
+  /// Icons of an opened pack become step 2 (generated, finished): copied next
+  /// to the app data, replacing the older copy of the same apps, then matched.
+  Future<int> _adoptPack(List<PbIcon> read, int stamp, {List<PbIcon> days = const [], bool asOriginals = false}) async {
+    // only icons linked to an app (a phone pack also holds empty slots)
+    final list = read.where((g) => g.package.isNotEmpty).toList();
+    await _adoptDays(days, stamp);
+    if (list.isEmpty) {
+      _set(S.pbPackVuoto, running: false);
+      return 0;
+    }
+    // the extracted files live in the cache: keep a copy with the app data
+    final dir = Directory(p.join(AppPaths.I.root.path, 'pack_imported', '$stamp'));
+    await dir.create(recursive: true);
+    for (final g in list) {
+      if (g.path == null) continue;
+      final dest = p.join(dir.path, '${sanitizeDrawableName(name: g.package)}_${g.id.hashCode.toUnsigned(32).toRadixString(16)}.png');
+      await File(g.path!).copy(dest);
+      g.path = dest;
+    }
+    // a newer copy of the same apps replaces the older imported ones
+    final pkgs = list.map((g) => g.key).toSet();
+    generated.removeWhere((g) => g.id.startsWith('pk') && pkgs.contains(g.key));
+    generated.addAll(list);
+    if (asOriginals) {
+      // no installed-app rows: the pack's own icons are the rows (ids "pko...")
+      originals.removeWhere((o) => o.id.startsWith('pko') && pkgs.contains(o.key));
+      originals.addAll([for (var i = 0; i < list.length; i++) list[i].withId('pko${stamp}_$i')]);
+    }
+    _reindex();
+    _set(S.pbPackAperto(list.length), running: false);
+    await match();
+    return list.length;
   }
 
   Future<String?> Function() _pickKindImpl = () async => null;
@@ -480,7 +562,13 @@ class PackBuilderController extends ChangeNotifier {
   /// Renders the originals with the current Studio settings (pack mode).
   Future<void> generateFromOriginals({List<PbRow>? only}) async {
     final st = AppState.I;
-    final targets = only?.map((r) => r.original).toList() ?? originals.where((o) => o.path != null || o.bytes != null).toList();
+    // icons of a pack or of the Studio are finished: a bulk render leaves them
+    // alone (a row is rendered again only when asked for it: "Rielabora")
+    final finished = {for (final r in rows) if (r.generatedId?.startsWith('pk') ?? false) r.original.id};
+    final targets = only?.map((r) => r.original).toList() ?? [
+      for (final o in originals)
+        if ((o.path != null || o.bytes != null) && renderOnBulk(originalId: o.id, hasStudioIcon: _studioFor(o) != null, rowFinished: finished.contains(o.id))) o,
+    ];
     if (targets.isEmpty) return;
     final byId = {for (final t in targets) t.id: t};
     final rowById = {for (final r in rows) r.original.id: r};
@@ -499,6 +587,7 @@ class PackBuilderController extends ChangeNotifier {
         ),
     ];
     _set(S.pbGenerazione(0, items.length), prog: 0, running: true);
+    _deferAppSaves = true;
     var done = 0;
     var okCount = 0;
     try {
@@ -514,7 +603,8 @@ class PackBuilderController extends ChangeNotifier {
         if (o != null && r.ok && r.output != null) {
           final gid = 'gen:${o.id}';
           okCount++;
-          generated.removeWhere((g) => g.id == gid);
+          // a scan of the whole list per icon was quadratic over a 5000 batch
+          if (_genById.containsKey(gid)) generated.removeWhere((g) => g.id == gid);
           // same name/package as the original: the association is exact
           final g = PbIcon(id: gid, label: o.label, package: o.package, activity: o.activity, file: o.file.isNotEmpty ? o.file : p.basename(r.output!), path: r.output);
           generated.add(g);
@@ -539,8 +629,14 @@ class PackBuilderController extends ChangeNotifier {
       if (okCount > 0) _log(only == null ? S.packLogCreate(okCount) : S.packLogRielabora(okCount));
       if (only == null) await _redoCustom();
     } finally {
+      _deferAppSaves = false;
+      if (_appSavePending) {
+        _appSavePending = false;
+        AppState.I.update(() {});
+      }
       _recount();
       _set(S.pbGenerateCaricate(generated.length), running: false);
+      unawaited(st.pruneCutouts());
     }
     if (only == null) await match();
   }
@@ -582,14 +678,19 @@ class PackBuilderController extends ChangeNotifier {
         } else {
           row.reason = S.pbNessunaIcona;
         }
+        // icons of an opened pack are finished: they count as confident
+        final pkIcon = generatedById(row.generatedId);
+        if (pkIcon != null && pkIcon.id.startsWith('pk') && pkIcon.package == row.original.package) row.auto = MatchState.confident;
         // saved corrections win over the automatic association
         final c = corr[row.original.key];
         if (c != null) {
           row.excluded = c['excluded'] == true;
           row.verified = c['verified'] == true;
+          // saved by icon id now; an older save holds the app key (first icon of it)
           final gk = c['generated'] as String?;
-          if (gk != null && genByKey[gk] != null) {
-            row.generatedId = genByKey[gk]!.id;
+          final pick = gk == null ? null : (_genById[gk] ?? genByKey[gk]);
+          if (pick != null) {
+            row.generatedId = pick.id;
             row.manual = true;
             row.reason = S.pbCorrezioneSalvata;
           }
@@ -682,13 +783,24 @@ class PackBuilderController extends ChangeNotifier {
     final g = generatedById(row.generatedId);
     // keeps the other saved fields (label, aliases, variants, keepWhite)
     final old = AppState.I.packCorrections[row.original.key] ?? {};
-    AppState.I.update(() => AppState.I.packCorrections[row.original.key] = {
+    void apply() => AppState.I.packCorrections[row.original.key] = {
           ...old,
-          'generated': row.manual ? g?.key : null,
+          // ids of an opened pack change at each opening: its app key is saved instead
+        'generated': row.manual && g != null ? (g.id.startsWith('pk') ? g.key : g.id) : null,
           'excluded': row.excluded,
           'verified': row.verified,
-        });
+        };
+    // a batch saves per icon: one app-wide rebuild and one disk save at the end
+    if (_deferAppSaves) {
+      apply();
+      _appSavePending = true;
+    } else {
+      AppState.I.update(apply);
+    }
   }
+
+  bool _deferAppSaves = false;
+  bool _appSavePending = false;
 
   void assign(PbRow row, PbIcon g) {
     row.generatedId = g.id;
@@ -772,7 +884,7 @@ class PackBuilderController extends ChangeNotifier {
         ),
       );
     }
-    return ProcessSettings(size: s.size, background: bg, placement: s.placement, segment: s.segment, ai: s.ai, effects: AppState.I.look.effects);
+    return ProcessSettings(size: s.size, background: bg, placement: s.placement, segment: s.segment, ai: s.ai, effects: AppState.I.look.effects, cutCacheDir: s.cutCacheDir);
   }
 
   /// Renders a picked image for [row] (nothing is assigned yet). Returns PNG.
@@ -922,7 +1034,7 @@ class PackBuilderController extends ChangeNotifier {
   Future<List<PbMatch>> matchFromPack(String path) async {
     _set(S.pbLettura, running: true);
     try {
-      final src = await _readSource(path, 'im${DateTime.now().millisecondsSinceEpoch}_');
+      final (src, _, _) = await _readSource(path, 'im${DateTime.now().millisecondsSinceEpoch}_');
       final open = [for (final r in rows) if (r.generatedId == null && !r.excluded && r.original.package.isNotEmpty) r];
       final byPkg = <String, PbRow>{};
       for (final r in open) {
@@ -993,7 +1105,7 @@ class PackBuilderController extends ChangeNotifier {
         _set(S.pbNienteDaEsportare, running: false);
         return null;
       }
-      final accent = '#${(AppState.I.export.packAccentOr(AppState.I.appearance.accent) & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+      final accent = '#${(AppState.I.export.packAccentOr(AppState.I.appearance.accentColor.toARGB32()) & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
       var built = await PlatformService.devicePackBuild(dir, name, accent);
       var apk = built['apk'] as String;
       final n = (built['count'] as num).toInt();
@@ -1060,7 +1172,7 @@ class PackBuilderController extends ChangeNotifier {
         _set(S.pbNienteDaEsportare, running: false);
         return;
       }
-      final accent = '#${(AppState.I.export.packAccentOr(AppState.I.appearance.accent) & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
+      final accent = '#${(AppState.I.export.packAccentOr(AppState.I.appearance.accentColor.toARGB32()) & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
       final built = await PlatformService.devicePackBuild(dir, name, accent);
       final v = built['version'] as String? ?? '';
       final out = p.join(await AppPaths.I.workDir('share'), 'IconFormatter-Pack-$v.apk');
@@ -1291,8 +1403,14 @@ class PackBuilderController extends ChangeNotifier {
     final path = o.path;
     if (path == null) return;
     try {
-      final fp = pack2Fingerprint(await File(path).readAsBytes());
-      AppState.I.update(() => AppState.I.packFingerprints[o.key] = fp);
+      // hashing every byte in Dart: done off the UI isolate
+      final fp = await Isolate.run(() => pack2Fingerprint(File(path).readAsBytesSync()));
+      if (_deferAppSaves) {
+        AppState.I.packFingerprints[o.key] = fp;
+        _appSavePending = true;
+      } else {
+        AppState.I.update(() => AppState.I.packFingerprints[o.key] = fp);
+      }
     } catch (_) {
       // an unreadable icon keeps its old reference
     }
@@ -1597,6 +1715,16 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                         children: [
                           if (Platform.isAndroid) ToolButton(icon: Icons.refresh_rounded, label: S.pbAggiornaCatalogo, onTap: c.busy ? null : () => _run(c.addInstalledApps)),
                           ToolButton(icon: Icons.inventory_2_outlined, label: Platform.isAndroid ? S.pbDaFile : S.pbOriginali, onTap: c.busy ? null : () => _run(() => c.addSource(original: true))),
+                          if (c.originals.any((o) => !o.id.startsWith('app:')))
+                            ToolButton(
+                              icon: Icons.clear_all,
+                              label: S.svuota,
+                              onTap: c.busy
+                                  ? null
+                                  : () async {
+                                      if (await confirm(context, S.svuotareLista, S.fileOriginaliNonVengonoToccati, ok: S.svuota)) _run(c.clearFileOriginals);
+                                    },
+                            ),
                         ],
                       ),
                       if (status != null && c.busy) Positioned(left: 0, right: 0, top: 0, child: status),
@@ -1726,7 +1854,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                           ),
                         ToolButton(icon: Icons.fact_check_outlined, label: S.packQualita, onTap: c.busy ? null : () => _run(_quality)),
                         ToolButton(icon: Icons.warning_amber_rounded, label: S.pack3Conflitti, onTap: c.busy ? null : () => _run(_conflicts)),
-                        ToolButton(icon: Icons.history_rounded, label: S.packRegistro, onTap: () => _run(() => _logSheet())),
+                        ToolButton(icon: Icons.history_rounded, label: S.btnRegistro, onTap: () => _run(() => _logSheet())),
                         ToolButton(icon: Icons.bookmarks_outlined, label: S.packProfili, onTap: c.busy ? null : () => _run(() => _profilesSheet())),
                       ],
                     ),
@@ -2222,19 +2350,23 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
   }
 
   Future<void> _details(PbRow r) async {
+    // the calendar day shown in the Before/After pair (null: the row's icon)
+    final dayPick = ValueNotifier<PbIcon?>(null);
     await showAppDialog<void>(
       context: context,
       builder: (ctx) => ListenableBuilder(
-        listenable: c,
+        listenable: Listenable.merge([c, dayPick]),
         builder: (ctx, _) {
           final g = c.generatedById(r.generatedId);
+          final days = c.calendarDaysOf(r);
+          final shown = dayPick.value ?? g;
           final hasSource = r.original.path != null || r.original.bytes != null;
           // secondary actions, two per row, all the same size
           final actions = <(IconData, String, VoidCallback?)>[
-            (Icons.grid_view_rounded, S.pbScegliIcona, () => _pick(r)),
-            if (hasSource) (Icons.refresh_rounded, S.pbRielabora, c.busy ? null : () => _run(() => c.generateFromOriginals(only: [r]))),
-            (r.verified ? Icons.verified : Icons.verified_outlined, r.verified ? S.pbVerificata : S.pbSegnaVerificata, g == null ? null : () => c.setVerified(r, !r.verified)),
-            (r.excluded ? Icons.add_circle_outline : Icons.block, r.excluded ? S.pbIncludi : S.pbEscludi, () => c.setExcluded(r, !r.excluded)),
+            (Icons.grid_view_rounded, S.btnScegliIcona, () => _pick(r)),
+            if (hasSource) (Icons.refresh_rounded, S.btnRielabora,c.busy ? null : () => _run(() => c.generateFromOriginals(only: [r]))),
+            (r.verified ? Icons.verified : Icons.verified_outlined, r.verified ? S.pbVerificata : S.btnSegnaVerificata, g == null ? null : () => c.setVerified(r, !r.verified)),
+            (r.excluded ? Icons.add_circle_outline : Icons.block, r.excluded ? S.pbIncludi : S.btnEscludi, () => c.setExcluded(r, !r.excluded)),
             (Icons.layers_outlined, S.pack2UsaPerAltre, g == null ? null : () => _alias(r)),
             (Icons.drive_file_rename_outline, S.pack2Rinomina, () => _rename(r)),
             if (r.state == PbState.missing || r.state == PbState.doubtful) (Icons.auto_awesome_outlined, S.pack3Suggerisci, c.busy ? null : () => _suggest(r)),
@@ -2252,7 +2384,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Icon(a.$1, size: 18),
                 const SizedBox(width: 6),
-                Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text(a.$2, maxLines: 1, style: const TextStyle(fontSize: 13)))),
+                Flexible(child: Text(a.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: kToolButtonFontSize))),
               ]),
             )),
           );
@@ -2288,18 +2420,36 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                         child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
                           preview(S.prima, r.original.image(size: 150), side),
                           Icon(Icons.compare_arrows_rounded, size: 18, color: Palette.text3),
-                          preview(S.dopo, g?.image(size: 150), side),
+                          preview(S.dopo, shown?.image(size: 150), side),
                         ]),
                       );
                     },
                   ),
-                  const SizedBox(height: 12),
-                  if (g != null) ...[_variantStrip(r), const SizedBox(height: 12)],
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: _color(r.state), shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Flexible(child: Text('${_label(r.state)} · ${r.changedOriginal ? S.pack2OriginaleCambiata : r.reason}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: Palette.text2))),
-                  ]),
+                  const SizedBox(height: 4),
+                  if (days.isNotEmpty) ...[_dayStrip(days, dayPick), const SizedBox(height: 14)],
+                  if (g != null) ...[_variantStrip(r), const SizedBox(height: 14)],
+                  // the state as a quiet status row (state icon, name, reason under it), no dot
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(color: Palette.fg.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14)),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(_icon(r.state), size: 20, color: _color(r.state)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_label(r.state), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.text)),
+                              const SizedBox(height: 2),
+                              Text(r.changedOriginal ? S.pack2OriginaleCambiata : r.reason, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Row(children: [
                     Expanded(
@@ -2390,7 +2540,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(dayPick.dispose);
   }
 
 
@@ -2667,6 +2817,47 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
     c.setLabel(r, name);
   }
 
+  /// The days of a calendar app as one horizontal strip; a tap shows the day in
+  /// the Before/After pair (the export keeps all the days as before).
+  Widget _dayStrip(List<PbIcon> days, ValueNotifier<PbIcon?> pick) {
+    return Column(
+      children: [
+        Text(S.pack2Varianti, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: Palette.text2)),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 66,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: days.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final d = days[i];
+              final on = identical(pick.value, d);
+              return InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => pick.value = d,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: on ? Theme.of(context).colorScheme.primary : Colors.transparent, width: 2),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 40, height: 40, child: IconImage(path: d.path)),
+                      Text('${d.calendarDay}', style: TextStyle(fontSize: 11, color: Palette.text2)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Variant thumbnails: the generated icon first, then up to two extra icons.
   /// A tap switches the icon used; a long press on an extra one removes it.
   Widget _variantStrip(PbRow r) {
@@ -2689,8 +2880,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(S.pack2Varianti, style: TextStyle(fontSize: 12, color: Palette.text3)),
-        const SizedBox(height: 6),
+        Text(S.pack2Varianti, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.2, color: Palette.text2)),
+        const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 8,
@@ -3075,7 +3266,8 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
                       : () async {
                           final comps = pending.where((m) => m['change'] != 'disinstallata').map((m) => m['component'] as String).toSet();
                           await widget.builder.addInstalledComponents(comps);
-                          await widget.builder.generateFromOriginals();
+                          // only the apps the change check named are rendered again
+                          await widget.builder.generateFromOriginals(only: widget.builder.rowsOfComponents(comps));
                           await PlatformService.autoSyncClear(pending.map((m) => m['component'] as String).toList());
                           await _load(PlatformService.autoSyncStatus);
                           // with Shizuku the refreshed pack is re-applied right away
@@ -3155,6 +3347,15 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
     }
   }
 
+  /// One fact per line: label on the left, value on the right.
+  Widget _infoRow(String k, String v) => Row(
+    children: [
+      Text(k, style: TextStyle(fontSize: 13, color: Palette.text3)),
+      const SizedBox(width: 12),
+      Expanded(child: Text(v, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Palette.text2))),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final sh = info['shizuku'] as String? ?? 'missing';
@@ -3177,52 +3378,45 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // header like the other step cards: centred, number badge and title
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   width: 32,
                   height: 32,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.16), shape: BoxShape.circle),
-                  child: Text(
-                    '3',
-                    style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700),
-                  ),
+                  child: Text('3', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    S.dpTitolo,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text),
-                  ),
-                ),
+                Flexible(child: Text(S.dpTitolo, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text))),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Icon(Icons.circle, size: 9, color: stateColor),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    stateText,
-                    key: const ValueKey('shizuku-state'),
-                    style: TextStyle(fontSize: 12.5, color: Palette.text),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 14),
+            // the state as a quiet status row: an icon in the state's colour, no dot
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(color: Palette.fg.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14)),
+              child: Row(
+                children: [
+                  Icon(stateColor == Palette.ok ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded, size: 20, color: stateColor),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(stateText, key: const ValueKey('shizuku-state'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: Palette.text))),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              [
-                if (info['version'] != null) S.dpVersioneInstallata(info['version']),
-                launcher == null ? S.dpNoLauncher : S.dpLauncher(launcher),
-              ].join(' · '),
-              style: TextStyle(fontSize: 11, color: Palette.text3),
+            const SizedBox(height: 12),
+            // what is installed, one fact per line: label left, value right
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                children: [
+                  _infoRow(S.dpInfoPack, info['version'] != null ? S.dpInfoVersione(info['version']) : S.dpInfoNonInstallato),
+                  const SizedBox(height: 8),
+                  _infoRow(S.dpInfoLauncher, launcher ?? S.dpInfoNonTrovato),
+                ],
+              ),
             ),
             if (info['state'] == 'residual') ...[
               const SizedBox(height: 6),

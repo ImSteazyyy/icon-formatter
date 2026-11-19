@@ -6,6 +6,7 @@ import '../app/state.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
 import '../widgets/onboarding_pages.dart';
+import '../widgets/tour2_visibility.dart';
 
 /// First-run tour, also reopened from Settings. Shown once: [AppState.setupDone]
 /// decides. Pages are built lazily by the PageView.
@@ -38,15 +39,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // after the frame: the shell must not be notified while it is building
+    WidgetsBinding.instance.addPostFrameCallback((_) => tourOpen.value = true);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => tourOpen.value = false);
     _controller.dispose();
     super.dispose();
   }
 
   void _go(int i) => _controller.animateToPage(
     i,
-    duration: const Duration(milliseconds: 280),
-    curve: Curves.easeOut,
+    duration: const Duration(milliseconds: 380),
+    curve: Curves.easeOutCubic,
   );
 
   // setupDone also covers "Salta": the tour is never shown again
@@ -73,7 +82,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: last
                       ? const SizedBox.shrink()
                       : Padding(
-                          padding: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.only(right: 12),
                           child: TextButton(
                             onPressed: _finish,
                             child: Text(S.tourSalta),
@@ -86,54 +95,67 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   controller: _controller,
                   itemCount: pages.length,
                   onPageChanged: (i) => setState(() => _index = i),
-                  itemBuilder: (_, i) => OnboardingPageBody(page: pages[i]),
+                  // gentle slide and fade: each page follows the swipe position
+                  itemBuilder: (_, i) => AnimatedBuilder(
+                    animation: _controller,
+                    child: OnboardingPageBody(page: pages[i]),
+                    builder: (context, child) {
+                      final p = _controller.hasClients
+                          ? (_controller.page ?? _index.toDouble())
+                          : _index.toDouble();
+                      final d = (i - p).clamp(-1.0, 1.0);
+                      return Opacity(
+                        opacity: 1 - d.abs() * 0.6,
+                        child: Transform.translate(
+                          offset: Offset(d * 28, 0),
+                          child: child,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Row(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: _index == 0
-                            ? const SizedBox.shrink()
-                            : TextButton(
-                                onPressed: () => _go(_index - 1),
-                                child: Text(S.tourIndietro),
-                              ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (var i = 0; i < pages.length; i++)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: i == _index
-                                  ? Palette.text
-                                  : Palette.text3.withValues(alpha: 0.35),
+                    // dots centred; "Indietro" quiet on the left, same height
+                    SizedBox(
+                      height: 40,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 110,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: _index == 0
+                                  ? const SizedBox.shrink()
+                                  : TextButton(
+                                      onPressed: () => _go(_index - 1),
+                                      child: Text(S.tourIndietro),
+                                    ),
                             ),
                           ),
-                      ],
+                          Expanded(
+                            child: Center(
+                              child: _Dots(count: pages.length, index: _index),
+                            ),
+                          ),
+                          const SizedBox(width: 110),
+                        ],
+                      ),
                     ),
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton(
-                          key: const ValueKey('tour-next'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(128, 50),
-                          ),
-                          onPressed: last ? _finish : () => _go(_index + 1),
-                          child: Text(
-                            last ? S.tourInizia : S.tourAvanti,
-                            style: const TextStyle(fontSize: 16),
-                          ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton(
+                        key: const ValueKey('tour-next'),
+                        onPressed: last ? _finish : () => _go(_index + 1),
+                        child: Text(
+                          last ? S.tourInizia : S.tourAvanti,
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ),
                     ),
@@ -146,4 +168,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
+
+/// Page position: the current dot stretches into a pill and animates its width.
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.index});
+
+  final int count;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < count; i++)
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          width: i == index ? 22 : 8,
+          height: 8,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: i == index
+                ? Palette.text
+                : Palette.text3.withValues(alpha: 0.35),
+          ),
+        ),
+    ],
+  );
 }

@@ -17,8 +17,10 @@ import '../screens/pack_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/studio_screen.dart';
 import '../widgets/common.dart';
+import '../widgets/barfold_geometry.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/title_bar.dart';
+import '../widgets/tour2_visibility.dart';
 import 'state.dart';
 import 'theme.dart';
 import '../l10n/strings.dart';
@@ -54,7 +56,7 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
   int index = 0;
   final _navKey = GlobalKey();
   double _navCovered = 90;
@@ -69,10 +71,38 @@ class _ShellState extends State<Shell> {
   bool _barsDown = false;
   bool _wantFold = false;
 
+  /// The one fold timeline (0 open, 1 folded) read by the tab bar, the action
+  /// bar and the jump buttons; see barfold_geometry.dart.
+  late final AnimationController _fold = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
+  Timer? _foldDebounce;
+
+  /// Moves from the current progress, so a reversal mid-way carries on from there.
+  void _runFold(bool fold) {
+    final target = fold ? 1.0 : 0.0;
+    if (AppState.I.appearance.animations) {
+      _fold.animateTo(target, curve: Curves.easeInOutCubic);
+    } else {
+      _fold.value = target;
+    }
+  }
+
   void _setFold(bool fold) {
+    _foldDebounce?.cancel();
     if (fold == _wantFold) return;
     _wantFold = fold;
     setState(() => _navFolded = _barsDown = fold);
+    _runFold(fold);
+  }
+
+  /// A scroll that flips direction for a moment must not reverse the fold: the
+  /// new state applies only once it has held for 120 ms.
+  void _requestFold(bool fold) {
+    if (fold == _wantFold) {
+      _foldDebounce?.cancel();
+      return;
+    }
+    if (_foldDebounce?.isActive ?? false) return;
+    _foldDebounce = Timer(const Duration(milliseconds: 120), () => _setFold(fold));
   }
 
   bool _onScroll(UserScrollNotification n) {
@@ -82,7 +112,7 @@ class _ShellState extends State<Shell> {
       ScrollDirection.forward => false,
       ScrollDirection.idle => _wantFold,
     };
-    _setFold(fold);
+    _requestFold(fold);
     return false;
   }
 
@@ -104,18 +134,19 @@ class _ShellState extends State<Shell> {
     const d = 60.0;
     // scrolling down folds the pill into a 50 dp button with the open
     // section (like the Glass bar); tapping it opens the pill again
-    final folded = _navFolded;
     return Padding(
       key: _navKey,
       padding: const EdgeInsets.all(12),
       child: LayoutBuilder(
         builder: (context, box) => Align(
           alignment: Alignment.bottomLeft,
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: AppState.I.appearance.animations ? 340 : 0),
-            curve: Curves.easeInOutCubic,
-            width: folded ? 50 : box.maxWidth,
-            height: folded ? 50 : d + 10,
+          child: AnimatedBuilder(
+            animation: _fold,
+            builder: (context, clip) => SizedBox(
+              width: BarFold.navWidth(_fold.value, box.maxWidth),
+              height: BarFold.navHeight(_fold.value),
+              child: clip,
+            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(d),
               child: BackdropFilter(
@@ -225,6 +256,8 @@ class _ShellState extends State<Shell> {
     _updateTimer?.cancel();
     studioShown.dispose();
     _pager.dispose();
+    _foldDebounce?.cancel();
+    _fold.dispose();
     super.dispose();
   }
 
@@ -262,6 +295,8 @@ class _ShellState extends State<Shell> {
       index = i;
       _navFolded = _barsDown = _wantFold = false;
     });
+    _foldDebounce?.cancel();
+    _runFold(false);
     studioShown.value = dests[i].id == 'studio';
     if (!_pager.hasClients) return;
     if ((i - from).abs() == 1 && AppState.I.appearance.animations) {
@@ -289,6 +324,8 @@ class _ShellState extends State<Shell> {
           index = i;
           _navFolded = _barsDown = _wantFold = false;
         });
+        _foldDebounce?.cancel();
+        _runFold(false);
         studioShown.value = dests[i].id == 'studio';
       }
     },
@@ -342,6 +379,7 @@ class _ShellState extends State<Shell> {
                 child: GlassInsets(
                   bottom: covered,
                   folded: _barsDown,
+                  fold: _fold,
                   child: NotificationListener<UserScrollNotification>(
                     onNotification: _onScroll,
                     child: SafeArea(bottom: false, child: stack),
@@ -355,10 +393,22 @@ class _ShellState extends State<Shell> {
                   right: 0,
                   bottom: inset,
                   // nav redraws on every settings change (glass, accent, shadows)
-                  child: ListenableBuilder(
-                    listenable: AppState.I,
-                    builder: (context, _) =>
-                        nothingStyle ? _nothingNav() : _glassNav(),
+                  // the tour owns the screen: the bar fades out while it is open
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: tourOpen,
+                    builder: (context, open, bar) => IgnorePointer(
+                      ignoring: open,
+                      child: AnimatedOpacity(
+                        opacity: open ? 0 : 1,
+                        duration: const Duration(milliseconds: 180),
+                        child: bar,
+                      ),
+                    ),
+                    child: ListenableBuilder(
+                      listenable: AppState.I,
+                      builder: (context, _) =>
+                          nothingStyle ? _nothingNav() : _glassNav(),
+                    ),
                   ),
                 ),
             ],

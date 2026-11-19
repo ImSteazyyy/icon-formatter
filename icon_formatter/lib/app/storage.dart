@@ -31,6 +31,9 @@ class AppPaths {
   String get bases => p.join(root.path, 'bases');
   String get outputs => p.join(root.path, 'outputs');
 
+  /// Saved cutouts (isolated glyphs), kept across runs. Not part of the backup.
+  String get cutouts => p.join(root.path, 'cutouts');
+
   /// Downloaded local AI models.
   String get models => p.join(root.path, 'models');
   String get stateFile => p.join(root.path, 'state.json');

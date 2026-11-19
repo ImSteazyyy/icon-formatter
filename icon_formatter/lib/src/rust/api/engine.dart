@@ -208,6 +208,24 @@ Future<AiPreview> aiPreview({
 Future<void> aiUnloadModel() =>
     RustLib.instance.api.crateApiEngineAiUnloadModel();
 
+/// Bytes used by the saved cutouts in `dir` (0 when there are none).
+Future<BigInt> cutoutCacheSize({required String dir}) =>
+    RustLib.instance.api.crateApiEngineCutoutCacheSize(dir: dir);
+
+/// Deletes the saved cutouts in `dir`. Other files in the folder are kept.
+Future<void> cutoutCacheClear({required String dir}) =>
+    RustLib.instance.api.crateApiEngineCutoutCacheClear(dir: dir);
+
+/// Deletes the oldest saved cutouts until the folder holds at most
+/// `max_bytes`. Returns the size left.
+Future<BigInt> cutoutCachePrune({
+  required String dir,
+  required BigInt maxBytes,
+}) => RustLib.instance.api.crateApiEngineCutoutCachePrune(
+  dir: dir,
+  maxBytes: maxBytes,
+);
+
 /// Associates originals with generated icons (name, package, file, visual).
 /// File where the matching signatures are kept between launches.
 Future<void> setMatchCacheFile({required String path}) =>
@@ -1140,6 +1158,9 @@ class ProcessSettings {
   /// Global look options (brightness, recolour, ...); None = off.
   final EffectSettings? effects;
 
+  /// Folder of the saved cutouts; None = isolate every time.
+  final String? cutCacheDir;
+
   const ProcessSettings({
     required this.size,
     required this.background,
@@ -1147,6 +1168,7 @@ class ProcessSettings {
     required this.segment,
     this.ai,
     this.effects,
+    this.cutCacheDir,
   });
 
   @override
@@ -1156,7 +1178,8 @@ class ProcessSettings {
       placement.hashCode ^
       segment.hashCode ^
       ai.hashCode ^
-      effects.hashCode;
+      effects.hashCode ^
+      cutCacheDir.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1168,7 +1191,8 @@ class ProcessSettings {
           placement == other.placement &&
           segment == other.segment &&
           ai == other.ai &&
-          effects == other.effects;
+          effects == other.effects &&
+          cutCacheDir == other.cutCacheDir;
 }
 
 enum SegMode { auto, keepAlpha, removeBackground, none }

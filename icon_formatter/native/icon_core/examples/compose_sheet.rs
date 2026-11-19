@@ -6,7 +6,7 @@ fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let base = imageops::decode_file(std::path::Path::new(&a[0])).unwrap();
     let size = 160;
-    let cfg = BatchConfig { size, background: Arc::new(render_background(&Background::Image(Arc::new(base)), size)), placement: Placement::default(), segment: SegmentOptions::default(), threads: 1, lucent: None, ai: None };
+    let cfg = BatchConfig { size, background: Arc::new(render_background(&Background::Image(Arc::new(base)), size)), placement: Placement::default(), segment: SegmentOptions::default(), threads: 1, lucent: None, ai: None, effects: Default::default(), cut_cache: None };
     let ins = &a[2..];
     let mut sheet = RgbaImage::from_pixel(size * 2, size * ins.len() as u32, Rgba([200, 120, 200, 255]));
     for (r, p) in ins.iter().enumerate() {

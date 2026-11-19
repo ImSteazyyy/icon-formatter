@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
+import 'barfold_geometry.dart';
 import 'toasts.dart';
 import 'liquid_glass.dart';
 
@@ -620,6 +621,16 @@ class SolidSurfaces extends InheritedWidget {
   bool updateShouldNotify(SolidSurfaces oldWidget) => false;
 }
 
+/// Label size of every [ToolButton], the same in all languages: the texts are
+/// kept short enough to fit it (checked by test/btn_labels_test.dart).
+const double kToolButtonFontSize = 13.5;
+
+/// Width budget of a [ToolButton] label: padding on both sides, icon, and the
+/// gap the button puts between icon and label.
+const double kToolButtonPadding = 14;
+const double kToolButtonIconSize = 20;
+const double kToolButtonIconGap = 8;
+
 class ToolButton extends StatelessWidget {
   const ToolButton({super.key, required this.icon, required this.label, required this.onTap});
 
@@ -636,15 +647,15 @@ class ToolButton extends StatelessWidget {
     final button = FilledButton.icon(
       onPressed: onTap,
       style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: const EdgeInsets.symmetric(horizontal: kToolButtonPadding),
         backgroundColor: nothingStyle ? NothingColors.raised : Palette.raised,
         foregroundColor: Palette.fg,
         iconColor: nothingStyle ? Palette.fg : Color.lerp(accent, Palette.fg, 0.35),
         side: nothingStyle ? BorderSide.none : BorderSide(color: Palette.fg.withValues(alpha: 0.06)),
       ),
-      icon: Icon(icon, size: 20),
-      // always one line; a label that does not fit shrinks a little
-      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1, style: const TextStyle(fontSize: 13.5))),
+      icon: Icon(icon, size: kToolButtonIconSize),
+      // one size for every label; the texts fit it, the ellipsis is only a guard
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: kToolButtonFontSize)),
     );
     final fill = context.dependOnInheritedWidgetOfExactType<_FillButtons>() != null;
     return LayoutBuilder(
@@ -1319,10 +1330,19 @@ class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
 
   @override
   Widget build(BuildContext context) {
+    // a hidden button gives its space back: with only one left it sits at the
+    // bottom of the column (the Positioned parent anchors the bottom edge)
+    Widget slot(bool on, Widget child) => AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          width: 44,
+          height: on ? 44 : 0,
+          child: ClipRect(child: OverflowBox(maxHeight: 44, alignment: Alignment.bottomCenter, child: child)),
+        );
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      _btn(Icons.keyboard_double_arrow_up_rounded, S.vaiInCima, canUp, () => _go(true)),
-      const SizedBox(height: 8),
-      _btn(Icons.keyboard_double_arrow_down_rounded, S.vaiInFondo, canDown, () => _go(false)),
+      slot(canUp, _btn(Icons.keyboard_double_arrow_up_rounded, S.vaiInCima, canUp, () => _go(true))),
+      AnimatedContainer(duration: const Duration(milliseconds: 220), curve: Curves.easeOutCubic, height: canUp && canDown ? 8 : 0),
+      slot(canDown, _btn(Icons.keyboard_double_arrow_down_rounded, S.vaiInFondo, canDown, () => _go(false))),
     ]);
   }
 }
@@ -1339,13 +1359,17 @@ class JumpButtonsSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final folded = GlassInsets.foldedOf(context);
-    return AnimatedPositioned(
-      duration: Duration(milliseconds: folded ? 340 : 200),
-      curve: folded ? Curves.easeInOutCubic : Curves.easeOutCubic,
-      right: right,
-      bottom: folded ? foldedBottom : openBottom,
+    final fold = GlassInsets.foldOf(context);
+    // same timeline as the bars: they only move after the action bar has dropped
+    // (barfold_geometry.dart), so they never cross the tab bar
+    return AnimatedBuilder(
+      animation: fold,
       child: ScrollJumpButtons(controller: controller),
+      builder: (context, child) => Positioned(
+        right: right,
+        bottom: BarFold.jumpBottom(fold.value, openBottom, foldedBottom),
+        child: child!,
+      ),
     );
   }
 }

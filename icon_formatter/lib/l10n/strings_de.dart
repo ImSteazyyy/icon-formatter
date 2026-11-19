@@ -63,7 +63,7 @@ class StringsDe extends Strings {
   @override
   String get ogniBaseHaCalibrazioneIndipendente => 'Der Hintergrund, auf dem das Symbol bei Originale Komposition sitzt. Tippe auf eine Basis, um sie zu verwenden.';
   @override
-  String get importaBase => 'Basis-Icon importieren';
+  String get importaBase => 'Base laden';
   @override
   String creaPreset(Object? a) => 'Aus Vorlage „$a" erstellen';
   @override
@@ -98,6 +98,10 @@ class StringsDe extends Strings {
   String get cartella => 'Ordner';
   @override
   String get svuota => 'Leeren';
+  @override
+  String get ritagliSalva => 'Ausschnitte speichern';
+  @override
+  String get ritagliSalvati => 'Gespeicherte Ausschnitte';
   @override
   String get analizzaCalibra => 'Analysieren und kalibrieren';
   @override
@@ -187,7 +191,7 @@ class StringsDe extends Strings {
   @override
   String get pbApriPack => 'Pack öffnen';
   @override
-  String get pbCondividiApk => 'APK teilen';
+  String get pbCondividiApk => 'Teilen';
   @override
   String pbApkPronto(Object? v) => 'Pack-APK $v bereit zum Teilen';
   @override
@@ -321,7 +325,7 @@ class StringsDe extends Strings {
   @override
   String get prossimaVerificare => 'Nächstes zum Prüfen';
   @override
-  String get apriCartella => 'Ordner öffnen';
+  String get apriCartella => 'Ordner';
   @override
   String get apriZip => 'ZIP öffnen';
   @override
@@ -819,7 +823,7 @@ class StringsDe extends Strings {
   @override
   String get pbOriginali => 'Originale';
   @override
-  String get pbGeneraDaStudio => 'Im Studio';
+  String get pbGeneraDaStudio => 'Aus Studio';
   @override
   String get pbImportaGenerate => 'Importieren';
   @override
@@ -937,7 +941,7 @@ class StringsDe extends Strings {
   @override
   String pbCatalogo(Object? n, Object? v) => '$n Apps ($v von Android erkannt)';
   @override
-  String get pbAggiornaCatalogo => 'Liste aktualisieren';
+  String get pbAggiornaCatalogo => 'Neu laden';
   @override
   String get pbImmagine => 'Bild';
   @override
@@ -993,7 +997,7 @@ class StringsDe extends Strings {
   @override
   String get calGiornalieroInfo => 'Jeden Morgen im Pack (Shizuku nötig)';
   @override
-  String get calAggiornaOra => 'Tag aktualisieren';
+  String get calAggiornaOra => 'Tag laden';
   @override
   String calAggiornato(Object? n) => 'Tag auf $n Icons aktualisiert';
   @override
@@ -1031,11 +1035,11 @@ class StringsDe extends Strings {
   @override
   String get asControllaOra => 'Jetzt prüfen';
   @override
-  String asRielabora(Object? n) => '$n Apps erneut verarbeiten';
+  String asRielabora(Object? n) => 'Erneut $n';
   @override
   String asAltre(Object? n) => '…und $n weitere';
   @override
-  String get apkCrea => 'APK erstellen';
+  String get apkCrea => 'APK bauen';
   @override
   String get apkNome => 'Name des Packs';
   @override
@@ -1051,7 +1055,7 @@ class StringsDe extends Strings {
   @override
   String apkFallita(Object? e) => 'APK konnte nicht erstellt werden: $e';
   @override
-  String get asSegnaViste => 'Als gesehen markieren';
+  String get asSegnaViste => 'Gesehen';
   @override
   String get dpTitolo => 'Im Launcher anwenden';
   @override
@@ -1129,7 +1133,7 @@ class StringsDe extends Strings {
   @override
   String get baseCerchio => 'Kreis';
   @override
-  String get creaDaPreset => 'Aus einer Vorlage';
+  String get creaDaPreset => 'Vorlage';
   @override
   String get inUso => 'In Verwendung';
   @override
@@ -1299,7 +1303,7 @@ class StringsDe extends Strings {
   @override
   String get cercaLista => 'In der Liste suchen';
   @override
-  String get anteprimaHome => 'Startbildschirm-Vorschau';
+  String get anteprimaHome => 'Startansicht';
   @override
   String get anteprimaTitolo => 'Vorschau des Startbildschirms';
   @override
@@ -1357,7 +1361,7 @@ class StringsDe extends Strings {
   @override
   String get comodoRisparmioSub => 'Weniger Effekte und Animationen, mehr Akkulaufzeit';
   @override
-  String get packQualita => 'Qualitätsprüfung';
+  String get packQualita => 'Prüfung';
   @override
   String packQualitaScan(Object? a, Object? b) => 'Prüfung $a von $b';
   @override
@@ -1375,7 +1379,7 @@ class StringsDe extends Strings {
   @override
   String get packProbScura => 'Zu dunkel';
   @override
-  String packMancanti(Object? n) => '$n fehlende verarbeiten';
+  String packMancanti(Object? n) => 'Fehlt $n';
   @override
   String get packRegistro => 'Pack-Protokoll';
   @override
@@ -1386,6 +1390,8 @@ class StringsDe extends Strings {
   String get packRegistroCopiato => 'Protokoll in die Zwischenablage kopiert';
   @override
   String packLogCreate(Object? n) => '$n Icons erstellt';
+  @override
+  String dbPackFallback(Object? r) => 'Pack-Archiv: JSON-Datei wird verwendet ($r)';
   @override
   String packLogRielabora(Object? n) => '$n Icons erneut verarbeitet';
   @override
@@ -1399,7 +1405,7 @@ class StringsDe extends Strings {
   @override
   String packLogProfilo(Object? name) => 'Gespeichertes Pack $name geladen';
   @override
-  String get packProfili => 'Gespeicherte Packs';
+  String get packProfili => 'Profile';
   @override
   String get packSalvaCome => 'Pack speichern als…';
   @override
@@ -1589,7 +1595,7 @@ class StringsDe extends Strings {
   @override
   String get vetroApplico => 'Qualität wird angewendet…';
   @override
-  String get pack2Anteprima => 'Vorschau exportieren';
+  String get pack2Anteprima => 'Vorschau';
   @override
   String get pack2AnteprimaVuota => 'Keine erzeugten Symbole zum Anzeigen.';
   @override
@@ -1597,7 +1603,7 @@ class StringsDe extends Strings {
   @override
   String get pack2AnteprimaTitolo => 'Symbol-Vorschau';
   @override
-  String get pack2UsaPerAltre => 'Für andere Apps verwenden…';
+  String get pack2UsaPerAltre => 'Auch nutzen';
   @override
   String get pack2AliasTitolo => 'Für andere Apps verwenden';
   @override
@@ -1605,7 +1611,7 @@ class StringsDe extends Strings {
   @override
   String get pack2AliasVuoto => 'Keine andere App zur Auswahl.';
   @override
-  String get pack2Rinomina => 'Im Pack umbenennen';
+  String get pack2Rinomina => 'Benennen';
   @override
   String get pack2RinominaTitolo => 'Name im Pack';
   @override
@@ -1719,15 +1725,21 @@ class StringsDe extends Strings {
   @override
   String get tourRivedi => 'Tour erneut ansehen';
   @override
-  String get wireAppIgnorate => 'Ignorierte Apps';
+  String get wireAppIgnorate => 'Ignoriert';
   @override
-  String wireAppIgnorateN(int n) => 'Ignorierte Apps ($n)';
+  String wireAppIgnorateN(int n) => 'Ignoriert $n';
   @override
   String wireNuovaVersione(Object? v) => 'Neue Version $v verfügbar';
   @override
   String get wireControllaAggiornamenti => 'Auf Updates prüfen';
   @override
   String get wireControllaAggiornamentiSub => 'Einmal pro Start, bei GitHub. Aus: keine Netzwerkanfrage.';
+  @override
+  String get fpsMostra => 'FPS anzeigen';
+  @override
+  String get fpsMostraSub => 'Zähler oben rechts: Bilder pro Sekunde, langsamstes Bild, Ruckler. Aus: keine Kosten.';
+  @override
+  String get fpsScatta => 'Ruckelt es, probiere Ausgewogen';
   @override
   String get wireCartellaOsservata => 'Überwachter Ordner';
   @override
@@ -1742,4 +1754,30 @@ class StringsDe extends Strings {
   String get batchElaborazione => 'Verarbeitung';
   @override
   String get batchCompletato => 'Fertig';
+  @override
+  String get btnRegistro => 'Protokoll';
+  @override
+  String get btnScegliIcona => 'Icon wählen';
+  @override
+  String get btnRielabora => 'Verarbeiten';
+  @override
+  String get btnSegnaVerificata => 'Geprüft';
+  @override
+  String get btnEscludi => 'Ausnehmen';
+  @override
+  String get dpInfoPack => 'Installiertes Pack';
+  @override
+  String dpInfoVersione(Object? v) => 'Version $v';
+  @override
+  String get dpInfoNonInstallato => 'Nicht installiert';
+  @override
+  String get dpInfoLauncher => 'Launcher';
+  @override
+  String get dpInfoNonTrovato => 'Nicht gefunden';
+  @override
+  String get btnAnnulla => 'Zurück';
+  @override
+  String get btnRipristina => 'Wiederholen';
+  @override
+  String get btnDuplicati => 'Dubletten';
 }

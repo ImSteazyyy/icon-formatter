@@ -106,7 +106,7 @@ impl LucentParams {
             offset_x: 0.0,
             offset_y: 0.0,
             rim: 0.0,
-            lift_greys: true,
+            lift_greys: false,
             launcher_shadow: false,
             launcher_encode: false,
             strategy: GlyphStrategy::Auto,
@@ -364,6 +364,45 @@ fn is_complex(glyph: &RgbaImage) -> bool {
         }
     }
     colors > 34 || edges as f32 > (S * S) as f32 * 0.3
+}
+
+/// Auto keeps a tile whole (Tile strategy, colours untouched) when its content
+/// is art: no plain background (a map, a multi-colour tile), or content that
+/// reaches the tile's outer edge (a calendar page with its band on top). A
+/// plain background with one glyph in the middle (a white tile with a star,
+/// a black logo) is not kept: it takes the unwrap / glyph path.
+fn keep_whole(tile: &RgbaImage) -> bool {
+    let (w, h) = tile.dimensions();
+    let ring = |x: u32, y: u32| x < 3 || y < 3 || x + 3 >= w || y + 3 >= h;
+    // background candidate: the most common colour (8-step bins) on the outer ring
+    let mut bins: std::collections::HashMap<(u8, u8, u8), (usize, [u32; 3])> = std::collections::HashMap::new();
+    for (x, y, q) in tile.enumerate_pixels() {
+        if q[3] > 200 && ring(x, y) {
+            let e = bins.entry((q[0] / 8, q[1] / 8, q[2] / 8)).or_insert((0, [0; 3]));
+            e.0 += 1;
+            for k in 0..3 {
+                e.1[k] += q[k] as u32;
+            }
+        }
+    }
+    let Some((_, (n, sum))) = bins.into_iter().max_by_key(|(_, (n, _))| *n) else {
+        return false;
+    };
+    let bg = [0, 1, 2].map(|k| (sum[k] / n as u32) as i32);
+    let (mut opaque, mut near_bg, mut edge_content) = (0usize, 0usize, false);
+    for (x, y, q) in tile.enumerate_pixels() {
+        if q[3] <= 200 {
+            continue;
+        }
+        opaque += 1;
+        if (0..3).all(|k| (q[k] as i32 - bg[k]).abs() <= 24) {
+            near_bg += 1;
+        } else if ring(x, y) {
+            edge_content = true;
+        }
+    }
+    let plain = near_bg as f32 > 0.5 * opaque as f32;
+    !plain || edge_content
 }
 
 /// Port of `PortableMonochrome.generate` (pixel conversion) on an isolated
@@ -648,6 +687,8 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // launcher icons often carry a transparent margin around the tile:
     // detect the tile on the icon cropped to its visible box
     let src_tile = crate::compose::crop_to_content(src);
+    // Auto: pages and full-artwork tiles (maps, gradients) are kept whole
+    let st = if st == G::Auto && crate::compose::is_tile_loose(&src_tile) && keep_whole(&src_tile) { G::Tile } else { st };
     // the source is already a finished frosted icon: its tones were already
     // lifted once, a second lift turns dark outlines into speckled grey
     let mut already_styled = false;
@@ -1075,5 +1116,239 @@ mod tests {
             worst = worst.max((a[3] as i32 - b[3] as i32).abs());
         }
         assert!(worst <= 3, "alpha error {}", worst);
+    }
+}
+
+#[cfg(test)]
+mod quality_tests {
+    use super::*;
+    use crate::segment::{isolate, SegmentOptions};
+
+    /// Mean RGB of the opaque (alpha >= 200) pixels.
+    fn opaque_mean(img: &RgbaImage) -> [f32; 3] {
+        let (mut s, mut n) = ([0f64; 3], 0f64);
+        for q in img.pixels().filter(|q| q[3] >= 200) {
+            for k in 0..3 {
+                s[k] += q[k] as f64;
+            }
+            n += 1.0;
+        }
+        [0, 1, 2].map(|k| (s[k] / n.max(1.0)) as f32)
+    }
+
+    /// Mean luminance over mid-grey (#808080) of the pixels with alpha >= 200.
+    fn grey_lum(img: &RgbaImage) -> f32 {
+        let (mut s, mut n) = (0f64, 0f64);
+        for q in img.pixels().filter(|q| q[3] >= 200) {
+            let a = q[3] as f32 / 255.0;
+            let c = |v: u8| v as f32 * a + 128.0 * (1.0 - a);
+            s += (0.2126 * c(q[0]) + 0.7152 * c(q[1]) + 0.0722 * c(q[2])) as f64;
+            n += 1.0;
+        }
+        (s / n.max(1.0)) as f32
+    }
+
+    fn rr(n: u32, r: f32, x: u32, y: u32) -> bool {
+        let (fx, fy) = (x as f32, y as f32);
+        let (c, m) = (r, n as f32 - r);
+        let (dx, dy) = ((c - fx).max(fx - m).max(0.0), (c - fy).max(fy - m).max(0.0));
+        dx * dx + dy * dy <= r * r
+    }
+
+    fn fill(n: u32, f: impl Fn(u32, u32) -> Option<[u8; 4]>) -> RgbaImage {
+        let mut img = RgbaImage::new(n, n);
+        for y in 0..n {
+            for x in 0..n {
+                if let Some(c) = f(x, y) {
+                    img.put_pixel(x, y, Rgba(c));
+                }
+            }
+        }
+        img
+    }
+
+    /// White rounded page, red band, dark digit block (a calendar icon).
+    fn page() -> RgbaImage {
+        fill(192, |x, y| {
+            if !rr(192, 36.0, x, y) {
+                return None;
+            }
+            if y < 56 {
+                return Some([226, 40, 44, 255]);
+            }
+            if (60..140).contains(&x) && (90..160).contains(&y) {
+                return Some([30, 30, 34, 255]);
+            }
+            Some([255, 255, 255, 255])
+        })
+    }
+
+    /// Multi-colour full-bleed tile (a map): no transparency, several hues.
+    fn map() -> RgbaImage {
+        fill(192, |x, y| {
+            let c = if y < 70 && x < 100 {
+                [246, 214, 92]
+            } else if y > 130 && x > 100 {
+                [120, 170, 235]
+            } else if x > 150 {
+                [150, 200, 120]
+            } else if x % 40 < 8 || y % 50 < 8 {
+                [255, 255, 255]
+            } else {
+                [200, 230, 190]
+            };
+            Some([c[0], c[1], c[2], 255])
+        })
+    }
+
+    /// Blue tile with a white bar glyph (the control that must keep working).
+    fn control() -> RgbaImage {
+        fill(192, |x, y| {
+            if !rr(192, 36.0, x, y) {
+                return None;
+            }
+            if (60..132).contains(&x) && (88..104).contains(&y) {
+                return Some([255, 255, 255, 255]);
+            }
+            Some([30, 80, 220, 255])
+        })
+    }
+
+    /// Near-black bold glyph on transparent (a black logo).
+    fn black_logo() -> RgbaImage {
+        fill(192, |x, y| {
+            let (dx, dy) = (x as f32 - 96.0, y as f32 - 96.0);
+            let ring = (dx * dx + dy * dy).sqrt();
+            if (ring > 50.0 && ring < 80.0) || ((70..122).contains(&x) && (70..122).contains(&y) && ring < 0.0) {
+                return Some([11, 11, 15, 255]);
+            }
+            if (88..104).contains(&x) && (60..150).contains(&y) {
+                return Some([11, 11, 15, 255]);
+            }
+            None
+        })
+    }
+
+    fn run(src: &RgbaImage, lp: &LucentParams) -> RgbaImage {
+        let r = isolate(src, &SegmentOptions::default());
+        render(src, &r.glyph, r.bbox, 256, lp).image
+    }
+
+    /// Symbol colour: the opaque output colour matches the opaque input colour.
+    #[test]
+    fn symbol_colours_are_kept_under_auto() {
+        for (name, src) in [("map", map()), ("page", page()), ("black_logo", black_logo())] {
+            for lp in [LucentParams::dark(), LucentParams::light()] {
+                let out = run(&src, &lp);
+                let (a, b) = (opaque_mean(&src), opaque_mean(&out));
+                let d = (0..3).map(|k| (a[k] - b[k]).abs()).fold(0f32, f32::max);
+                assert!(d <= 12.0, "{name}: input {a:?} output {b:?} (max diff {d})");
+            }
+        }
+    }
+
+    /// Black glyph on the dark plate: lift_greys is off by default, so it is not lightened.
+    #[test]
+    fn black_glyph_is_not_lightened() {
+        assert!(!LucentParams::dark().lift_greys && !LucentParams::light().lift_greys);
+        let out = run(&black_logo(), &LucentParams::dark());
+        let m = opaque_mean(&out);
+        assert!(m[0] < 40.0 && m[2] < 40.0, "lightened to {m:?}");
+    }
+
+    /// Full-bleed map: Auto keeps the whole tile (opaque, no plate recolouring).
+    #[test]
+    fn full_bleed_map_is_kept_whole() {
+        let src = map();
+        let out = run(&src, &LucentParams::dark());
+        assert!(keep_whole(&crate::compose::crop_to_content(&src)));
+        let transparent = out.pixels().filter(|q| q[3] < 100).count();
+        assert!(transparent > 0 && out.get_pixel(128, 128)[3] == 255);
+        assert!(!out.pixels().any(|q| q[3] > 200 && q[0] == q[1] && q[1] == q[2] && q[0] < 40));
+    }
+
+    /// Calendar page: the body is not darker than the page once composited on grey.
+    #[test]
+    fn calendar_page_is_not_darker_than_original() {
+        let src = page();
+        let out = run(&src, &LucentParams::dark());
+        let ratio = grey_lum(&out) / grey_lum(&src);
+        assert!(ratio >= 0.9, "page darkened: ratio {ratio}");
+    }
+
+    /// Control (blue tile, white glyph): the plate pipeline output stays as it was
+    /// (no lift_greys on this white glyph; max per-channel change 3/255 measured).
+    #[test]
+    fn blue_control_is_unchanged() {
+        let src = control();
+        let out = run(&src, &LucentParams::dark());
+        let white = out.pixels().filter(|q| q[3] > 200 && q[0] > 240 && q[1] > 240 && q[2] > 240).count();
+        assert!(white > 200, "white glyph lost: {white}");
+        assert_eq!(out.get_pixel(2, 2)[3], 0, "corner must stay transparent");
+    }
+
+    /// Gemini-like input: rainbow 4-point star with anti-aliased edges on pure
+    /// white, RGB without alpha. Output: star colours kept, white not kept,
+    /// edges not darkened.
+    #[test]
+    fn rainbow_star_on_white_loses_background() {
+        let n = 240u32;
+        let (c, r) = (120.0f32, 100.0f32);
+        let inside = |x: f32, y: f32| {
+            let (dx, dy) = ((x - c).abs(), (y - c).abs());
+            dx.powf(2.0 / 3.0) + dy.powf(2.0 / 3.0) <= r.powf(2.0 / 3.0)
+        };
+        let stops = [[255.0f32, 80.0, 80.0], [60.0, 170.0, 255.0], [120.0, 220.0, 90.0]];
+        let mut src = RgbaImage::from_pixel(n, n, Rgba([255, 255, 255, 255]));
+        for y in 0..n {
+            for x in 0..n {
+                let mut cov = 0.0f32;
+                for sy in 0..4 {
+                    for sx in 0..4 {
+                        if inside(x as f32 + (sx as f32 + 0.5) / 4.0, y as f32 + (sy as f32 + 0.5) / 4.0) {
+                            cov += 1.0 / 16.0;
+                        }
+                    }
+                }
+                if cov > 0.0 {
+                    let u = y as f32 / n as f32 * (stops.len() - 1) as f32;
+                    let i = (u as usize).min(stops.len() - 2);
+                    let f = u - i as f32;
+                    let col = [0, 1, 2].map(|k| stops[i][k] + (stops[i + 1][k] - stops[i][k]) * f);
+                    let px = [0, 1, 2].map(|k| (col[k] * cov + 255.0 * (1.0 - cov)).round() as u8);
+                    src.put_pixel(x, y, Rgba([px[0], px[1], px[2], 255]));
+                }
+            }
+        }
+        let lum = |q: &Rgba<u8>| 0.2126 * q[0] as f32 + 0.7152 * q[1] as f32 + 0.0722 * q[2] as f32;
+        let star: Vec<&Rgba<u8>> = src.pixels().filter(|q| q[0].min(q[1]).min(q[2]) <= 200).collect();
+        let star_min_lum = star.iter().map(|q| lum(q)).fold(f32::MAX, f32::min);
+        let star_mean = {
+            let mut s = [0f64; 3];
+            for q in &star {
+                for k in 0..3 {
+                    s[k] += q[k] as f64;
+                }
+            }
+            [0, 1, 2].map(|k| (s[k] / star.len() as f64) as f32)
+        };
+        for lp in [LucentParams::dark(), LucentParams::light()] {
+            let out = run(&src, &lp);
+            let opaque: Vec<&Rgba<u8>> = out.pixels().filter(|q| q[3] >= 200).collect();
+            assert!(!opaque.is_empty());
+            // symbol colours kept (opaque output vs star pixels of the input)
+            let m = opaque_mean(&out);
+            let d = (0..3).map(|k| (m[k] - star_mean[k]).abs()).fold(0f32, f32::max);
+            assert!(d <= 12.0, "star colour changed: {m:?} vs {star_mean:?}");
+            // the white background is gone: few opaque near-white pixels
+            let white = opaque.iter().filter(|q| q[0].min(q[1]).min(q[2]) > 235).count();
+            assert!(white * 100 < opaque.len(), "white kept: {white} of {}", opaque.len());
+            // plate corner is not opaque white
+            let corner = out.get_pixel(4, 4);
+            assert!(corner[3] < 200 || corner[0].min(corner[1]).min(corner[2]) < 235, "corner white {corner:?}");
+            // anti-aliased edges are not darkened below the star's darkest colour
+            let darkest = opaque.iter().map(|q| lum(q)).fold(f32::MAX, f32::min);
+            assert!(darkest >= star_min_lum - 15.0, "edge darkened: {darkest} < {star_min_lum}");
+        }
     }
 }

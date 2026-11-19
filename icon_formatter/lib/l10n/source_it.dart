@@ -44,7 +44,7 @@ class S {
       'Icona base creata dal preset $a';
   static const ogniBaseHaCalibrazioneIndipendente =
       "Ogni icona base ha la sua calibrazione. Le icone escono alla stessa risoluzione dell'icona base.";
-  static const importaBase = 'Importa icona base';
+  static const importaBase = 'Carica base';
   static String creaPreset(Object? a) => 'Crea da preset "$a"';
   static const nessunBaseIcon = 'Nessuna icona base';
   static String px(Object? a, Object? b) => '$a×${b}px';
@@ -66,6 +66,8 @@ class S {
   static const file = 'File';
   static const cartella = 'Cartella';
   static const svuota = 'Svuota';
+  static const ritagliSalva = 'Salva i ritagli';
+  static const ritagliSalvati = 'Ritagli salvati';
   static const analizzaCalibra = 'Analizza e calibra';
   static const risultatiMedianaOutlierEsclusi =
       'Risultati (valore medio, esempi anomali esclusi)';
@@ -118,7 +120,7 @@ class S {
   static const stile = 'Personalizza';
   static const altro = 'Altro';
   static const pbApriPack = 'Apri un pack';
-  static const pbCondividiApk = 'Condividi APK';
+  static const pbCondividiApk = 'Condividi';
   static String pbApkPronto(Object? v) =>
       'APK del pack $v pronto da condividere';
   static const pbPackInstallato = 'Pack installato su questo telefono';
@@ -521,8 +523,8 @@ class S {
   // Icon Pack Builder
   static const pbTitolo = 'Icon Pack Builder';
   static const pbOriginali = 'Originali';
-  static const pbGeneraDaStudio = 'Crea con lo Studio';
-  static const pbImportaGenerate = 'Importa icone';
+  static const pbGeneraDaStudio = 'Dallo Studio';
+  static const pbImportaGenerate = 'Importa';
   static const pbAbbina = 'Abbina';
   static const pbLetturaApp = 'Leggo le app installate…';
   static const pbLettura = 'Lettura…';
@@ -598,11 +600,11 @@ class S {
   static String pbCatalogoInfo(Object? n, Object? v) => '$n app installate';
   static String pbCatalogo(Object? n, Object? v) =>
       '$n app ($v viste da Android)';
-  static const pbAggiornaCatalogo = 'Aggiorna elenco';
+  static const pbAggiornaCatalogo = 'Aggiorna';
   static const pbImmagine = 'Immagine';
   static const pbFormatiImmagine = 'PNG, JPG o WEBP';
-  static const pbScegliImmagine = 'Scegli immagine';
-  static const pbCambiaImmagine = 'Cambia immagine';
+  static const pbScegliImmagine = 'Scegli';
+  static const pbCambiaImmagine = 'Cambia';
   static const pbScegliImmagineHint =
       "Scegli un'immagine per vedere il risultato";
   static const pbTrattamento = 'Trattamento';
@@ -628,7 +630,7 @@ class S {
   static String sfondoUniformato(Object? n, Object? pct) => 'Sfondo uniformato su $n icone (trasparenza $pct%)';
   static const calGiornaliero = 'Giorno del calendario';
   static const calGiornalieroInfo = 'Ogni mattina nel pack (serve Shizuku)';
-  static const calAggiornaOra = 'Aggiorna giorno';
+  static const calAggiornaOra = 'Aggiorna';
   static String calAggiornato(Object? n) => 'Giorno aggiornato su $n icone';
   static const calGiaOggi = 'Il pack mostra già il giorno di oggi';
   static const calServeShizuku = 'Serve Shizuku per aggiornare il pack da solo';
@@ -651,7 +653,7 @@ class S {
   static const asInfo =
       "Il controllo parte allo sblocco del telefono e ogni 6 ore, senza root e senza servizi sempre attivi. Se nessuna app è cambiata non fa niente; se qualcosa è cambiato ricevi una notifica silenziosa.";
   static const asControllaOra = 'Controlla ora';
-  static String asRielabora(Object? n) => 'Rielabora $n app';
+  static String asRielabora(Object? n) => 'Rifai $n';
   static String asAltre(Object? n) => '…e altre $n';
 
   // APK del pack
@@ -664,7 +666,7 @@ class S {
   static const apkSdkMancante =
       'Android SDK non trovato: installalo e imposta ANDROID_HOME.';
   static String apkFallita(Object? e) => "Non sono riuscito a creare l'APK: $e";
-  static const asSegnaViste = 'Segna come viste';
+  static const asSegnaViste = 'Segna viste';
 
   // Applica nel launcher (Shizuku)
   static const dpTitolo = 'Applica nel launcher';
@@ -818,7 +820,7 @@ class S {
   static String applicaATutteConferma(Object? n) => 'Icone da aggiornare: $n. Le correzioni di questa icona verranno copiate su tutte le altre e rielaborate.';
   static String applicaATutteFatto(Object? n) => 'Correzioni applicate: $n';
   static const cercaLista = 'Cerca nella lista';
-  static const anteprimaHome = 'Anteprima home';
+  static const anteprimaHome = 'Vista home';
   static const anteprimaTitolo = 'Anteprima schermata home';
   static const anteprimaScuro = 'Scuro';
   static const anteprimaChiaro = 'Chiaro';
@@ -847,7 +849,7 @@ class S {
   static const comodoBkPiuTardi = 'Più tardi';
   static const comodoRisparmio = 'Risparmio energetico';
   static const comodoRisparmioSub = 'Meno effetti e animazioni, più autonomia';
-  static const packQualita = 'Controllo qualità';
+  static const packQualita = 'Controllo';
   static String packQualitaScan(Object? a, Object? b) => 'Controllo $a di $b';
   static const packQualitaOk = 'Nessun problema trovato nelle icone';
   static String packQualitaN(Object? n) => '$n icone da controllare';
@@ -856,12 +858,13 @@ class S {
   static const packProbPiccola = 'Troppo piccola';
   static const packProbDecentrata = 'Fuori centro';
   static const packProbScura = 'Troppo scura';
-  static String packMancanti(Object? n) => 'Elabora $n mancanti';
+  static String packMancanti(Object? n) => 'Elabora $n';
   static const packRegistro = 'Registro del pack';
   static const packRegistroVuoto = 'Nessuna operazione registrata';
   static const packRegistroCopia = 'Copia';
   static const packRegistroCopiato = 'Registro copiato negli appunti';
   static String packLogCreate(Object? n) => 'Create $n icone';
+  static String dbPackFallback(Object? r) => 'Archivio pack: uso il file JSON ($r)';
   static String packLogRielabora(Object? n) => 'Rielaborate $n icone';
   static String packLogEsportata(Object? n, Object? nuove, Object? cambiate, Object? rimosse) => 'Esportate $n icone: $nuove nuove, $cambiate cambiate, $rimosse rimosse';
   static String packLogEsportataPrima(Object? n) => 'Esportate $n icone (prima esportazione)';
@@ -968,15 +971,15 @@ class S {
   static const extra2ScorImp = 'Apre le Impostazioni';
   static const extra2ScorTema = 'Passa dal tema chiaro a quello scuro';
   static const vetroApplico = 'Applico la qualità…';
-  static const pack2Anteprima = 'Esporta anteprima';
+  static const pack2Anteprima = 'Anteprima';
   static const pack2AnteprimaVuota = 'Nessuna icona generata da mostrare.';
   static String pack2AnteprimaProgresso(Object? n, Object? m) => 'Anteprima: $n di $m icone';
   static const pack2AnteprimaTitolo = 'Anteprima icone';
-  static const pack2UsaPerAltre = 'Usa per altre app…';
+  static const pack2UsaPerAltre = 'Usa altrove';
   static const pack2AliasTitolo = 'Usa per altre app';
   static const pack2AliasCerca = 'Cerca app';
   static const pack2AliasVuoto = "Nessun'altra app da scegliere.";
-  static const pack2Rinomina = 'Rinomina nel pack';
+  static const pack2Rinomina = 'Rinomina';
   static const pack2RinominaTitolo = 'Nome nel pack';
   static String pack2Copertura(Object? n, Object? m, Object? p) => '$n icone su $m app installate ($p%)';
   static const pack2Varianti = 'Varianti';
@@ -1036,10 +1039,13 @@ class S {
 
   // wire: auto-update card, ignored apps, watched folder
   static const wireAppIgnorate = 'App ignorate';
-  static String wireAppIgnorateN(int n) => 'App ignorate ($n)';
+  static String wireAppIgnorateN(int n) => 'Ignorate $n';
   static String wireNuovaVersione(Object? v) => 'Nuova versione $v disponibile';
   static const wireControllaAggiornamenti = 'Controlla gli aggiornamenti';
   static const wireControllaAggiornamentiSub = 'Una volta per avvio, verso GitHub. Spento: nessuna richiesta di rete.';
+  static const fpsMostra = 'Mostra gli FPS';
+  static const fpsMostraSub = 'Contatore in alto a destra: fotogrammi al secondo, frame più lento, scatti. Spento: nessun costo.';
+  static const fpsScatta = 'Se scatta, prova Bilanciato';
   static const wireCartellaOsservata = 'Cartella osservata';
   static const wireCartellaOsservataSub = 'Le nuove immagini qui vengono importate nello Studio';
   static const wireScegliCartella = 'Scegli la cartella da osservare';
@@ -1047,4 +1053,17 @@ class S {
   static const wireRimuoviCartella = 'Rimuovi cartella';
   static const batchElaborazione = 'Elaborazione';
   static const batchCompletato = 'Completato';
+  static const btnRegistro = 'Registro';
+  static const btnScegliIcona = 'Scegli icona';
+  static const btnRielabora = 'Rielabora';
+  static const btnSegnaVerificata = 'Verifica';
+  static const btnEscludi = 'Escludi';
+  static const dpInfoPack = 'Pack installato';
+  static String dpInfoVersione(Object? v) => 'Versione $v';
+  static const dpInfoNonInstallato = 'Non installato';
+  static const dpInfoLauncher = 'Launcher';
+  static const dpInfoNonTrovato = 'Non trovato';
+  static const btnAnnulla = 'Annulla';
+  static const btnRipristina = 'Ripeti';
+  static const btnDuplicati = 'Via doppi';
 }

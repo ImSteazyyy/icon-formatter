@@ -14,6 +14,7 @@ import 'screens/setup_screen.dart';
 import 'app/state.dart';
 import 'app/storage.dart';
 import 'app/theme.dart';
+import 'widgets/fps_overlay.dart';
 import 'widgets/glassfix_warmup.dart';
 import 'widgets/theme_reveal.dart';
 import 'widgets/toasts.dart';
@@ -31,6 +32,11 @@ Future<void> main() async {
   await RustLib.init();
   await AppPaths.init();
   await AppState.I.load();
+  // grid thumbnails of thousands of icons: the default cache (1000 images /
+  // 100 MB) keeps stale decodes of scrolled-away tiles on a phone
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 300
+    ..maximumSizeBytes = 80 << 20;
   // phones: 4 Rust workers by default (a mid-range phone: 2 big + 6
   // little cores; all 8 at full load mostly adds heat and battery drain)
   if (Platform.isAndroid) setWorkerThreads(n: AppState.I.threads > 0 ? AppState.I.threads : 4);
@@ -103,7 +109,7 @@ class IconFormatterApp extends StatelessWidget {
               systemNavigationBarColor: Colors.transparent,
               systemNavigationBarContrastEnforced: false,
             ),
-            child: ToastHost(child: Stack(fit: StackFit.expand, children: [child ?? const SizedBox(), const GlassWarmUp()])),
+            child: ToastHost(child: Stack(fit: StackFit.expand, children: [child ?? const SizedBox(), const GlassWarmUp(), if (AppState.I.showFps) const FpsOverlay()])),
           );
           if (AppState.I.appearance.style != UiStyle.nothing) return page;
           final mq = MediaQuery.of(context);

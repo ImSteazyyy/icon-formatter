@@ -308,37 +308,45 @@ public class MainActivity extends Activity {
 
     private void refreshPills() {
         for (int k = 0; k < 3; k++) stylePill(filterPills[k], k == filterMode);
-        sortPill.setText(sortInstalled ? txtSortInstalled : txtSortName);
+        sortPill.setTag(sortInstalled ? txtSortInstalled : txtSortName);
+        stylePill(sortPill, false);
     }
 
     private TextView pill(String text) {
         TextView t = new TextView(this);
         t.setText(text);
-        t.setTextSize(12);
+        t.setTextSize(14);
         t.setSingleLine(true);
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setGravity(Gravity.CENTER);
-        t.setPadding(dp(2), 0, dp(2), 0);
+        t.setPadding(dp(8), 0, dp(8), 0);
+        t.setTag(text);
         return t;
     }
 
     private LinearLayout.LayoutParams pillLp(boolean weighted) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(weighted ? 0 : ViewGroup.LayoutParams.WRAP_CONTENT, dp(34), weighted ? 1f : 0f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(weighted ? 0 : ViewGroup.LayoutParams.WRAP_CONTENT, dp(44), weighted ? 1f : 0f);
         lp.setMargins(dp(3), 0, dp(3), 0);
         return lp;
     }
 
-    // same look as the search field; the selected pill is filled with the accent
+    // same look as the app's filter pills: an outline; the selected one has a
+    // soft accent fill, an accent outline and a check mark
     private void stylePill(TextView t, boolean selected) {
         GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius(dp(17));
+        g.setCornerRadius(dp(22));
+        Object base = t.getTag();
+        String label = base instanceof String ? (String) base : t.getText().toString();
         if (selected) {
-            g.setColor(styleAccent);
+            g.setColor((styleAccent & 0x00FFFFFF) | 0x33000000);
+            g.setStroke(dp(1), (styleAccent & 0x00FFFFFF) | 0xB3000000);
             t.setTextColor(0xFFFFFFFF);
+            t.setText("✓ " + label);
         } else {
-            g.setColor(styleNothing ? 0x0DFFFFFF : 0x66232226);
+            g.setColor(0x00000000);
             g.setStroke(dp(1), styleNothing ? 0x24FFFFFF : ((styleAccent & 0x00FFFFFF) | 0x55000000));
-            t.setTextColor(0xFFA8A8A8);
+            t.setTextColor(0xFFE0E0E0);
+            t.setText(label);
         }
         t.setBackground(g);
     }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show ScrollController;
@@ -142,10 +143,12 @@ class WorkspaceController extends ChangeNotifier {
   void _onSettings() => schedulePreview();
 
   void _onBatch() {
+    // one index per notification: the old nested loop was items x results on
+    // every progress tick (166 ms per tick on the host at 5000 icons)
+    final byId = {for (final i in items) i.id: i};
     for (final r in batch.results.values) {
-      for (final i in items) {
-        if (i.id == r.id) i.result = r;
-      }
+      final i = byId[r.id];
+      if (i != null) i.result = r;
     }
     notifyListeners();
   }
@@ -370,8 +373,10 @@ class WorkspaceController extends ChangeNotifier {
       for (final it in e.value) {
         if (gen != _dupScan) return;
         try {
-          final bytes = it.bytes ?? await File(it.path!).readAsBytes();
-          it.fingerprint = '${e.key}:${studioHash(bytes)}';
+          // the hash runs over every byte: off the UI isolate for files
+          final path = it.path;
+          final h = it.bytes != null ? studioHash(it.bytes!) : await Isolate.run(() => studioHash(File(path!).readAsBytesSync()));
+          it.fingerprint = '${e.key}:$h';
         } catch (_) {
           // unreadable file: not a duplicate candidate
         }
@@ -433,7 +438,7 @@ class WorkspaceController extends ChangeNotifier {
         ),
       );
     }
-    return ProcessSettings(size: s.size, background: bg, placement: _placementOf(it, s), segment: it.segOverride ?? s.segment, effects: s.effects);
+    return ProcessSettings(size: s.size, background: bg, placement: _placementOf(it, s), segment: it.segOverride ?? s.segment, effects: s.effects, cutCacheDir: s.cutCacheDir);
   }
 
   /// Placement of [it] with the global optical-centre switch applied.
@@ -666,7 +671,7 @@ class WorkspaceController extends ChangeNotifier {
       if (AppState.I.bgProvider == BgProvider.removeBg) {
         final cut = await BgRemovalService.cutout(cacheKey: it.id + (it.path ?? ''), path: it.path, bytes: it.bytes);
         if (seq != _previewSeq) return;
-        s = ProcessSettings(size: s.size, background: s.background, placement: s.placement, segment: _keepAlpha(s.segment), effects: s.effects);
+        s = ProcessSettings(size: s.size, background: s.background, placement: s.placement, segment: _keepAlpha(s.segment), effects: s.effects, cutCacheDir: s.cutCacheDir);
         r = await previewFile(path: cut, settings: s);
       } else {
         r = it.path != null ? await previewFile(path: it.path!, settings: s) : await previewBytes(bytes: it.bytes!, settings: s);
@@ -759,7 +764,7 @@ class WorkspaceController extends ChangeNotifier {
     for (final e in byMode.entries) {
       if (batch.cancelRequested) break;
       final first = itemById[e.value.first.id]!;
-      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment, effects: s.effects));
+      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment, effects: s.effects, cutCacheDir: s.cutCacheDir));
     }
     // icons marked "Sfondo come il pack" keep it through a new processing
     final marked = list.where((i) => i.matchPlate).toList();

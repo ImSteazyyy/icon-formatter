@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../app/state.dart';
 import '../src/rust/api/engine.dart';
 import 'platform_service.dart';
+import 'progress_throttle.dart';
 
 /// Wraps the Rust batch stream: progress, results per item, cancellation.
 /// The UI stays responsive because all work happens on Rust worker threads.
@@ -40,7 +41,7 @@ class BatchController extends ChangeNotifier {
     phase = null;
     notifyListeners();
     final completer = Completer<void>();
-    var lastNotify = DateTime.now();
+    final uiThrottle = ProgressThrottle(Duration(milliseconds: Platform.isAndroid ? 250 : 80));
     // Android: a notification with progress while a long batch runs
     final notify = Platform.isAndroid && items.length > 8;
     var lastPush = DateTime.fromMillisecondsSinceEpoch(0);
@@ -57,10 +58,7 @@ class BatchController extends ChangeNotifier {
         // throttle rebuilds: every rebuild repaints the grid under the glass
         // bars (blur), so on phones a few refreshes per second are enough
         final now = DateTime.now();
-        if (now.difference(lastNotify).inMilliseconds > (Platform.isAndroid ? 250 : 80) || ev.done == ev.total) {
-          lastNotify = now;
-          notifyListeners();
-        }
+        if (uiThrottle.allow(now, force: ev.done == ev.total)) notifyListeners();
         if (notify && (ev.done == ev.total || now.difference(lastPush).inMilliseconds >= 500)) {
           lastPush = now;
           unawaited(PlatformService.processingProgress(ev.done, ev.total));
@@ -85,6 +83,8 @@ class BatchController extends ChangeNotifier {
     cancelled = token.isCancelled();
     _token = null;
     notifyListeners();
+    // once per batch, not per item
+    unawaited(AppState.I.pruneCutouts());
   }
 
   /// Progress of a pre-processing phase run outside Rust (cloud calls).

@@ -29,15 +29,52 @@ class OnboardingPageBody extends StatelessWidget {
   };
 }
 
-class _PageList extends StatelessWidget {
-  const _PageList({required this.children});
+/// One tour page: the content is centred in the free height and scrolls
+/// only when the screen is too short for it, so nothing overflows.
+class _TourPage extends StatelessWidget {
+  const _TourPage({required this.children});
 
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-    children: children,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) => SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: box.maxHeight - 16),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// The illustration area of a page: a soft card holding one drawing.
+class _ArtCard extends StatelessWidget {
+  const _ArtCard({required this.child, this.height = 180});
+
+  final Widget child;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    height: height,
+    alignment: Alignment.center,
+    margin: const EdgeInsets.only(bottom: 24),
+    decoration: BoxDecoration(
+      color: Palette.card,
+      borderRadius: BorderRadius.circular(32),
+      border: Border.all(color: Palette.text3.withValues(alpha: 0.18)),
+    ),
+    child: child,
   );
 }
 
@@ -45,36 +82,21 @@ class _Welcome extends StatelessWidget {
   const _Welcome();
 
   @override
-  Widget build(BuildContext context) => _PageList(
+  Widget build(BuildContext context) => _TourPage(
     children: [
-      const SizedBox(height: 40),
-      Center(
+      _ArtCard(
+        height: 240,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(36),
           child: Image.asset(
             'assets/branding/app_icon.png',
-            width: 96,
-            height: 96,
+            width: 136,
+            height: 136,
             filterQuality: FilterQuality.medium,
           ),
         ),
       ),
-      const SizedBox(height: 24),
-      Text(
-        'Icon Formatter',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 30,
-          fontWeight: FontWeight.w700,
-          color: Palette.text,
-        ),
-      ),
-      const SizedBox(height: 10),
-      Text(
-        S.tourBenvenutoSub,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, color: Palette.text2, height: 1.35),
-      ),
+      LargeHeader('Icon Formatter', subtitle: S.tourBenvenutoSub),
     ],
   );
 }
@@ -87,9 +109,10 @@ class _ThemePage extends StatelessWidget {
     final st = AppState.I;
     final a = st.appearance;
     void pick(UiStyle v) => ThemeReveal.run(() => st.update(() => a.style = v));
-    return _PageList(
+    return _TourPage(
       children: [
         LargeHeader(S.stileApp, subtitle: S.tourStileSub),
+        // the two style previews are this page's illustration
         Row(
           children: [
             Expanded(
@@ -113,7 +136,7 @@ class _ThemePage extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
         SectionTitle(S.comodoTema),
         // same choice as Settings; the theme spreads from the touch
         ChoiceRows<ThemeChoice>(
@@ -282,8 +305,12 @@ class _LanguagePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final st = AppState.I;
     final a = st.appearance;
-    return _PageList(
+    return _TourPage(
       children: [
+        _ArtCard(
+          height: 140,
+          child: Icon(Icons.translate_rounded, size: 64, color: Palette.text2),
+        ),
         LargeHeader(S.lingua, subtitle: S.tourLinguaSub),
         ChoiceRows<String>(
           options: [
@@ -302,8 +329,12 @@ class _DonePage extends StatelessWidget {
   const _DonePage();
 
   @override
-  Widget build(BuildContext context) => _PageList(
+  Widget build(BuildContext context) => _TourPage(
     children: [
+      _ArtCard(
+        height: 140,
+        child: Icon(Icons.check_circle_rounded, size: 72, color: Palette.ok),
+      ),
       LargeHeader(S.tourFineTitolo, subtitle: S.tourFineSub),
       SettingsCard(
         children: [_Tip(S.tourFine1), _Tip(S.tourFine2), _Tip(S.tourFine3)],
@@ -411,8 +442,16 @@ class _OnboardingPermissionsState extends State<OnboardingPermissions>
   };
 
   @override
-  Widget build(BuildContext context) => _PageList(
+  Widget build(BuildContext context) => _TourPage(
     children: [
+      _ArtCard(
+        height: 140,
+        child: Icon(
+          Icons.verified_user_outlined,
+          size: 64,
+          color: Palette.text2,
+        ),
+      ),
       LargeHeader(S.tourPermessi, subtitle: S.tourPermSub),
       SettingsCard(
         children: [

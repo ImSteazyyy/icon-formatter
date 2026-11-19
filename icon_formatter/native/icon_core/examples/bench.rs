@@ -46,6 +46,8 @@ fn main() {
             threads,
             lucent: None,
             ai: None,
+            effects: Default::default(),
+            cut_cache: None,
         };
         let t = Instant::now();
         let r = run(&jobs, &cfg, &AtomicBool::new(false), &|_, _, _| {});

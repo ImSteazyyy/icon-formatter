@@ -6,7 +6,7 @@
 use crate::frb_generated::StreamSink;
 use anyhow::{anyhow, Result};
 use icon_core::{
-    ai, batch, calibrate, compose, effects, iconpack, imageops, lucent, matching, pack, platealpha, segment, squircle, translucent,
+    ai, batch, calibrate, compose, cutcache, effects, iconpack, imageops, lucent, matching, pack, platealpha, segment, squircle, translucent,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -151,7 +151,7 @@ impl From<&LucentSettings> for lucent::LucentParams {
             offset_x: 0.0,
             offset_y: 0.0,
             rim: l.rim,
-            lift_greys: true,
+            lift_greys: false,
             launcher_shadow: l.launcher_shadow,
             launcher_encode: l.launcher_encode,
             strategy: match l.strategy {
@@ -229,6 +229,8 @@ pub struct ProcessSettings {
     pub ai: Option<AiSettings>,
     /// Global look options (brightness, recolour, ...); None = off.
     pub effects: Option<EffectSettings>,
+    /// Folder of the saved cutouts; None = isolate every time.
+    pub cut_cache_dir: Option<String>,
 }
 
 fn ai_kind(k: AiModelKind) -> ai::ModelKind {
@@ -249,11 +251,9 @@ fn ai_of(s: &Option<AiSettings>) -> Result<Option<(Arc<ai::Model>, ai::AiOptions
     })
 }
 
-fn isolate_with(img: &image::RgbaImage, s: &ProcessSettings) -> Result<segment::SegmentResult> {
-    Ok(match ai_of(&s.ai)? {
-        Some((m, o)) => ai::isolate_ai(img, &m, o).map_err(|e| anyhow!(e))?.seg,
-        None => segment::isolate(img, &(&s.segment).into()),
-    })
+fn isolate_with(img: &image::RgbaImage, s: &ProcessSettings, cache: Option<&Path>) -> Result<segment::SegmentResult> {
+    let ai = ai_of(&s.ai)?;
+    batch::isolate_cached(img, cache, &(&s.segment).into(), ai.as_ref().map(|(m, o)| (&**m, *o)), false).map_err(|e| anyhow!(e))
 }
 
 impl From<&SegmentSettings> for segment::SegmentOptions {
@@ -440,8 +440,10 @@ fn preview_image(img: &image::RgbaImage, s: &ProcessSettings) -> Result<PreviewR
         lucent,
         ai: None,
         effects: effects_of(&s.effects),
+        cut_cache: None,
     };
-    let mut res = isolate_with(img, s)?;
+    let cache = s.cut_cache_dir.as_ref().map(PathBuf::from);
+    let mut res = isolate_with(img, s, cache.as_deref())?;
     let (mut out, notes) = batch::compose_canvas(img, &mut res, &cfg, &placement, None, None);
     imageops::clean_transparent(&mut out);
     res.notes.extend(notes);
@@ -705,10 +707,11 @@ pub fn run_batch(
         lucent: lucent_of(&settings.background),
         ai: ai_of(&settings.ai)?,
         effects: effects_of(&settings.effects),
+        cut_cache: settings.cut_cache_dir.as_ref().map(PathBuf::from),
     };
     let flag = cancel.handle();
     let sink = std::sync::Mutex::new(sink);
-    batch::run(&jobs, &cfg, &flag, &|r, done, total| {
+    batch::run_chunked(&jobs, &cfg, &flag, &|r, done, total| {
         if let Ok(s) = sink.lock() {
             let _ = s.add(BatchProgress { result: item_result(r), done: done as u32, total: total as u32 });
         }
@@ -990,6 +993,23 @@ pub fn ai_preview(path: String, settings: AiSettings) -> Result<AiPreview> {
 /// Frees the cached model.
 pub fn ai_unload_model() {
     ai::unload();
+}
+
+// ---------------------------------------------------------------- cutout cache
+/// Bytes used by the saved cutouts in `dir` (0 when there are none).
+pub fn cutout_cache_size(dir: String) -> u64 {
+    cutcache::size(Path::new(&dir))
+}
+
+/// Deletes the saved cutouts in `dir`. Other files in the folder are kept.
+pub fn cutout_cache_clear(dir: String) -> Result<()> {
+    Ok(cutcache::clear(Path::new(&dir))?)
+}
+
+/// Deletes the oldest saved cutouts until the folder holds at most
+/// `max_bytes`. Returns the size left.
+pub fn cutout_cache_prune(dir: String, max_bytes: u64) -> Result<u64> {
+    Ok(cutcache::prune(Path::new(&dir), max_bytes)?)
 }
 
 // ---------------------------------------------------------------- pack builder matching

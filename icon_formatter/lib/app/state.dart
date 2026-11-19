@@ -6,9 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding, WidgetsBindingObserver;
 import 'package:path/path.dart' as p;
 
+import '../l10n/strings.dart';
 import '../services/app_lists.dart';
 import '../services/bg_removal_service.dart';
 import '../services/extra2_auto_backup.dart';
+import '../services/packdb_db.dart';
+import '../services/packdb_store.dart';
 import '../services/preset_share.dart';
 import '../services/update_check.dart';
 import '../src/rust/api/engine.dart';
@@ -47,6 +50,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   bool useBaseCalibrationForTranslucent = false;
   int translucentSize = 512;
   int threads = 0;
+
+  /// Keep the isolated glyphs, so that a change of plate, opacity or colour
+  /// does not cut every icon out again.
+  bool keepCutouts = true;
+
+  /// Size limit of the saved cutouts in MB; the oldest are removed above it.
+  int cutoutLimitMb = 500;
 
   /// Background removal provider (local Rust is the default).
   BgProvider bgProvider = BgProvider.local;
@@ -106,6 +116,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Looks for a newer release once per start (Settings > System).
   bool checkUpdates = true;
+  /// Frame monitor overlay (Impostazioni > Sistema). Not part of the backup file.
+  bool showFps = false;
+  /// Premium glass that keeps missing the frame budget (set only while the monitor runs).
+  final ValueNotifier<bool> fpsStruggling = ValueNotifier(false);
 
   /// Folder whose new images are imported while the Studio is shown (null = off).
   /// Not part of the backup file.
@@ -133,13 +147,31 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         debugPrint('state load failed: $e');
       }
     }
+    // Pack builder maps: from pack.db when it is in use, else as read above
+    final pk = await packStoreBoot(
+      PackContent.maps(corrections: packCorrections, log: packLog, profiles: packProfiles, exportSnapshot: packExportSnapshot, fingerprints: packFingerprints),
+      root: AppPaths.I.root.path,
+      stateFile: AppPaths.I.stateFile,
+      exists: (f) => File(f).existsSync(),
+    );
+    packCorrections = pk.corrections;
+    packLog = pk.log;
+    packProfiles = pk.profiles;
+    packExportSnapshot = pk.exportSnapshot;
+    packFingerprints = pk.fingerprints;
+    PackStore.onFallback.add(update);
+    if (PackStore.fallbackReason != null) {
+      packLog.insert(0, {'date': DateTime.now().toIso8601String(), 'text': S.dbPackFallback(PackStore.fallbackReason!)});
+    }
     await _ensureReferenceBase();
     _loaded = true;
     notifyListeners();
+    // the cache check runs later, after the first frames
+    Future<void>.delayed(const Duration(seconds: 4)).then((_) => pruneCutouts());
   }
 
   /// Backup file text: look, styles, presets and defaults (no AI settings).
-  String backupJson() => const JsonEncoder.withIndent(' ').convert(toJson()..remove('localAi')..remove('backupReminder')..remove('lastSeenBuild')..remove('autoBackupDir')..remove('watchDir'));
+  String backupJson() => const JsonEncoder.withIndent(' ').convert(toJson()..remove('localAi')..remove('backupReminder')..remove('lastSeenBuild')..remove('autoBackupDir')..remove('watchDir')..remove('showFps'));
 
   /// Restores a backup made by [backupJson]; throws FormatException if it is not one.
   Future<void> restoreBackup(String text) async {
@@ -185,6 +217,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     useBaseCalibrationForTranslucent = j['useBaseCalibrationForTranslucent'] as bool? ?? false;
     translucentSize = (j['translucentSize'] as num?)?.toInt() ?? translucentSize;
     threads = (j['threads'] as num?)?.toInt() ?? threads;
+    keepCutouts = j['keepCutouts'] as bool? ?? keepCutouts;
+    cutoutLimitMb = (j['cutoutLimitMb'] as num?)?.toInt() ?? cutoutLimitMb;
     bgProvider = BgProvider.values.firstWhere((b) => b.name == j['bgProvider'], orElse: () => BgProvider.local);
     autoSendToPack = j['autoSendToPack'] as bool? ?? false;
     setupDone = j['setupDone'] as bool? ?? false;
@@ -206,6 +240,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     lastSeenBuild = j['lastSeenBuild'] as String? ?? lastSeenBuild;
     autoBackupDir = j['autoBackupDir'] as String? ?? autoBackupDir;
     checkUpdates = j['checkUpdates'] as bool? ?? true;
+    showFps = j['showFps'] as bool? ?? showFps;
     watchDir = j['watchDir'] as String? ?? watchDir;
   }
 
@@ -229,6 +264,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'useBaseCalibrationForTranslucent': useBaseCalibrationForTranslucent,
         'translucentSize': translucentSize,
         'threads': threads,
+        'keepCutouts': keepCutouts,
+        'cutoutLimitMb': cutoutLimitMb,
         'bgProvider': bgProvider.name,
         'autoSendToPack': autoSendToPack,
       'setupDone': setupDone,
@@ -247,6 +284,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         'lastSeenBuild': lastSeenBuild,
         'autoBackupDir': autoBackupDir,
         'checkUpdates': checkUpdates,
+        'showFps': showFps,
         'watchDir': watchDir,
       };
 
@@ -330,7 +368,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> save() async {
     final f = File(AppPaths.I.stateFile);
     final tmp = File('${f.path}.tmp');
-    await tmp.writeAsString(const JsonEncoder.withIndent(' ').convert(toJson()));
+    // the pack maps go to pack.db (one row per change) when it is in use
+    if (PackStore.I.ownsMaps) {
+      await PackStore.I.writeMaps(PackContent.maps(corrections: packCorrections, log: packLog, profiles: packProfiles, exportSnapshot: packExportSnapshot, fingerprints: packFingerprints));
+    }
+    final j = toJson();
+    if (PackStore.I.ownsMaps) {
+      for (final k in const ['packCorrections', 'packLog', 'packProfiles', 'packExportSnapshot', 'packFingerprints']) {
+        j.remove(k);
+      }
+    }
+    await tmp.writeAsString(const JsonEncoder.withIndent(' ').convert(j));
     await tmp.rename(f.path);
   }
 
@@ -353,6 +401,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     useBaseCalibrationForTranslucent = false;
     translucentSize = 512;
     threads = 0;
+    keepCutouts = true;
+    cutoutLimitMb = 500;
     bgProvider = BgProvider.local;
     autoSendToPack = false;
     packMode = StudioMode.translucent;
@@ -526,6 +576,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Folder of the saved cutouts, or null while the setting is off.
+  String? get cutCacheDir => keepCutouts ? AppPaths.I.cutouts : null;
+
+  /// Keeps the saved cutouts under the size limit. Rust does the work on its
+  /// own threads; a failure only leaves the folder larger.
+  Future<void> pruneCutouts() async {
+    if (!keepCutouts) return;
+    try {
+      await cutoutCachePrune(dir: AppPaths.I.cutouts, maxBytes: BigInt.from(cutoutLimitMb) * BigInt.from(1024 * 1024));
+    } catch (e) {
+      debugPrint('cutout prune failed: $e');
+    }
+  }
+
   ProcessSettings settingsFor(StudioMode mode, {String? presetId, SegmentSettings? seg}) => ProcessSettings(
         size: sizeFor(mode),
         background: backgroundFor(mode, presetId: presetId),
@@ -533,6 +597,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         segment: seg ?? segment,
         ai: aiSettings,
         effects: look.effects,
+        cutCacheDir: cutCacheDir,
       );
 
   /// Path of a downloaded local model.
