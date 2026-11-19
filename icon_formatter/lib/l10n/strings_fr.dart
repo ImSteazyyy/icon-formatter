@@ -1738,4 +1738,8 @@ class StringsFr extends Strings {
   String get wireCartellaNonLeggibile => 'Dossier illisible depuis ici';
   @override
   String get wireRimuoviCartella => 'Retirer le dossier';
+  @override
+  String get batchElaborazione => 'Traitement';
+  @override
+  String get batchCompletato => 'Terminé';
 }

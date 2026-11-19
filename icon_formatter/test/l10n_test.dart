@@ -881,6 +881,8 @@ void main() {
         S.wireScegliCartella,
         S.wireCartellaNonLeggibile,
         S.wireRimuoviCartella,
+        S.batchElaborazione,
+        S.batchCompletato,
       ];
       for (final s in all) {
         expect(s.trim(), isNotEmpty);

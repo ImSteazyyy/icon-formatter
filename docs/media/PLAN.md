@@ -107,3 +107,10 @@ Tutti i file vanno in `docs/media/`. Il README li richiama con percorsi relativi
 - Nessuna icona di terze parti, né logo, né nome di app reale (controlla anche le barre di stato e i menu).
 - Nessun dato personale, né percorsi con il nome utente.
 - Pesi nei limiti; le GIF si riproducono in loop senza scatti.
+
+## Stato delle catture (emulatore, build 1)
+
+- **Prodotti (8):** hero.png, studio-import.gif, studio-style.gif, studio-corrections.png, calendar.gif, themes-nothing-glass.png, onboarding.gif, settings.png.
+- **Calendar.gif:** registrato dallo Studio con l'importazione "Calendario da un icon pack" (31 icone sintetiche da un pack di test), non dalla sezione Pack.
+- **Non prodotti (5):** pack-matching.gif, pack-details.png, pack-preview-home.png, android-apply.gif, pack-app.png. La schermata Pack mostra sempre le app installate con le loro icone reali, quindi non si può catturare senza terze parti. Per android-apply.gif e pack-app.png serve un pack installato sul telefono.
+- **Nel README** sono reinseriti solo i blocchi dei file prodotti; gli altri cinque restano fuori finché non vengono catturati.

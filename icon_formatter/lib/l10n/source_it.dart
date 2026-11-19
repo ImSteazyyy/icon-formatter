@@ -1045,4 +1045,6 @@ class S {
   static const wireScegliCartella = 'Scegli la cartella da osservare';
   static const wireCartellaNonLeggibile = 'Cartella non leggibile da qui';
   static const wireRimuoviCartella = 'Rimuovi cartella';
+  static const batchElaborazione = 'Elaborazione';
+  static const batchCompletato = 'Completato';
 }

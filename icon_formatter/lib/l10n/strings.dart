@@ -911,4 +911,6 @@ class S {
   static String get wireScegliCartella => current.wireScegliCartella;
   static String get wireCartellaNonLeggibile => current.wireCartellaNonLeggibile;
   static String get wireRimuoviCartella => current.wireRimuoviCartella;
+  static String get batchElaborazione => current.batchElaborazione;
+  static String get batchCompletato => current.batchCompletato;
 }

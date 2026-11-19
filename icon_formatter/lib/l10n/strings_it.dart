@@ -883,4 +883,6 @@ class Strings {
   String get wireScegliCartella => 'Scegli la cartella da osservare';
   String get wireCartellaNonLeggibile => 'Cartella non leggibile da qui';
   String get wireRimuoviCartella => 'Rimuovi cartella';
+  String get batchElaborazione => 'Elaborazione';
+  String get batchCompletato => 'Completato';
 }

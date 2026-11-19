@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/media/hero.png" alt="Icone di app con sfondi e forme diverse, trasformate in un unico stile" width="800">
+</p>
+
 # Icon Formatter
 
 Trasforma le icone delle app in uno stile uniforme e crea icon pack pronti da installare. Su Android installa e applica il pack nel launcher con Shizuku, senza PC e senza root.
@@ -26,6 +30,10 @@ Le icone che hai raccolto arrivano da posti diversi, con sfondi, forme e dimensi
 
 Lo Studio è il punto di partenza. Importi immagini (PNG, JPG, WEBP o SVG), una cartella, un icon pack in ZIP o APK, oppure le app installate sul telefono. Puoi incollare dagli appunti e ricevere immagini dal menu Condividi di Android. Scegli lo stile, premi **Elabora tutte** e ogni icona esce con lo stesso piatto, la stessa dimensione e lo stesso sfondo.
 
+<p align="center">
+  <img src="docs/media/studio-import.gif" width="320" alt="Importazione di alcune icone nello Studio, poi elaborazione">
+</p>
+
 Dopo l'elaborazione puoi rifinire il risultato:
 
 - correggere una singola icona (dimensione, posizione, colore del simbolo, centratura ottica, forma e colore del piatto) e copiare la correzione su tutte le altre;
@@ -36,6 +44,10 @@ Dopo l'elaborazione puoi rifinire il risultato:
 - confrontare due stili sulla stessa icona;
 - togliere lo sfondo in tre modi: metodo standard sul dispositivo, AI locale con un modello facoltativo, oppure remove.bg con una tua chiave API.
 
+<p align="center">
+  <img src="docs/media/studio-corrections.png" width="320" alt="Anteprima di un'icona con i controlli di correzione">
+</p>
+
 ## Stili
 
 - **Lucent**: un piatto traslucido, scuro o chiaro, sulla forma dell'icona originale (cerchio o squircle). Il simbolo resta com'era, con i suoi colori oppure in un colore solo.
@@ -43,6 +55,10 @@ Dopo l'elaborazione puoi rifinire il risultato:
 - **Composizione originale**: ogni icona mantiene la posizione e le proporzioni dell'originale, dentro la dimensione dell'icona base scelta.
 - **Preset**: Minimale, Scuro piatto e quelli che crei tu. I preset si esportano in un file e si importano su un altro dispositivo.
 - **Basi**: Cerchio e Squircle sono incluse. Puoi importare una tua base e calibrarla con una ventina di icone di esempio, così margini e centro vengono misurati.
+
+<p align="center">
+  <img src="docs/media/studio-style.gif" width="320" alt="Scelta dello stile Lucent, regolazione della dimensione e confronto prima e dopo">
+</p>
 
 ## Pack
 
@@ -73,6 +89,10 @@ Sul telefono il pack prende vita.
 - **Elaborazione in background**: un lavoro lungo mostra una notifica con l'avanzamento.
 - **L'app del pack**: il pack ha una sua schermata con tutte le icone, ricerca, filtri (tutte, installate, mancanti) e ordinamento. Tenendo premuta un'app copi il nome del pacchetto o la apri.
 
+<p align="center">
+  <img src="docs/media/calendar.gif" width="320" alt="Giorno del calendario aggiornato in un'icona del pack">
+</p>
+
 ## Aspetto
 
 - **Stile Nothing** (predefinito): nero, card grigie, titoli serif e accento rosso.
@@ -84,6 +104,18 @@ Sul telefono il pack prende vita.
 - **Backup**: salvi aspetto, stili e preferenze in un file e li ripristini quando vuoi. Dopo molte modifiche l'app può salvare anche una copia automatica nella cartella che scegli, tenendo le ultime tre.
 - **Copia info** per segnalare un problema: versione, sistema e impostazioni, senza dati personali.
 - **Su Windows**: Ctrl+1 fino a Ctrl+4 per le prime quattro sezioni, Ctrl+, per le Impostazioni, Ctrl+Maiusc+T per passare dal chiaro allo scuro.
+
+<p align="center">
+  <img src="docs/media/themes-nothing-glass.png" width="640" alt="Impostazioni di aspetto con lo stile Nothing e lo stile Vetro affiancati">
+</p>
+
+<p align="center">
+  <img src="docs/media/onboarding.gif" width="320" alt="Primo avvio: lingua, aggiornamento automatico e tour iniziale">
+</p>
+
+<p align="center">
+  <img src="docs/media/settings.png" width="320" alt="Schermata Impostazioni con le sezioni">
+</p>
 
 ## Lingue
 

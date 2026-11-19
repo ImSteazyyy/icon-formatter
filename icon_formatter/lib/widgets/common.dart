@@ -480,10 +480,11 @@ class ProgressStrip extends StatelessWidget {
     final strip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Palette.toast,
+        // lifted from the content under it, like the notices
+        color: Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
         borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
-        border: Border.all(color: Palette.fg.withValues(alpha: 0.08)),
-        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
+        border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.75), width: 1.4),
+        boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
       ),
       child: Row(
         children: [
@@ -492,7 +493,7 @@ class ProgressStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(S.completateRimanentiErrori(label ?? (running ? 'Elaborazione' : 'Completato'), done, total, total - done, errors), style: TextStyle(fontSize: 12, color: Palette.text2)),
+                Text(S.completateRimanentiErrori(label ?? (running ? S.batchElaborazione : S.batchCompletato), done, total, total - done, errors), style: TextStyle(fontSize: 12, color: Palette.text2)),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),

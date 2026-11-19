@@ -1738,4 +1738,8 @@ class StringsPt extends Strings {
   String get wireCartellaNonLeggibile => 'Pasta não legível daqui';
   @override
   String get wireRimuoviCartella => 'Remover pasta';
+  @override
+  String get batchElaborazione => 'A processar';
+  @override
+  String get batchCompletato => 'Concluído';
 }

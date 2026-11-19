@@ -1738,4 +1738,8 @@ class StringsDe extends Strings {
   String get wireCartellaNonLeggibile => 'Ordner von hier nicht lesbar';
   @override
   String get wireRimuoviCartella => 'Ordner entfernen';
+  @override
+  String get batchElaborazione => 'Verarbeitung';
+  @override
+  String get batchCompletato => 'Fertig';
 }

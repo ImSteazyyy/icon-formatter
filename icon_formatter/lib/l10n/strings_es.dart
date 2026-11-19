@@ -1738,4 +1738,8 @@ class StringsEs extends Strings {
   String get wireCartellaNonLeggibile => 'Carpeta no legible desde aquí';
   @override
   String get wireRimuoviCartella => 'Quitar carpeta';
+  @override
+  String get batchElaborazione => 'Procesando';
+  @override
+  String get batchCompletato => 'Completado';
 }

@@ -1738,4 +1738,8 @@ class StringsEn extends Strings {
   String get wireCartellaNonLeggibile => 'Folder not readable from here';
   @override
   String get wireRimuoviCartella => 'Remove folder';
+  @override
+  String get batchElaborazione => 'Processing';
+  @override
+  String get batchCompletato => 'Done';
 }
