@@ -211,7 +211,9 @@ ThemeData buildTheme(Appearance a, [GlassConfig? glass]) {
     pageTransitionsTheme: PageTransitionsTheme(
       builders: {
         for (final p in TargetPlatform.values)
-          p: a.animations ? const FadeForwardsPageTransitionsBuilder() : const _NoTransition(),
+          // the transition paints a backdrop behind the page: the app's own
+          // background, not the scheme's lighter surface (it flashed grey)
+          p: a.animations ? FadeForwardsPageTransitionsBuilder(backgroundColor: nothing ? NothingColors.bg : Palette.bg) : const _NoTransition(),
       },
     ),
   );
