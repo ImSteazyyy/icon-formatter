@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1146500309;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -784277115;
 
 // Section: executor
 
@@ -421,6 +421,35 @@ fn wire__crate__api__engine__core_version_impl(
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Ok::<_, ()>(crate::api::engine::core_version())?;
+                std::result::Result::Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__engine__default_effect_settings_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "default_effect_settings",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Ok::<_, ()>(crate::api::engine::default_effect_settings())?;
                 std::result::Result::Ok(output_ok)
             })())
         },
@@ -1452,6 +1481,8 @@ impl SseDecode for crate::api::engine::BatchItem {
         let mut var_placement =
             <Option<crate::api::engine::PlacementSettings>>::sse_decode(deserializer);
         let mut var_skipIsolation = <bool>::sse_decode(deserializer);
+        let mut var_shape = <Option<crate::api::engine::LucentShape>>::sse_decode(deserializer);
+        let mut var_backdrop = <Option<u32>>::sse_decode(deserializer);
         return crate::api::engine::BatchItem {
             id: var_id,
             name: var_name,
@@ -1461,6 +1492,8 @@ impl SseDecode for crate::api::engine::BatchItem {
             segment: var_segment,
             placement: var_placement,
             skip_isolation: var_skipIsolation,
+            shape: var_shape,
+            backdrop: var_backdrop,
         };
     }
 }
@@ -1553,6 +1586,26 @@ impl SseDecode for crate::api::engine::CalibrationSample {
             method: var_method,
             outlier: var_outlier,
             error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::api::engine::EffectSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_brightness = <f32>::sse_decode(deserializer);
+        let mut var_saturation = <f32>::sse_decode(deserializer);
+        let mut var_hue = <f32>::sse_decode(deserializer);
+        let mut var_recolor = <Option<u32>>::sse_decode(deserializer);
+        let mut var_plateTint = <f32>::sse_decode(deserializer);
+        let mut var_sharpen = <f32>::sse_decode(deserializer);
+        return crate::api::engine::EffectSettings {
+            brightness: var_brightness,
+            saturation: var_saturation,
+            hue: var_hue,
+            recolor: var_recolor,
+            plate_tint: var_plateTint,
+            sharpen: var_sharpen,
         };
     }
 }
@@ -1916,6 +1969,41 @@ impl SseDecode for Option<crate::api::engine::AiSettings> {
     }
 }
 
+impl SseDecode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<bool>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::engine::EffectSettings> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::engine::EffectSettings>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::engine::LucentShape> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::engine::LucentShape>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::engine::PlacementSettings> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1936,6 +2024,17 @@ impl SseDecode for Option<crate::api::engine::SegmentSettings> {
             return Some(<crate::api::engine::SegmentSettings>::sse_decode(
                 deserializer,
             ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u32>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -2003,6 +2102,7 @@ impl SseDecode for crate::api::engine::PlacementSettings {
         let mut var_scaleMul = <f32>::sse_decode(deserializer);
         let mut var_offsetX = <f32>::sse_decode(deserializer);
         let mut var_offsetY = <f32>::sse_decode(deserializer);
+        let mut var_opticalCentre = <Option<bool>>::sse_decode(deserializer);
         return crate::api::engine::PlacementSettings {
             glyph_ratio: var_glyphRatio,
             area_ratio: var_areaRatio,
@@ -2012,6 +2112,7 @@ impl SseDecode for crate::api::engine::PlacementSettings {
             scale_mul: var_scaleMul,
             offset_x: var_offsetX,
             offset_y: var_offsetY,
+            optical_centre: var_opticalCentre,
         };
     }
 }
@@ -2066,12 +2167,15 @@ impl SseDecode for crate::api::engine::ProcessSettings {
         let mut var_placement = <crate::api::engine::PlacementSettings>::sse_decode(deserializer);
         let mut var_segment = <crate::api::engine::SegmentSettings>::sse_decode(deserializer);
         let mut var_ai = <Option<crate::api::engine::AiSettings>>::sse_decode(deserializer);
+        let mut var_effects =
+            <Option<crate::api::engine::EffectSettings>>::sse_decode(deserializer);
         return crate::api::engine::ProcessSettings {
             size: var_size,
             background: var_background,
             placement: var_placement,
             segment: var_segment,
             ai: var_ai,
+            effects: var_effects,
         };
     }
 }
@@ -2177,30 +2281,30 @@ fn pde_ffi_dispatcher_primary_impl(
         7 => wire__crate__api__engine__calibrate_base_impl(port, ptr, rust_vec_len, data_len),
         8 => wire__crate__api__engine__collect_images_impl(port, ptr, rust_vec_len, data_len),
         9 => wire__crate__api__engine__compose_glyph_png_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__engine__finalize_pack_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__engine__find_calendar_icons_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__engine__match_plate_alpha_impl(port, ptr, rust_vec_len, data_len),
-        22 => {
+        16 => wire__crate__api__engine__finalize_pack_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__engine__find_calendar_icons_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__engine__image_dimensions_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__engine__import_as_png_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__engine__init_app_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__engine__match_icons_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__engine__match_plate_alpha_impl(port, ptr, rust_vec_len, data_len),
+        23 => {
             wire__crate__api__engine__match_plate_alpha_png_impl(port, ptr, rust_vec_len, data_len)
         }
-        23 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
-        26 => {
+        24 => wire__crate__api__engine__open_pack_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__engine__preview_bytes_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__engine__preview_file_impl(port, ptr, rust_vec_len, data_len),
+        27 => {
             wire__crate__api__engine__render_background_png_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
-        29 => {
+        28 => wire__crate__api__engine__run_batch_impl(port, ptr, rust_vec_len, data_len),
+        30 => {
             wire__crate__api__engine__set_match_cache_file_impl(port, ptr, rust_vec_len, data_len)
         }
-        31 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__engine__thumbnail_png_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__engine__visual_similarity_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__engine__write_file_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__engine__zip_directory_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2217,16 +2321,17 @@ fn pde_ffi_dispatcher_sync_impl(
         2 => wire__crate__api__engine__CancelToken_is_cancelled_impl(ptr, rust_vec_len, data_len),
         3 => wire__crate__api__engine__CancelToken_new_impl(ptr, rust_vec_len, data_len),
         10 => wire__crate__api__engine__core_version_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__engine__default_lucent_settings_impl(ptr, rust_vec_len, data_len),
-        12 => {
+        11 => wire__crate__api__engine__default_effect_settings_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__engine__default_lucent_settings_impl(ptr, rust_vec_len, data_len),
+        13 => {
             wire__crate__api__engine__default_placement_settings_impl(ptr, rust_vec_len, data_len)
         }
-        13 => wire__crate__api__engine__default_segment_settings_impl(ptr, rust_vec_len, data_len),
-        14 => {
+        14 => wire__crate__api__engine__default_segment_settings_impl(ptr, rust_vec_len, data_len),
+        15 => {
             wire__crate__api__engine__default_translucent_settings_impl(ptr, rust_vec_len, data_len)
         }
-        28 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__engine__sanitize_drawable_name_impl(ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__engine__set_worker_threads_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2380,6 +2485,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::BatchItem {
             self.segment.into_into_dart().into_dart(),
             self.placement.into_into_dart().into_dart(),
             self.skip_isolation.into_into_dart().into_dart(),
+            self.shape.into_into_dart().into_dart(),
+            self.backdrop.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2491,6 +2598,31 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::CalibrationSample>
     for crate::api::engine::CalibrationSample
 {
     fn into_into_dart(self) -> crate::api::engine::CalibrationSample {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::engine::EffectSettings {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.brightness.into_into_dart().into_dart(),
+            self.saturation.into_into_dart().into_dart(),
+            self.hue.into_into_dart().into_dart(),
+            self.recolor.into_into_dart().into_dart(),
+            self.plate_tint.into_into_dart().into_dart(),
+            self.sharpen.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::engine::EffectSettings
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::engine::EffectSettings>
+    for crate::api::engine::EffectSettings
+{
+    fn into_into_dart(self) -> crate::api::engine::EffectSettings {
         self
     }
 }
@@ -2774,6 +2906,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::PlacementSettings {
             self.scale_mul.into_into_dart().into_dart(),
             self.offset_x.into_into_dart().into_dart(),
             self.offset_y.into_into_dart().into_dart(),
+            self.optical_centre.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2849,6 +2982,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::engine::ProcessSettings {
             self.placement.into_into_dart().into_dart(),
             self.segment.into_into_dart().into_dart(),
             self.ai.into_into_dart().into_dart(),
+            self.effects.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3064,6 +3198,8 @@ impl SseEncode for crate::api::engine::BatchItem {
         <Option<crate::api::engine::SegmentSettings>>::sse_encode(self.segment, serializer);
         <Option<crate::api::engine::PlacementSettings>>::sse_encode(self.placement, serializer);
         <bool>::sse_encode(self.skip_isolation, serializer);
+        <Option<crate::api::engine::LucentShape>>::sse_encode(self.shape, serializer);
+        <Option<u32>>::sse_encode(self.backdrop, serializer);
     }
 }
 
@@ -3121,6 +3257,18 @@ impl SseEncode for crate::api::engine::CalibrationSample {
         <String>::sse_encode(self.method, serializer);
         <bool>::sse_encode(self.outlier, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::engine::EffectSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <f32>::sse_encode(self.brightness, serializer);
+        <f32>::sse_encode(self.saturation, serializer);
+        <f32>::sse_encode(self.hue, serializer);
+        <Option<u32>>::sse_encode(self.recolor, serializer);
+        <f32>::sse_encode(self.plate_tint, serializer);
+        <f32>::sse_encode(self.sharpen, serializer);
     }
 }
 
@@ -3410,6 +3558,36 @@ impl SseEncode for Option<crate::api::engine::AiSettings> {
     }
 }
 
+impl SseEncode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <bool>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::engine::EffectSettings> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::engine::EffectSettings>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::engine::LucentShape> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::engine::LucentShape>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::engine::PlacementSettings> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3426,6 +3604,16 @@ impl SseEncode for Option<crate::api::engine::SegmentSettings> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::engine::SegmentSettings>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u32>::sse_encode(value, serializer);
         }
     }
 }
@@ -3474,6 +3662,7 @@ impl SseEncode for crate::api::engine::PlacementSettings {
         <f32>::sse_encode(self.scale_mul, serializer);
         <f32>::sse_encode(self.offset_x, serializer);
         <f32>::sse_encode(self.offset_y, serializer);
+        <Option<bool>>::sse_encode(self.optical_centre, serializer);
     }
 }
 
@@ -3510,6 +3699,7 @@ impl SseEncode for crate::api::engine::ProcessSettings {
         <crate::api::engine::PlacementSettings>::sse_encode(self.placement, serializer);
         <crate::api::engine::SegmentSettings>::sse_encode(self.segment, serializer);
         <Option<crate::api::engine::AiSettings>>::sse_encode(self.ai, serializer);
+        <Option<crate::api::engine::EffectSettings>>::sse_encode(self.effects, serializer);
     }
 }
 

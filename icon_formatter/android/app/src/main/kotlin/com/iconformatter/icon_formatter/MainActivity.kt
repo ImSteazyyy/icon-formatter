@@ -16,6 +16,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -31,6 +32,7 @@ class MainActivity : FlutterActivity() {
     private val main = Handler(Looper.getMainLooper())
     private var pendingTree: MethodChannel.Result? = null
     private val reqTree = 4711
+    private val extraShortcut = "shortcutAction"
 
     /** Display mode last written to the window (0 = no preference). */
     private var requestedMode = 0
@@ -81,6 +83,7 @@ class MainActivity : FlutterActivity() {
         DevicePack.appCtx = applicationContext
         super.configureFlutterEngine(flutterEngine)
         AutoSync.registerUnlock(applicationContext)
+        handleShortcut(intent, finishWhenDone = true)
         // ask Shizuku permission once when Shizuku is running and it is missing
         rikka.shizuku.Shizuku.addBinderReceivedListenerSticky(shizukuBinder)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
@@ -114,6 +117,14 @@ class MainActivity : FlutterActivity() {
                 "autoSyncCheckNow" -> background(result) { AutoSync.check(applicationContext, notify = false); AutoSync.status(applicationContext) }
                 "calendarDailySet" -> background(result) {
                     AutoSync.setCalendarDaily(applicationContext, call.argument<Boolean>("enabled") ?: true)
+                    AutoSync.status(applicationContext)
+                }
+                "calendarHourSet" -> background(result) {
+                    AutoSync.setCalendarHour(applicationContext, call.argument<Int>("hour") ?: -1)
+                    AutoSync.status(applicationContext)
+                }
+                "autoSyncScheduleSet" -> background(result) {
+                    AutoSync.setSchedule(applicationContext, call.argument<Int>("hours") ?: 6, call.argument<Boolean>("charging") ?: false)
                     AutoSync.status(applicationContext)
                 }
                 "calendarRefreshNow" -> background(result) { DevicePack.refreshCalendar(applicationContext) }
@@ -172,6 +183,25 @@ class MainActivity : FlutterActivity() {
                 "devicePackArchiveInfo" -> background(result) { DevicePack.archiveInfo(applicationContext, call.argument<String>("path")!!) }
                 "devicePackUninstall" -> background(result) { DevicePack.uninstallShizuku(applicationContext); true }
                 "devicePackRestore" -> background(result) { DevicePack.restore(applicationContext) }
+                "takeSharedImages" -> {
+                    val uris = sharedUris(intent)
+                    // handled once: a later call, or a recreated activity, gets nothing
+                    intent?.action = Intent.ACTION_MAIN
+                    background(result) { ShareIntake.copyToCache(applicationContext, uris) }
+                }
+                "autoSyncIgnoredSet" -> background(result) {
+                    AutoSync.setIgnored(applicationContext, call.argument<List<String>>("packages") ?: emptyList())
+                    AutoSync.status(applicationContext)
+                }
+                "processingStart" -> result.success(ProcessingService.start(applicationContext, call.argument<Int>("total") ?: 0))
+                "processingProgress" -> {
+                    ProcessingService.update(applicationContext, call.argument<Int>("done") ?: 0, call.argument<Int>("total") ?: 0)
+                    result.success(null)
+                }
+                "processingStop" -> {
+                    ProcessingService.stop(applicationContext)
+                    result.success(null)
+                }
                 "openLauncherPicker" -> result.success(DevicePack.openPicker(this))
                 else -> result.notImplemented()
             }
@@ -185,6 +215,65 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleShortcut(intent, finishWhenDone = false)
+    }
+
+    /** Image URIs of an ACTION_SEND or ACTION_SEND_MULTIPLE intent. */
+    @Suppress("DEPRECATION")
+    private fun sharedUris(i: Intent?): List<Uri> {
+        if (i == null) return emptyList()
+        val uris: List<Uri> = when (i.action) {
+            Intent.ACTION_SEND -> listOfNotNull(
+                if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM),
+            )
+            Intent.ACTION_SEND_MULTIPLE -> (
+                if (Build.VERSION.SDK_INT >= 33) i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+            )?.toList() ?: emptyList()
+            else -> emptyList()
+        }
+        return uris.take(ShareIntake.MAX_FILES)
+    }
+
+    /**
+     * Static shortcut (res/xml/shortcuts.xml): runs its action on the executor
+     * and shows a toast. A cold start made only for the action finishes again.
+     */
+    private fun handleShortcut(i: Intent?, finishWhenDone: Boolean) {
+        if (i == null) return
+        val kind = i.getStringExtra(extraShortcut) ?: return
+        i.removeExtra(extraShortcut)
+        executor.execute {
+            val text = try {
+                if (kind == "check") checkNow() else refreshDay()
+            } catch (_: Exception) {
+                AppText.get(applicationContext, R.string.toast_failed)
+            }
+            main.post {
+                Toast.makeText(applicationContext, text, Toast.LENGTH_LONG).show()
+                if (finishWhenDone) finish()
+            }
+        }
+    }
+
+    private fun checkNow(): String {
+        AutoSync.check(applicationContext, notify = false)
+        val n = AutoSync.pendingCount(applicationContext)
+        return if (n == 0) AppText.get(applicationContext, R.string.toast_check_none)
+        else AppText.get(applicationContext, R.string.toast_check_some, n)
+    }
+
+    private fun refreshDay(): String {
+        val res = when (DevicePack.refreshCalendar(applicationContext)["state"] as? String) {
+            "updated" -> R.string.toast_refresh_done
+            "current" -> R.string.toast_refresh_current
+            "no_calendar" -> R.string.toast_refresh_no_calendar
+            "no_shizuku" -> R.string.err_shizuku_off
+            "not_installed" -> R.string.err_not_installed
+            else -> R.string.toast_failed
+        }
+        return AppText.get(applicationContext, res)
     }
 
     private fun background(result: MethodChannel.Result, work: () -> Any?) {

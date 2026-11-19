@@ -1,12 +1,22 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../app/models.dart';
 import '../app/state.dart';
+import '../app/storage.dart';
 import '../app/theme.dart';
+import '../services/preset_share.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/ai_mask.dart';
 import '../widgets/common.dart';
 import 'workspace_controller.dart';
+import 'extra_compare_styles.dart';
+import 'studio2_color_section.dart';
 import '../l10n/strings.dart';
 
 /// Controls shared by all pipelines.
@@ -41,6 +51,8 @@ class AdjustPanel extends StatelessWidget {
               const SizedBox(height: 18),
             ],
             ..._styleSection(context, st),
+            const SizedBox(height: 18),
+            Studio2ColorSection(c: c),
             const SizedBox(height: 18),
             _overrideSwitch(context),
             ..._placementSection(context),
@@ -135,10 +147,61 @@ class AdjustPanel extends StatelessWidget {
                   }
                 },
               ),
+            IconButton(tooltip: S.presetCondividiCondividi, icon: const Icon(Icons.ios_share), onPressed: () => _sharePreset(context, pr)),
+            IconButton(tooltip: S.presetCondividiImporta, icon: const Icon(Icons.file_download_outlined), onPressed: () => _importPresets(context, st)),
           ]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => showCompareStyles(context, c, pr.id),
+              icon: const Icon(Icons.compare_outlined, size: 18),
+              label: Text(S.extraConfrontaStili),
+            ),
+          ),
+          const SizedBox(height: 6),
           ...translucentSliders(pr.params, (t) => st.setPresetParams(pr.id, t)),
         ];
+    }
+  }
+
+  /// Mobile: share sheet. Desktop: save dialog, like the settings backup.
+  Future<void> _sharePreset(BuildContext context, StylePreset pr) async {
+    final bytes = Uint8List.fromList(utf8.encode(encodePresets([pr])));
+    final fileName = 'preset-${pr.name.replaceAll(RegExp(r'[^\w-]+'), '_')}.json';
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final file = File('${AppPaths.I.cache.path}/$fileName');
+        await file.writeAsBytes(bytes);
+        await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      } else {
+        final path = await FilePicker.platform.saveFile(fileName: fileName, bytes: bytes, type: FileType.custom, allowedExtensions: ['json']);
+        if (path == null) return;
+        await File(path).writeAsBytes(bytes);
+        if (context.mounted) showMsg(context, S.presetCondividiSalvato);
+      }
+    } catch (e) {
+      if (context.mounted) showMsg(context, S.errore(e), error: true);
+    }
+  }
+
+  Future<void> _importPresets(BuildContext context, AppState st) async {
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    final f = r?.files.firstOrNull;
+    if (f == null) return;
+    try {
+      final data = f.bytes ?? await File(f.path!).readAsBytes();
+      final items = decodePresets(utf8.decode(data), st.defaultTranslucent);
+      final id = st.importPresets(items);
+      if (id != null) {
+        c.setPreset(id);
+        if (!c.packSettings) st.update(() => st.activePresetId = id);
+      }
+      if (context.mounted) showMsg(context, S.presetCondividiImportati(items.length));
+    } on FormatException {
+      if (context.mounted) showMsg(context, S.presetCondividiNonValido, error: true);
+    } catch (e) {
+      if (context.mounted) showMsg(context, S.errore(e), error: true);
     }
   }
 
@@ -212,6 +275,13 @@ class AdjustPanel extends StatelessWidget {
         subtitle: Text(S.uniformaGlyphLarghiStrettiArea, style: TextStyle(fontSize: 11)),
         value: pl.areaFit,
         onChanged: c.editSelectedOnly ? (v) => c.setPlacement(copyPlacement(pl, areaFit: v)) : null,
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(S.studio2CentraturaOttica, style: TextStyle(fontSize: 13)),
+        value: AppState.I.look.opticalCentre,
+        onChanged: (v) => AppState.I.update(() => AppState.I.look.opticalCentre = v),
       ),
       Text(
         S.areaUtileLatoGlyphCentro((pl.glyphRatio * pl.scaleMul * 100).toStringAsFixed(1), (pl.centerX + pl.offsetX).toStringAsFixed(3), (pl.centerY + pl.offsetY).toStringAsFixed(3)),

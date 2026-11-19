@@ -219,6 +219,7 @@ pub fn aggregate(ms: &mut [SampleMeasure]) -> Calibration {
             scale_mul: 1.0,
             offset_x: 0.0,
             offset_y: 0.0,
+            optical_centre: false,
         };
     }
     let x0s = pick(&|m| m.bbox[0]);

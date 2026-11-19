@@ -3,9 +3,14 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding, WidgetsBindingObserver;
 import 'package:path/path.dart' as p;
 
+import '../services/app_lists.dart';
 import '../services/bg_removal_service.dart';
+import '../services/extra2_auto_backup.dart';
+import '../services/preset_share.dart';
+import '../services/update_check.dart';
 import '../src/rust/api/engine.dart';
 import 'models.dart';
 import 'storage.dart';
@@ -13,7 +18,7 @@ import 'storage.dart';
 enum StudioMode { original, translucent, preset }
 
 /// Global persisted app state.
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
   AppState._();
 
   static final AppState I = AppState._();
@@ -27,6 +32,7 @@ class AppState extends ChangeNotifier {
   final GlassConfig glass = GlassConfig();
   final LucentConfig lucent = LucentConfig();
   final LocalAiConfig localAi = LocalAiConfig();
+  final LookConfig look = LookConfig();
 
   List<StylePreset> presets = [];
   String activePresetId = 'nothing';
@@ -62,13 +68,56 @@ class AppState extends ChangeNotifier {
   /// Icon Pack Builder: manual corrections by original key (package or file).
   Map<String, Map<String, dynamic>> packCorrections = {};
 
+  /// Pack builder: newest first {date, text} lines, at most 30 (release notes).
+  List<Map<String, dynamic>> packLog = [];
+
+  /// Saved correction sets: {name, date, corrections}.
+  List<Map<String, dynamic>> packProfiles = [];
+
+  /// Saved selections of apps (Apps screen, "Liste").
+  List<AppList> appLists = [];
+
+  /// Pack builder: original key -> icon file at the last export (null = never).
+  Map<String, String>? packExportSnapshot;
+
+  /// Pack builder: original key -> fingerprint of the system icon at the last generation.
+  Map<String, String> packFingerprints = {};
+
   /// Section guides closed with "Ho capito" (ids), and the first-run tour.
   Set<String> seenGuides = {};
   bool tourDone = false;
 
+  /// Backup reminder: changes since the last backup, last backup and snooze (ms since epoch).
+  int backupChanges = 0;
+  int lastBackupMs = 0;
+  int snoozeUntilMs = 0;
+  int _lastChangeMs = 0;
+
+  /// App version whose "Novità" was last shown or recorded ('' = none yet).
+  String lastSeenBuild = '';
+
+  /// Automatic backup folder (null = off). Not part of the backup file.
+  String? autoBackupDir;
+  bool _autoBackupRunning = false;
+  int _autoBackupRetryAt = 0;
+
+  /// True while the last automatic backup failed; the Shell shows one message on change.
+  final ValueNotifier<bool> autoBackupFailed = ValueNotifier(false);
+
+  /// Looks for a newer release once per start (Settings > System).
+  bool checkUpdates = true;
+
+  /// Folder whose new images are imported while the Studio is shown (null = off).
+  /// Not part of the backup file.
+  String? watchDir;
+
+  /// Newer release found at start; not saved, the card hides when dismissed.
+  final ValueNotifier<UpdateInfo?> newRelease = ValueNotifier(null);
+
   bool _loaded = false;
 
   Future<void> load() async {
+    WidgetsBinding.instance.addObserver(this);
     defaultTranslucent = defaultTranslucentSettings();
     defaultPlacement = defaultPlacementSettings();
     defaultSegment = defaultSegmentSettings();
@@ -89,6 +138,20 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Backup file text: look, styles, presets and defaults (no AI settings).
+  String backupJson() => const JsonEncoder.withIndent(' ').convert(toJson()..remove('localAi')..remove('backupReminder')..remove('lastSeenBuild')..remove('autoBackupDir')..remove('watchDir'));
+
+  /// Restores a backup made by [backupJson]; throws FormatException if it is not one.
+  Future<void> restoreBackup(String text) async {
+    final j = jsonDecode(text);
+    if (j is! Map<String, dynamic> || j['appearance'] is! Map) throw const FormatException('backup');
+    final ai = localAi.toJson();
+    _fromJson(j);
+    localAi.load(ai);
+    notifyListeners();
+    await save();
+  }
+
   void _fromJson(Map<String, dynamic> j) {
     appearance.load((j['appearance'] as Map?)?.cast() ?? {});
     // v1 used the olive/gold accent as default: move untouched defaults to v2
@@ -98,6 +161,7 @@ class AppState extends ChangeNotifier {
     export.load((j['export'] as Map?)?.cast() ?? {});
     glass.load((j['glass'] as Map?)?.cast() ?? {});
     lucent.load((j['lucent'] as Map?)?.cast() ?? {});
+    look.load((j['look'] as Map?)?.cast() ?? {});
     // v3: the Lucent plate is the reference squircle (the clipping edge)
     if ((j['version'] as num? ?? 1) < 3) lucent.shape = LucentShape.squircle;
     localAi.load((j['localAi'] as Map?)?.cast() ?? {});
@@ -130,6 +194,19 @@ class AppState extends ChangeNotifier {
     packCorrections = ((j['packCorrections'] as Map?) ?? {}).map((k, v) => MapEntry(k as String, (v as Map).cast<String, dynamic>()));
     seenGuides = ((j['seenGuides'] as List?) ?? []).cast<String>().toSet();
     tourDone = j['tourDone'] as bool? ?? false;
+    final br = (j['backupReminder'] as Map?)?.cast<String, dynamic>() ?? {};
+    backupChanges = (br['changes'] as num?)?.toInt() ?? backupChanges;
+    lastBackupMs = (br['lastBackupMs'] as num?)?.toInt() ?? lastBackupMs;
+    snoozeUntilMs = (br['snoozeUntilMs'] as num?)?.toInt() ?? snoozeUntilMs;
+    packLog = ((j['packLog'] as List?) ?? []).cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    packProfiles = ((j['packProfiles'] as List?) ?? []).cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    appLists = appListsFromJson(j['appLists']);
+    packExportSnapshot = (j['packExportSnapshot'] as Map?)?.cast<String, String>();
+    packFingerprints = ((j['packFingerprints'] as Map?) ?? {}).cast<String, String>();
+    lastSeenBuild = j['lastSeenBuild'] as String? ?? lastSeenBuild;
+    autoBackupDir = j['autoBackupDir'] as String? ?? autoBackupDir;
+    checkUpdates = j['checkUpdates'] as bool? ?? true;
+    watchDir = j['watchDir'] as String? ?? watchDir;
   }
 
   Map<String, dynamic> toJson() => {
@@ -138,6 +215,7 @@ class AppState extends ChangeNotifier {
         'export': export.toJson(),
         'glass': glass.toJson(),
         'lucent': lucent.toJson(),
+        'look': look.toJson(),
         'localAi': localAi.toJson(),
         'presets': presets.map((e) => e.toJson()).toList(),
         'activePresetId': activePresetId,
@@ -158,20 +236,94 @@ class AppState extends ChangeNotifier {
         'packPresetId': packPresetId,
         'processedPackages': processedPackages.toList(),
         'packCorrections': packCorrections,
+        'packLog': packLog,
+        'packProfiles': packProfiles,
+        'appLists': listsToJson(appLists),
+        'packExportSnapshot': packExportSnapshot,
+        'packFingerprints': packFingerprints,
         'seenGuides': seenGuides.toList(),
         'tourDone': tourDone,
+        'backupReminder': {'changes': backupChanges, 'lastBackupMs': lastBackupMs, 'snoozeUntilMs': snoozeUntilMs},
+        'lastSeenBuild': lastSeenBuild,
+        'autoBackupDir': autoBackupDir,
+        'checkUpdates': checkUpdates,
+        'watchDir': watchDir,
       };
 
   Future<void>? _pending;
 
+  /// Phone light / dark switched: only the "Segui il telefono" choice changes.
+  @override
+  void didChangePlatformBrightness() {
+    if (appearance.themeChoice == ThemeChoice.system && appearance.syncLight()) notifyListeners();
+  }
+
+  /// Backup saved: the reminder starts counting again from zero.
+  void markBackupMade() => update(() {
+        backupChanges = 0;
+        lastBackupMs = DateTime.now().millisecondsSinceEpoch;
+        snoozeUntilMs = 0;
+      });
+
+  /// "Più tardi": no reminder for seven days.
+  void snoozeBackupReminder() => update(() => snoozeUntilMs = DateTime.now().add(const Duration(days: 7)).millisecondsSinceEpoch);
+
+  /// Automatic backup once the reminder threshold is reached. A failure waits
+  /// for another full threshold of changes before the next try.
+  void _maybeAutoBackup() {
+    final dir = autoBackupDir;
+    if (dir == null || _autoBackupRunning || backupChanges < kBackupReminderChanges || backupChanges < _autoBackupRetryAt) return;
+    _autoBackupRunning = true;
+    writeAutoBackup(dir, backupJson()).then((ok) {
+      _autoBackupRunning = false;
+      if (ok) {
+        _autoBackupRetryAt = 0;
+        autoBackupFailed.value = false;
+        markBackupMade();
+      } else {
+        _autoBackupRetryAt = backupChanges + kBackupReminderChanges;
+        autoBackupFailed.value = true;
+      }
+    });
+  }
+
+  /// Power saving: fast glass and no animations; the user's values are put back when it goes off.
+  void setPowerSaving(bool on) => update(() {
+        final a = appearance;
+        if (on == a.powerSaving) return;
+        if (on) {
+          a.savedGlassQuality = glass.quality.name;
+          a.savedAnimations = a.animations;
+          glass.quality = GlassQualityLevel.fast;
+          a.animations = false;
+        } else {
+          // only put back what is still the forced value, so a choice made meanwhile survives
+          if (glass.quality == GlassQualityLevel.fast) {
+            glass.quality = GlassQualityLevel.values.firstWhere((q) => q.name == a.savedGlassQuality, orElse: () => glass.quality);
+          }
+          if (!a.animations) a.animations = a.savedAnimations;
+        }
+        a.powerSaving = on;
+      });
+
+  /// Counts a change for the backup reminder; a burst (slider drag) counts once.
+  void _countChange() {
+    if (!_loaded) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastChangeMs > 1000) backupChanges++;
+    _lastChangeMs = now;
+  }
+
   /// Persists (debounced) and notifies listeners.
   void update([VoidCallback? fn]) {
+    _countChange();
     fn?.call();
     notifyListeners();
     if (!_loaded) return;
     _pending ??= Future.delayed(const Duration(milliseconds: 400), () async {
       _pending = null;
       await save();
+      _maybeAutoBackup();
     });
   }
 
@@ -189,6 +341,7 @@ class AppState extends ChangeNotifier {
     export.load(ExportSettings().toJson());
     glass.reset();
     lucent.reset();
+    look.load(LookConfig().toJson());
     localAi.load(LocalAiConfig().toJson());
     presets = builtInPresets(defaultTranslucent);
     activePresetId = 'nothing';
@@ -223,6 +376,19 @@ class AppState extends ChangeNotifier {
       activePresetId = pr.id;
     });
     return pr;
+  }
+
+  /// Adds imported presets under new ids and unique names; returns the first new id.
+  String? importPresets(List<({String name, TranslucentSettings params})> items) {
+    final ids = <String>[];
+    update(() {
+      for (final (i, it) in items.indexed) {
+        final id = 'u${DateTime.now().microsecondsSinceEpoch}$i';
+        ids.add(id);
+        presets.add(StylePreset(id: id, name: uniqueName(it.name, presets.map((e) => e.name)), params: it.params));
+      }
+    });
+    return ids.firstOrNull;
   }
 
   void resetPreset(String id) {
@@ -339,7 +505,7 @@ class AppState extends ChangeNotifier {
     if (mode == StudioMode.original || useBaseCalibrationForTranslucent) {
       if (b?.calibration != null) base = b!.calibration!;
     }
-    return copyPlacement(base, scaleMul: scaleMul, offsetX: offsetX, offsetY: offsetY);
+    return copyPlacement(base, scaleMul: scaleMul, offsetX: offsetX, offsetY: offsetY, opticalCentre: look.opticalCentre);
   }
 
   int sizeFor(StudioMode mode) {
@@ -366,6 +532,7 @@ class AppState extends ChangeNotifier {
         placement: placementFor(mode),
         segment: seg ?? segment,
         ai: aiSettings,
+        effects: look.effects,
       );
 
   /// Path of a downloaded local model.

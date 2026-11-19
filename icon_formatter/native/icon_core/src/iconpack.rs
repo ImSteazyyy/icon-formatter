@@ -67,7 +67,28 @@ fn file_safe(s: &str) -> String {
         .to_string()
 }
 
+/// Launcher fallback for apps the pack does not map: `<iconback>`,
+/// `<iconmask>`, `<iconupon>` and `<scale>` in appfilter.xml. The names are
+/// drawables that must exist in res/drawable-nodpi.
+#[derive(Clone, Debug, Default)]
+pub struct FallbackPlate {
+    pub backs: Vec<String>,
+    pub mask: Option<String>,
+    pub upon: Option<String>,
+    pub scale: Option<f32>,
+}
+
 pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_path: Option<&Path>) -> Result<IconPackReport> {
+    build_with_fallback(entries, out_dir, pack_name, zip_path, None)
+}
+
+pub fn build_with_fallback(
+    entries: &[IconPackEntry],
+    out_dir: &Path,
+    pack_name: &str,
+    zip_path: Option<&Path>,
+    fallback: Option<&FallbackPlate>,
+) -> Result<IconPackReport> {
     let mut notes = Vec::new();
     fs::create_dir_all(out_dir.join("res/drawable-nodpi"))?;
     fs::create_dir_all(out_dir.join("res/xml"))?;
@@ -158,6 +179,26 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
         }));
         count += 1;
     }
+    if let Some(fb) = fallback {
+        if !fb.backs.is_empty() {
+            let imgs: String = fb
+                .backs
+                .iter()
+                .enumerate()
+                .map(|(i, n)| format!(" img{}=\"{}\"", i + 1, sanitize_drawable(n)))
+                .collect();
+            appfilter.push_str(&format!("    <iconback{imgs} />\n"));
+        }
+        if let Some(m) = &fb.mask {
+            appfilter.push_str(&format!("    <iconmask img1=\"{}\" />\n", sanitize_drawable(m)));
+        }
+        if let Some(u) = &fb.upon {
+            appfilter.push_str(&format!("    <iconupon img1=\"{}\" />\n", sanitize_drawable(u)));
+        }
+        if let Some(s) = fb.scale {
+            appfilter.push_str(&format!("    <scale factor=\"{s}\" />\n"));
+        }
+    }
     appfilter.push_str("</resources>\n");
     drawable.push_str("</resources>\n");
     fs::write(out_dir.join("res/xml/appfilter.xml"), &appfilter)?;
@@ -215,6 +256,34 @@ mod tests {
         assert!(xml.contains("drawable=\"com_a_2\""));
         let parsed = crate::pack::parse_appfilter(&xml).unwrap();
         assert_eq!(parsed.len(), 2);
+    }
+
+    #[test]
+    fn fallback_plate_xml() {
+        let t = tempfile::tempdir().unwrap();
+        let png = t.path().join("x.png");
+        image::RgbaImage::new(4, 4).save(&png).unwrap();
+        let entries = vec![IconPackEntry { label: "A".into(), package: "com.a".into(), activity: "com.a.Main".into(), png, calendar_day: 0 }];
+        let fb = FallbackPlate {
+            backs: vec!["ic_back_1".into(), "Ic Back 2".into()],
+            mask: Some("ic_mask".into()),
+            upon: Some("ic_upon".into()),
+            scale: Some(1.0),
+        };
+        let out = t.path().join("pack");
+        build_with_fallback(&entries, &out, "Test", None, Some(&fb)).unwrap();
+        let xml = fs::read_to_string(out.join("res/xml/appfilter.xml")).unwrap();
+        assert!(xml.contains("<iconback img1=\"ic_back_1\" img2=\"ic_back_2\" />"), "{xml}");
+        assert!(xml.contains("<iconmask img1=\"ic_mask\" />"));
+        assert!(xml.contains("<iconupon img1=\"ic_upon\" />"));
+        assert!(xml.contains("<scale factor=\"1\" />"));
+        // the mapped app is still there and the parser still reads the items
+        assert_eq!(crate::pack::parse_appfilter(&xml).unwrap().len(), 1);
+        // no fallback: no plate tags at all
+        let out2 = t.path().join("pack2");
+        build(&entries, &out2, "Test", None).unwrap();
+        let xml2 = fs::read_to_string(out2.join("res/xml/appfilter.xml")).unwrap();
+        assert!(!xml2.contains("iconback") && !xml2.contains("<scale"));
     }
 
     #[test]

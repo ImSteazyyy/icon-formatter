@@ -26,6 +26,9 @@ pub struct Placement {
     pub scale_mul: f32,
     pub offset_x: f32,
     pub offset_y: f32,
+    /// Centre the alpha centroid instead of the box (off by default).
+    #[serde(default)]
+    pub optical_centre: bool,
 }
 
 impl Default for Placement {
@@ -41,6 +44,7 @@ impl Default for Placement {
             scale_mul: 1.0,
             offset_x: 0.0,
             offset_y: 0.0,
+            optical_centre: false,
         }
     }
 }
@@ -78,8 +82,15 @@ pub fn place_glyph(canvas: &mut RgbaImage, glyph: &RgbaImage, pl: &Placement) {
     let scaled = resize(&g, tw, th);
     let cx = (pl.center_x + pl.offset_x) * canvas.width() as f32;
     let cy = (pl.center_y + pl.offset_y) * canvas.height() as f32;
-    let ox = (cx - tw as f32 / 2.0).round() as i32;
-    let oy = (cy - th as f32 / 2.0).round() as i32;
+    // optical centring (opt-in): the alpha centroid goes to the anchor point
+    let (dx, dy) = if pl.optical_centre {
+        let lim = crate::effects::optical_limit(canvas.width() as f32, canvas.height() as f32, tw, th);
+        crate::effects::centroid_shift(&scaled, lim)
+    } else {
+        (0.0, 0.0)
+    };
+    let ox = (cx + dx - tw as f32 / 2.0).round() as i32;
+    let oy = (cy + dy - th as f32 / 2.0).round() as i32;
     draw_over(canvas, &scaled, ox, oy, 1.0);
 }
 

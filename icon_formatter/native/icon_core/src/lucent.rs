@@ -68,6 +68,8 @@ pub struct LucentParams {
     pub launcher_encode: bool,
     /// How the symbol is taken from the source (per-app override).
     pub strategy: GlyphStrategy,
+    /// Centre the symbol's alpha centroid on the anchor (off = unchanged).
+    pub optical_centre: bool,
 }
 
 /// Per-app choice of how the symbol is taken from the original icon.
@@ -108,6 +110,7 @@ impl LucentParams {
             launcher_shadow: false,
             launcher_encode: false,
             strategy: GlyphStrategy::Auto,
+            optical_centre: false,
         }
     }
 
@@ -128,6 +131,7 @@ pub fn with_placement(p: &LucentParams, pl: &crate::compose::Placement) -> Lucen
         glyph_scale: p.glyph_scale * pl.scale_mul,
         offset_x: p.offset_x + pl.offset_x,
         offset_y: p.offset_y + pl.offset_y,
+        optical_centre: p.optical_centre || pl.optical_centre,
         ..p.clone()
     }
 }
@@ -834,6 +838,14 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     let scaled = soften_hard_edges(resize(&layer, tw, th));
     let cx = cx + p.offset_x * size as f32;
     let cy = cy + p.offset_y * size as f32;
+    // optical centring (opt-in): the alpha centroid goes to the anchor
+    let (cx, cy) = if p.optical_centre {
+        let lim = crate::effects::optical_limit(size as f32, size as f32, tw, th);
+        let (dx, dy) = crate::effects::centroid_shift(&scaled, lim);
+        (cx + dx, cy + dy)
+    } else {
+        (cx, cy)
+    };
     let ox = (cx - tw as f32 / 2.0).round() as i64;
     let oy = (cy - th as f32 / 2.0).round() as i64;
 

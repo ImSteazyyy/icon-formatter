@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Teilen, Verknüpfungen, Verarbeitungsbenachrichtigung -->
+<resources>
+    <string name="share_label">Mit Icon Formatter teilen</string>
+    <string name="shortcut_check_short">Jetzt prüfen</string>
+    <string name="shortcut_check_long">Apps jetzt prüfen</string>
+    <string name="shortcut_refresh_short">Tag aktualisieren</string>
+    <string name="shortcut_refresh_long">Tag im Pack aktualisieren</string>
+    <string name="toast_check_none">Keine Änderungen an Apps</string>
+    <string name="toast_check_some">%d Änderungen an Apps zu prüfen</string>
+    <string name="toast_refresh_done">Tag im Pack aktualisiert</string>
+    <string name="toast_refresh_current">Der Tag ist bereits aktuell</string>
+    <string name="toast_refresh_no_calendar">Das Pack hat keine Kalender</string>
+    <string name="toast_failed">Vorgang fehlgeschlagen</string>
+    <string name="processing_channel">Icon-Verarbeitung</string>
+    <string name="processing_title">Icons werden verarbeitet %1$d/%2$d</string>
+</resources>

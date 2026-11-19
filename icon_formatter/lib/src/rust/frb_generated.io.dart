@@ -85,7 +85,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BackgroundSettings dco_decode_box_autoadd_background_settings(dynamic raw);
 
   @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw);
+
+  @protected
+  EffectSettings dco_decode_box_autoadd_effect_settings(dynamic raw);
+
+  @protected
   LucentSettings dco_decode_box_autoadd_lucent_settings(dynamic raw);
+
+  @protected
+  LucentShape dco_decode_box_autoadd_lucent_shape(dynamic raw);
 
   @protected
   PlacementSettings dco_decode_box_autoadd_placement_settings(dynamic raw);
@@ -100,6 +109,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TranslucentSettings dco_decode_box_autoadd_translucent_settings(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   CalendarIconInfo dco_decode_calendar_icon_info(dynamic raw);
 
   @protected
@@ -107,6 +119,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CalibrationSample dco_decode_calibration_sample(dynamic raw);
+
+  @protected
+  EffectSettings dco_decode_effect_settings(dynamic raw);
 
   @protected
   double dco_decode_f_32(dynamic raw);
@@ -187,10 +202,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AiSettings? dco_decode_opt_box_autoadd_ai_settings(dynamic raw);
 
   @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
+  EffectSettings? dco_decode_opt_box_autoadd_effect_settings(dynamic raw);
+
+  @protected
+  LucentShape? dco_decode_opt_box_autoadd_lucent_shape(dynamic raw);
+
+  @protected
   PlacementSettings? dco_decode_opt_box_autoadd_placement_settings(dynamic raw);
 
   @protected
   SegmentSettings? dco_decode_opt_box_autoadd_segment_settings(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
@@ -298,9 +325,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  EffectSettings sse_decode_box_autoadd_effect_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LucentSettings sse_decode_box_autoadd_lucent_settings(
     SseDeserializer deserializer,
   );
+
+  @protected
+  LucentShape sse_decode_box_autoadd_lucent_shape(SseDeserializer deserializer);
 
   @protected
   PlacementSettings sse_decode_box_autoadd_placement_settings(
@@ -323,6 +361,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   CalendarIconInfo sse_decode_calendar_icon_info(SseDeserializer deserializer);
 
   @protected
@@ -330,6 +371,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   CalibrationSample sse_decode_calibration_sample(SseDeserializer deserializer);
+
+  @protected
+  EffectSettings sse_decode_effect_settings(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -418,6 +462,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  EffectSettings? sse_decode_opt_box_autoadd_effect_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  LucentShape? sse_decode_opt_box_autoadd_lucent_shape(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PlacementSettings? sse_decode_opt_box_autoadd_placement_settings(
     SseDeserializer deserializer,
   );
@@ -426,6 +483,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SegmentSettings? sse_decode_opt_box_autoadd_segment_settings(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -547,8 +607,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_effect_settings(
+    EffectSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_lucent_settings(
     LucentSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_lucent_shape(
+    LucentShape self,
     SseSerializer serializer,
   );
 
@@ -577,6 +652,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_calendar_icon_info(
     CalendarIconInfo self,
     SseSerializer serializer,
@@ -591,6 +669,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_calibration_sample(
     CalibrationSample self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_effect_settings(
+    EffectSettings self,
     SseSerializer serializer,
   );
 
@@ -718,6 +802,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_effect_settings(
+    EffectSettings? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_lucent_shape(
+    LucentShape? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_placement_settings(
     PlacementSettings? self,
     SseSerializer serializer,
@@ -728,6 +827,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     SegmentSettings? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_list_prim_u_8_strict(

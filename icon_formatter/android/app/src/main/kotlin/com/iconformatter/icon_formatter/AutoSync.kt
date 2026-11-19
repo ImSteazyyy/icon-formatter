@@ -81,21 +81,50 @@ object AutoSync {
         if (calendarDaily(c)) schedule(c)
     }
 
-    /** From the job: today's day into the pack, when that is wanted. */
+    /** Hour of day (0..23) from which the calendar day is refreshed; -1 = at every check. */
+    fun calendarHour(c: Context) = prefs(c).getInt("calendarHour", -1)
+
+    fun setCalendarHour(c: Context, hour: Int) {
+        prefs(c).edit().putInt("calendarHour", hour.coerceIn(-1, 23)).apply()
+    }
+
+    /**
+     * From the job: today's day into the pack, when that is wanted. With an hour
+     * set it runs once per local day at the first check on/after that hour; a
+     * day missed while the phone was off is applied at the next check.
+     */
     fun refreshCalendarIfDue(c: Context) {
         if (!calendarDaily(c)) return
+        val p = prefs(c)
+        val now = java.util.Calendar.getInstance()
+        val today = "${now.get(java.util.Calendar.YEAR)}-${now.get(java.util.Calendar.DAY_OF_YEAR)}"
+        val hour = calendarHour(c)
+        if (hour >= 0 && (now.get(java.util.Calendar.HOUR_OF_DAY) < hour || p.getString("lastCalendarDay", null) == today)) return
         try {
-            DevicePack.refreshCalendar(c)
+            val state = DevicePack.refreshCalendar(c)["state"]
+            // no_shizuku / error: not stored, so the next check retries
+            if (state == "updated" || state == "current") p.edit().putString("lastCalendarDay", today).apply()
         } catch (_: Throwable) {
         }
+    }
+
+    /** Hours between two checks: 6, 12 or 24 (the calendar day needs a daily check at least). */
+    fun intervalHours(c: Context) = prefs(c).getInt("intervalHours", 6).coerceIn(6, 24)
+
+    fun onlyCharging(c: Context) = prefs(c).getBoolean("onlyCharging", false)
+
+    fun setSchedule(c: Context, hours: Int, charging: Boolean) {
+        prefs(c).edit().putInt("intervalHours", if (hours in listOf(6, 12, 24)) hours else 6).putBoolean("onlyCharging", charging).apply()
+        if (wanted(c)) schedule(c)
     }
 
     fun schedule(c: Context) {
         val js = c.getSystemService(JobScheduler::class.java)
         val info = JobInfo.Builder(JOB_PERIODIC, ComponentName(c, AutoSyncJob::class.java))
-            .setPeriodic(TimeUnit.HOURS.toMillis(6), TimeUnit.HOURS.toMillis(1))
+            .setPeriodic(TimeUnit.HOURS.toMillis(intervalHours(c).toLong()), TimeUnit.HOURS.toMillis(1))
             .setPersisted(true)
             .setRequiresBatteryNotLow(true)
+            .setRequiresCharging(onlyCharging(c))
             .build()
         js.schedule(info)
     }
@@ -183,8 +212,9 @@ object AutoSync {
         val snap = JSONObject()
         var pending = p.getString("pending", null)?.let { JSONArray(it) } ?: JSONArray()
         var added = 0
+        val skip = ignored(c)
         fun push(component: String, label: String, kind: String) {
-            if (baseline) return
+            if (baseline || component.substringBefore('/') in skip) return
             // latest change wins (e.g. uninstalled, then installed again)
             val keep = JSONArray()
             for (i in 0 until pending.length()) {
@@ -240,7 +270,11 @@ object AutoSync {
             "lastCheck" to p.getLong("lastCheck", 0L),
             "pending" to list,
             "calendarDaily" to calendarDaily(c),
+            "calendarHour" to calendarHour(c),
+            "intervalHours" to intervalHours(c),
+            "onlyCharging" to onlyCharging(c),
             "calendar" to DevicePack.calendarInfo(c),
+            "ignored" to ignored(c).sorted(),
         )
     }
 
@@ -256,6 +290,24 @@ object AutoSync {
         }
         c.getSystemService(NotificationManager::class.java).cancel(NOTIF_ID)
     }
+
+    /** Packages left out of the change check: no pending entries and no notification for them. */
+    fun ignored(c: Context): Set<String> = prefs(c).getStringSet("ignored", null)?.toSet() ?: emptySet()
+
+    /** Replaces the ignored packages and drops their pending entries. */
+    fun setIgnored(c: Context, packages: List<String>) {
+        val skip = packages.toSet()
+        prefs(c).edit().putStringSet("ignored", skip).apply()
+        val pending = prefs(c).getString("pending", null)?.let { JSONArray(it) } ?: return
+        val keep = JSONArray()
+        for (i in 0 until pending.length()) {
+            val o = pending.getJSONObject(i)
+            if (o.getString("component").substringBefore('/') !in skip) keep.put(o)
+        }
+        prefs(c).edit().putString("pending", keep.toString()).apply()
+    }
+
+    fun pendingCount(c: Context): Int = prefs(c).getString("pending", null)?.let { JSONArray(it).length() } ?: 0
 
     private fun notifyChanges(c: Context, n: Int) {
         if (Build.VERSION.SDK_INT >= 33 && c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return

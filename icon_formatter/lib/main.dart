@@ -14,6 +14,7 @@ import 'screens/setup_screen.dart';
 import 'app/state.dart';
 import 'app/storage.dart';
 import 'app/theme.dart';
+import 'widgets/glassfix_warmup.dart';
 import 'widgets/theme_reveal.dart';
 import 'widgets/toasts.dart';
 import 'src/rust/api/engine.dart';
@@ -102,14 +103,14 @@ class IconFormatterApp extends StatelessWidget {
               systemNavigationBarColor: Colors.transparent,
               systemNavigationBarContrastEnforced: false,
             ),
-            child: ToastHost(child: child ?? const SizedBox()),
+            child: ToastHost(child: Stack(fit: StackFit.expand, children: [child ?? const SizedBox(), const GlassWarmUp()])),
           );
           if (AppState.I.appearance.style != UiStyle.nothing) return page;
           final mq = MediaQuery.of(context);
           return MediaQuery(data: mq.copyWith(textScaler: _Scaled(mq.textScaler, 0.93)), child: page);
         },
-        // first launch on Android: the short setup, then the app
-        home: Platform.isAndroid && !AppState.I.setupDone ? const SetupScreen() : const Shell(),
+        // first launch (any platform): the short tour, then the app
+        home: !AppState.I.setupDone ? const OnboardingScreen() : const Shell(),
       );
       },
     );

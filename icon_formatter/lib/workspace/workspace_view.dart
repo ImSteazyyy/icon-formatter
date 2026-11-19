@@ -8,8 +8,11 @@ import '../app/theme.dart';
 import '../services/export_service.dart';
 import '../widgets/common.dart';
 import '../widgets/glass_menu.dart';
+import 'studio2_plate_sheets.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/studio_guide.dart';
 import 'adjust_panel.dart';
+import 'studio_list.dart';
 import 'workspace_controller.dart';
 import '../l10n/strings.dart';
 import '../src/rust/api/engine.dart';
@@ -44,20 +47,23 @@ class WorkTile extends StatelessWidget {
       }
     }
     final accent = Theme.of(context).colorScheme.primary;
+    final picked = c.isSelected(it);
     return Tooltip(
       message: '${it.label ?? it.rel}\n$tip',
       waitDuration: const Duration(milliseconds: 600),
       child: GestureDetector(
-        onTap: () => c.select(it.id),
+        // a tap picks the preview; while icons are selected it toggles them
+        onTap: () => c.selecting ? c.toggleSelect(it) : c.select(it.id),
         onDoubleTap: () => showZoom(context, path: out ?? it.path, bytes: out == null ? it.bytes : null, title: it.label ?? it.name),
-        onLongPress: () => _menu(context, null),
-        onSecondaryTapDown: (d) => _menu(context, d.globalPosition),
+        // long press starts the selection; the menu is on right click and in the preview
+        onLongPress: () => c.toggleSelect(it),
+        onSecondaryTapDown: (d) => menu(context, c, it, d.globalPosition),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: sel ? accent.withValues(alpha: 0.10) : Palette.fg.withValues(alpha: 0.025),
-            border: Border.all(color: sel ? accent.withValues(alpha: 0.7) : Palette.fg.withValues(alpha: 0.06)),
+            color: sel || picked ? accent.withValues(alpha: 0.10) : Palette.fg.withValues(alpha: 0.025),
+            border: Border.all(color: sel || picked ? accent.withValues(alpha: 0.7) : Palette.fg.withValues(alpha: 0.06)),
           ),
           padding: const EdgeInsets.all(8),
           child: Column(
@@ -73,6 +79,8 @@ class WorkTile extends StatelessWidget {
                     ),
                     if (dot != null) Positioned(right: 0, top: 0, child: StatusDot(color: dot)),
                     if (it.hasOverride) Positioned(left: 0, top: 0, child: Icon(Icons.edit, size: 12, color: Palette.text2)),
+                    if (it.isDuplicate) Positioned(right: 0, bottom: 0, child: Tooltip(message: S.studioDuplicato, child: Icon(Icons.content_copy_rounded, size: 14, color: Palette.warn))),
+                    if (picked) Positioned(left: 0, bottom: 0, child: Icon(Icons.check_circle, size: 18, color: accent)),
                     if (selectable)
                       Positioned(
                         left: -8,
@@ -96,7 +104,8 @@ class WorkTile extends StatelessWidget {
     );
   }
 
-  Future<void> _menu(BuildContext context, Offset? pos) async {
+  /// Per-icon menu: right click on a tile, or the "more" button of the preview.
+  static Future<void> menu(BuildContext context, WorkspaceController c, WorkItem it, [Offset? pos]) async {
     final items = <PopupMenuEntry<String>>[
       PopupMenuItem(value: 'zoom', child: Text(S.ingrandisci)),
       PopupMenuItem(value: 'exclude', child: Text(it.excluded ? S.includi : S.escludi)),
@@ -105,7 +114,12 @@ class WorkTile extends StatelessWidget {
       PopupMenuItem(value: 'mode', child: Text(S.rigeneraConModalita)),
       PopupMenuItem(value: 'white', child: Text(c.keepsInnerWhite(it) ? S.togliBiancoInterno : S.mantieniBiancoInterno)),
       PopupMenuItem(value: 'plate', child: Text(S.sfondoComePack)),
+      if (c.mode == StudioMode.translucent) ...[
+        PopupMenuItem(value: 'shape', child: Text(S.studio2FormaPiattoMenu)),
+        PopupMenuItem(value: 'backdrop', child: Text(S.studio2ColorePiattoMenu)),
+      ],
       if (it.hasOverride) PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
+      if (it.hasOverride && !c.batch.running && c.overrideTargets(it).isNotEmpty) PopupMenuItem(value: 'applyAll', child: Text(S.applicaATutte)),
       PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
     ];
     String? v;
@@ -143,6 +157,10 @@ class WorkTile extends StatelessWidget {
       case 'plate':
         final r = await c.matchPlateOf([it]);
         if (context.mounted) showMsg(context, plateMatchMessage(r), error: r == null);
+      case 'shape':
+        if (context.mounted) await studio2PlateShapeSheet(context, c, it);
+      case 'backdrop':
+        if (context.mounted) await studio2PlateColorSheet(context, c, it);
       case 'mode':
         if (!context.mounted) return;
         final cur = it.strategyOverride ?? LucentStrategy.auto;
@@ -182,6 +200,13 @@ class WorkTile extends StatelessWidget {
         if (st != null) c.setStrategy(it, st);
       case 'reset':
         c.clearOverrides(it);
+      case 'applyAll':
+        if (!context.mounted) return;
+        final n = c.overrideTargets(it).length;
+        if (await confirm(context, S.applicaATutte, S.applicaATutteConferma(n), ok: S.applicaATutteOk) && context.mounted) {
+          final done = await c.applyOverridesToAll(it);
+          if (context.mounted) showMsg(context, S.applicaATutteFatto(done));
+        }
       case 'remove':
         c.remove(it);
     }
@@ -216,7 +241,8 @@ class PreviewPane extends StatelessWidget {
         final info = c.previewInfo;
         final compare = ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: BeforeAfter(
+          child: Stack(fit: StackFit.expand, children: [
+          BeforeAfter(
             before: Padding(
               padding: EdgeInsets.all(compact ? 12 : 18),
               child: IconImage(path: it.path, bytes: it.bytes),
@@ -237,6 +263,9 @@ class PreviewPane extends StatelessWidget {
                         : const CircularProgressIndicator(strokeWidth: 2),
                   ),
           ),
+          // preview only: the guide is never written to the output
+          if (c.safeGuide) const Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: StudioGuidePainter()))),
+          ]),
         );
         final zoom = IconButton(
           tooltip: S.ingrandisci,
@@ -252,6 +281,20 @@ class PreviewPane extends StatelessWidget {
                   final r = await ExportService.saveSingle(c.previewPng!, '${it.name}.png');
                   if (r != null && context.mounted) showMsg(context, '${r.message}${r.location != null ? ': ${r.location}' : ''}');
                 },
+        );
+        final guide = IconButton(
+          key: const ValueKey('preview-guide'),
+          tooltip: S.studioGuidaArea,
+          isSelected: c.safeGuide,
+          icon: const Icon(Icons.crop_square_outlined),
+          selectedIcon: Icon(Icons.crop_square_rounded, color: Theme.of(context).colorScheme.primary),
+          onPressed: c.toggleSafeGuide,
+        );
+        final more = IconButton(
+          key: const ValueKey('preview-more'),
+          tooltip: S.studioAltreIcona,
+          icon: const Icon(Icons.more_horiz_rounded),
+          onPressed: () => WorkTile.menu(context, c, it),
         );
         if (compact) {
           // phones: Before/After on the left, name, details and buttons on the
@@ -301,6 +344,7 @@ class PreviewPane extends StatelessWidget {
                       children: [
                         zoom,
                         save,
+                        more,
                         if (c.previewBusy) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                       ],
                     ),
@@ -334,6 +378,8 @@ class PreviewPane extends StatelessWidget {
                 if (c.previewBusy) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
                 zoom,
                 save,
+                guide,
+                more,
               ],
             ),
             if (info != null && (info.ambiguous || info.notes.isNotEmpty))
@@ -637,6 +683,44 @@ class WorkspaceView extends StatelessWidget {
     );
   }
 
+  /// Bar above the grid while icons are picked (long press): acts on them.
+  Widget _selectionBar(BuildContext context) {
+    final n = c.selection.length;
+    final src = c.selected;
+    final canApply = src != null && src.hasOverride && !c.batch.running;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(S.studioSelezionate(n), key: const ValueKey('studio-selection-count'), style: TextStyle(fontWeight: FontWeight.w600, color: Palette.text)),
+          FilledButton.tonal(
+            key: const ValueKey('studio-sel-apply'),
+            // the corrections of the previewed icon go to the picked ones
+            onPressed: canApply
+                ? () async {
+                    final done = await c.applySelectionCorrections();
+                    if (context.mounted) showMsg(context, done == 0 ? S.studioNessunaCorrezione : S.studioCorrezioniApplicate(done));
+                  }
+                : null,
+            child: Text(S.studioApplicaCorrezioni),
+          ),
+          OutlinedButton(key: const ValueKey('studio-sel-exclude'), onPressed: () => c.setSelectedExcluded(true), child: Text(S.studioEscludi)),
+          OutlinedButton(
+            key: const ValueKey('studio-sel-remove'),
+            onPressed: () async {
+              if (await confirm(context, S.studioRimuoviSelezioneTitolo(n), S.studioRimuoviSelezioneSub, ok: S.studioRimuovi)) c.removeSelected();
+            },
+            child: Text(S.studioRimuovi),
+          ),
+          IconButton(tooltip: S.studioDeselezionaTutte, icon: const Icon(Icons.close_rounded), onPressed: c.clearSelection),
+        ],
+      ),
+    );
+  }
+
   Widget _grid(BuildContext context, double tile, {double bottomPad = 0, bool search = false, bool jump = false}) {
     return ListenableBuilder(
       listenable: c,
@@ -663,12 +747,13 @@ class WorkspaceView extends StatelessWidget {
           slivers: [
             // the search stays at the top while the icons scroll under it
             if (search || c.query.isNotEmpty) SliverPinnedSearch(padding: const EdgeInsets.fromLTRB(4, 4, 4, 6), child: StudioSearch(c: c)),
+            if (c.selecting) SliverToBoxAdapter(child: _selectionBar(context)),
             if (list.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    S.nessunRisultato(c.query),
+                    c.filter != StudioFilter.all && c.query.trim().isEmpty ? S.studioNessunaIconaFiltrata : S.nessunRisultato(c.query),
                     key: const ValueKey('studio-no-results'),
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Palette.text2),
@@ -719,24 +804,92 @@ class _StudioSearchState extends State<StudioSearch> {
     return TextField(
       key: const ValueKey('studio-search'),
       controller: t,
-      decoration: pillSearchDecoration(context, S.cercaNomeFile).copyWith(
-        suffixIcon: ValueListenableBuilder(
-          valueListenable: t,
-          builder: (_, v, _) => v.text.isEmpty
-              ? const SizedBox.shrink()
-              : IconButton(
-                  tooltip: S.cancellaRicerca,
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () {
-                    t.clear();
-                    widget.c.setQuery('');
-                  },
-                ),
+      decoration: pillSearchDecoration(context, S.cercaLista).copyWith(
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ValueListenableBuilder(
+              valueListenable: t,
+              builder: (_, v, _) => v.text.isEmpty
+                  ? const SizedBox.shrink()
+                  : IconButton(
+                      tooltip: S.cancellaRicerca,
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () {
+                        t.clear();
+                        widget.c.setQuery('');
+                      },
+                    ),
+            ),
+            // sort and filter of the list: display only
+            ListenableBuilder(
+              listenable: widget.c,
+              builder: (context, _) {
+                final on = widget.c.sort != StudioSort.added || widget.c.filter != StudioFilter.all;
+                return IconButton(
+                  key: const ValueKey('studio-arrange'),
+                  tooltip: S.studioOrdinaFiltra,
+                  icon: Icon(Icons.tune_rounded, color: on ? Theme.of(context).colorScheme.primary : null),
+                  onPressed: () => showArrangeSheet(context, widget.c),
+                );
+              },
+            ),
+          ],
         ),
       ),
       onChanged: widget.c.setQuery,
     );
   }
+}
+
+/// Sort and filter of the list. Stays open, so both can be combined.
+Future<void> showArrangeSheet(BuildContext context, WorkspaceController c) {
+  return showAppSheet(
+    context: context,
+    builder: (ctx) => ListenableBuilder(
+      listenable: c,
+      builder: (ctx, _) {
+        final accent = Theme.of(ctx).colorScheme.primary;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 2),
+                child: Text(S.studioOrdinaFiltra, style: Theme.of(ctx).textTheme.titleMedium),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 6),
+                child: Text(S.studioFiltroSub, style: TextStyle(fontSize: 12, color: Palette.text2)),
+              ),
+              for (final (v, t) in [(StudioSort.added, S.studioOrdineAggiunta), (StudioSort.name, S.studioOrdinaNome), (StudioSort.state, S.studioOrdinaStato)])
+                ListTile(
+                  key: ValueKey('sort-${v.name}'),
+                  title: Text(t),
+                  trailing: c.sort == v ? Icon(Icons.check_rounded, color: accent) : null,
+                  onTap: () => c.setSort(v),
+                ),
+              const Divider(height: 16),
+              for (final (f, t) in [
+                (StudioFilter.all, S.studioFiltroTutte),
+                (StudioFilter.modified, S.studioFiltroModificate),
+                (StudioFilter.errors, S.studioFiltroErrori),
+                (StudioFilter.excluded, S.studioFiltroEscluse),
+              ])
+                ListTile(
+                  key: ValueKey('filter-${f.name}'),
+                  title: Text(t),
+                  trailing: c.filter == f ? Icon(Icons.check_rounded, color: accent) : null,
+                  onTap: () => c.setFilter(f),
+                ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
 }
 
 /// Result summary dialog after an export.

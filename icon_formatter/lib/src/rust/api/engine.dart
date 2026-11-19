@@ -9,8 +9,11 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'engine.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `ai_kind`, `ai_of`, `background_image`, `candidates`, `check_size`, `handle`, `isolate_with`, `item_result`, `lucent_of`, `pack_info`, `placement_dto`, `preview_image`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `ai_kind`, `ai_of`, `argb_bytes`, `background_image`, `candidates`, `check_size`, `effects_of`, `handle`, `isolate_with`, `item_result`, `lucent_of`, `pack_info`, `placement_dto`, `plate_shape`, `preview_image`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
+
+EffectSettings defaultEffectSettings() =>
+    RustLib.instance.api.crateApiEngineDefaultEffectSettings();
 
 SegmentSettings defaultSegmentSettings() =>
     RustLib.instance.api.crateApiEngineDefaultSegmentSettings();
@@ -353,6 +356,12 @@ class BatchItem {
   final PlacementSettings? placement;
   final bool skipIsolation;
 
+  /// Per-icon plate shape (Lucent only); None = the global shape.
+  final LucentShape? shape;
+
+  /// Per-icon plate colour, ARGB (Lucent only); None = the global colour.
+  final int? backdrop;
+
   const BatchItem({
     required this.id,
     required this.name,
@@ -362,6 +371,8 @@ class BatchItem {
     this.segment,
     this.placement,
     required this.skipIsolation,
+    this.shape,
+    this.backdrop,
   });
 
   @override
@@ -373,7 +384,9 @@ class BatchItem {
       output.hashCode ^
       segment.hashCode ^
       placement.hashCode ^
-      skipIsolation.hashCode;
+      skipIsolation.hashCode ^
+      shape.hashCode ^
+      backdrop.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -387,7 +400,9 @@ class BatchItem {
           output == other.output &&
           segment == other.segment &&
           placement == other.placement &&
-          skipIsolation == other.skipIsolation;
+          skipIsolation == other.skipIsolation &&
+          shape == other.shape &&
+          backdrop == other.backdrop;
 }
 
 class BatchProgress {
@@ -554,6 +569,58 @@ class CalibrationSample {
           method == other.method &&
           outlier == other.outlier &&
           error == other.error;
+}
+
+/// Global look options, applied to every icon (see icon_core effects.rs).
+/// Neutral values: brightness, saturation, hue, plate_tint, sharpen 0, recolor null.
+class EffectSettings {
+  /// -1..1
+  final double brightness;
+
+  /// -1..1 (-1 greyscale)
+  final double saturation;
+
+  /// Hue rotation in degrees.
+  final double hue;
+
+  /// Monochrome symbol colour (ARGB). None keeps the colours.
+  final int? recolor;
+
+  /// 0..1: plate colour pulled towards the symbol's mean colour (Lucent).
+  final double plateTint;
+
+  /// 0..1: unsharp strength for symbols scaled up more than 2x.
+  final double sharpen;
+
+  const EffectSettings({
+    required this.brightness,
+    required this.saturation,
+    required this.hue,
+    this.recolor,
+    required this.plateTint,
+    required this.sharpen,
+  });
+
+  @override
+  int get hashCode =>
+      brightness.hashCode ^
+      saturation.hashCode ^
+      hue.hashCode ^
+      recolor.hashCode ^
+      plateTint.hashCode ^
+      sharpen.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EffectSettings &&
+          runtimeType == other.runtimeType &&
+          brightness == other.brightness &&
+          saturation == other.saturation &&
+          hue == other.hue &&
+          recolor == other.recolor &&
+          plateTint == other.plateTint &&
+          sharpen == other.sharpen;
 }
 
 class IconPackApp {
@@ -932,6 +999,9 @@ class PlacementSettings {
   final double offsetX;
   final double offsetY;
 
+  /// Centre the symbol's alpha centroid instead of its box (default off).
+  final bool? opticalCentre;
+
   const PlacementSettings({
     required this.glyphRatio,
     required this.areaRatio,
@@ -941,6 +1011,7 @@ class PlacementSettings {
     required this.scaleMul,
     required this.offsetX,
     required this.offsetY,
+    this.opticalCentre,
   });
 
   @override
@@ -952,7 +1023,8 @@ class PlacementSettings {
       areaFit.hashCode ^
       scaleMul.hashCode ^
       offsetX.hashCode ^
-      offsetY.hashCode;
+      offsetY.hashCode ^
+      opticalCentre.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -966,7 +1038,8 @@ class PlacementSettings {
           areaFit == other.areaFit &&
           scaleMul == other.scaleMul &&
           offsetX == other.offsetX &&
-          offsetY == other.offsetY;
+          offsetY == other.offsetY &&
+          opticalCentre == other.opticalCentre;
 }
 
 /// Result of [`match_plate_alpha`].
@@ -1064,12 +1137,16 @@ class ProcessSettings {
   /// When set, the glyph is isolated by the local AI model.
   final AiSettings? ai;
 
+  /// Global look options (brightness, recolour, ...); None = off.
+  final EffectSettings? effects;
+
   const ProcessSettings({
     required this.size,
     required this.background,
     required this.placement,
     required this.segment,
     this.ai,
+    this.effects,
   });
 
   @override
@@ -1078,7 +1155,8 @@ class ProcessSettings {
       background.hashCode ^
       placement.hashCode ^
       segment.hashCode ^
-      ai.hashCode;
+      ai.hashCode ^
+      effects.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -1089,7 +1167,8 @@ class ProcessSettings {
           background == other.background &&
           placement == other.placement &&
           segment == other.segment &&
-          ai == other.ai;
+          ai == other.ai &&
+          effects == other.effects;
 }
 
 enum SegMode { auto, keepAlpha, removeBackground, none }

@@ -8,6 +8,7 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import '../app/models.dart';
 import '../app/state.dart';
 import '../app/theme.dart';
+import 'glassfix_premium_gate.dart';
 
 /// "Stile Nothing": solid black and grey surfaces, no glass.
 bool get nothingStyle => AppState.I.appearance.style == UiStyle.nothing;
@@ -415,22 +416,26 @@ class LiquidGlass extends StatelessWidget {
           final full = appGlassSettings(dark: dark, chromatic: chromatic);
           final settings = nativeGlass && !live ? full.copyWith(frost: 0, blur: 0) : full;
           final quality = live ? glassQualityFor(live: true) : (nativeGlass ? GlassQuality.standard : appGlassQuality);
-          Widget glass = GlassContainer(
-            shape: LiquidRoundedSuperellipse(borderRadius: radius),
-            padding: padding,
-            settings: settings,
-            useOwnLayer: true,
+          // premium surfaces join in batches (GlassPremiumGate), not all at once
+          final Widget glass = GlassStagedQuality(
             quality: quality,
-            clipBehavior: Clip.antiAlias,
-            child: withGlassShadows(child),
+            builder: (q) {
+              final container = GlassContainer(
+                shape: LiquidRoundedSuperellipse(borderRadius: radius),
+                padding: padding,
+                settings: settings,
+                useOwnLayer: true,
+                quality: q,
+                clipBehavior: Clip.antiAlias,
+                child: withGlassShadows(child),
+              );
+              // native material: the lightweight renderer needs its own backdrop
+              // read, or the card comes out black. Not live: the blur is already
+              // there, so the renderer pushes no BackdropFilterLayer for this surface.
+              if (live) return container;
+              return InheritedLiquidGlass(settings: settings, quality: q, isBlurProvidedByAncestor: true, child: container);
+            },
           );
-          // native material: the lightweight renderer needs its own backdrop
-          // read, or the card comes out black
-          if (!live) {
-            // tells the lightweight renderer the blur is already there, so it
-            // pushes no BackdropFilterLayer for this surface
-            glass = InheritedLiquidGlass(settings: settings, quality: quality, isBlurProvidedByAncestor: true, child: glass);
-          }
           // native glass: the rim light is in the material already, as on
           // the bottom bar; the extra gloss would set the two apart
           body = nativeGlass ? glass : GlossOverlay(radius: radius, child: glass);

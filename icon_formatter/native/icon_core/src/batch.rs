@@ -1,9 +1,11 @@
 //! Parallel batch engine with progress reporting and cooperative cancellation.
 
 use crate::compose::Placement;
+use crate::effects::{self, Effects};
 use crate::error::{CoreError, Result};
 use crate::imageops::{clean_transparent, decode, decode_file, resize, write_png};
-use crate::segment::{isolate, SegmentOptions};
+use crate::lucent::{GlyphStrategy, PlateShape};
+use crate::segment::{isolate, SegmentOptions, SegmentResult};
 use image::RgbaImage;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -28,6 +30,10 @@ pub struct Job {
     pub placement: Option<Placement>,
     /// When set, the glyph is placed without isolation (already a glyph).
     pub skip_isolation: bool,
+    /// Plate overrides for this icon (Lucent only; ignored otherwise).
+    pub shape: Option<PlateShape>,
+    /// Plate colour and alpha, RGBA (Lucent only).
+    pub backdrop: Option<[u8; 4]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,12 +62,14 @@ pub struct BatchConfig {
     pub lucent: Option<crate::lucent::LucentParams>,
     /// Local AI background removal (cached model + mask options).
     pub ai: Option<(Arc<crate::ai::Model>, crate::ai::AiOptions)>,
+    /// Global look options; `Effects::default()` changes nothing.
+    pub effects: Effects,
 }
 
 pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage, JobResult) {
     let seg = job.segment.as_ref().unwrap_or(&cfg.segment);
     let pl = job.placement.as_ref().unwrap_or(&cfg.placement);
-    let res = if job.skip_isolation {
+    let mut res = if job.skip_isolation {
         isolate(img, &SegmentOptions { mode: crate::segment::SegmentMode::KeepAlpha, ..seg.clone() })
     } else if let Some((model, opt)) = &cfg.ai {
         match crate::ai::isolate_ai(img, model, *opt) {
@@ -76,20 +84,7 @@ pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage,
     } else {
         isolate(img, seg)
     };
-    let mut extra = Vec::new();
-    let mut canvas = if let Some(lp) = &cfg.lucent {
-        let o = crate::lucent::render(img, &res.glyph, res.bbox, cfg.size, &crate::lucent::with_placement(lp, pl));
-        extra = o.notes;
-        o.image
-    } else {
-        let mut c = if cfg.background.width() == cfg.size {
-            (*cfg.background).clone()
-        } else {
-            resize(&cfg.background, cfg.size, cfg.size)
-        };
-        crate::compose::place_on_plate(&mut c, img, &res, pl);
-        c
-    };
+    let (mut canvas, extra) = compose_canvas(img, &mut res, cfg, pl, job.shape, job.backdrop);
     clean_transparent(&mut canvas);
     let r = JobResult {
         id: job.id.clone(),
@@ -103,6 +98,60 @@ pub fn process_one(img: &RgbaImage, cfg: &BatchConfig, job: &Job) -> (RgbaImage,
         notes: res.notes.into_iter().chain(extra).collect(),
     };
     (canvas, r)
+}
+
+/// Builds the icon from an isolated symbol, with the effects of `cfg`.
+/// Shared by the batch and the preview, so the preview shows the export.
+/// Returns the canvas and the notes the renderer added.
+pub fn compose_canvas(
+    img: &RgbaImage,
+    res: &mut SegmentResult,
+    cfg: &BatchConfig,
+    pl: &Placement,
+    shape: Option<PlateShape>,
+    backdrop: Option<[u8; 4]>,
+) -> (RgbaImage, Vec<String>) {
+    let fx = &cfg.effects;
+    if let Some(rgb) = fx.recolor {
+        effects::recolor(&mut res.glyph, rgb);
+    }
+    let (mut canvas, extra) = if let Some(lp) = &cfg.lucent {
+        let mut lp = crate::lucent::with_placement(lp, pl);
+        if let Some(s) = shape {
+            lp.shape = s;
+        }
+        if let Some(b) = backdrop {
+            lp.backdrop = b;
+        }
+        if fx.plate_tint > 0.0 {
+            if let Some(mean) = effects::mean_color(&res.glyph) {
+                lp.backdrop = effects::tint_backdrop(lp.backdrop, mean, fx.plate_tint);
+            }
+        }
+        if fx.recolor.is_some() {
+            // a recoloured symbol is drawn as it is, not re-tinted from the source
+            lp.strategy = GlyphStrategy::AsIs;
+            lp.lift_greys = false;
+        }
+        let o = crate::lucent::render(img, &res.glyph, res.bbox, cfg.size, &lp);
+        (o.image, o.notes)
+    } else {
+        let mut c = if cfg.background.width() == cfg.size {
+            (*cfg.background).clone()
+        } else {
+            resize(&cfg.background, cfg.size, cfg.size)
+        };
+        crate::compose::place_on_plate(&mut c, img, res, pl);
+        (c, Vec::new())
+    };
+    // symbol scaled up more than 2x (output size over its longest side)
+    let (x0, y0, x1, y1) = res.bbox;
+    let up = cfg.size as f32 / (x1 - x0).max(y1 - y0).max(1) as f32;
+    if fx.sharpen > 0.0 && up > 2.0 {
+        effects::unsharp(&mut canvas, fx.sharpen);
+    }
+    effects::adjust_color(&mut canvas, &fx.adjust);
+    (canvas, extra)
 }
 
 fn run_job(job: &Job, cfg: &BatchConfig) -> Result<JobResult> {
@@ -202,6 +251,8 @@ mod tests {
                 segment: None,
                 placement: None,
                 skip_isolation: false,
+                shape: None,
+                backdrop: None,
             })
             .collect();
         let cfg = BatchConfig {
@@ -212,6 +263,7 @@ mod tests {
             threads: 2,
             lucent: None,
             ai: None,
+            effects: Effects::default(),
         };
         let cancel = AtomicBool::new(false);
         let r = run(&jobs, &cfg, &cancel, &|_, _, _| {});
@@ -220,6 +272,41 @@ mod tests {
         let cancel = AtomicBool::new(true);
         let r = run(&jobs, &cfg, &cancel, &|_, _, _| {});
         assert!(r.iter().all(|r| !r.ok));
+    }
+
+    #[test]
+    fn recolor_and_plate_override_reach_the_lucent_render() {
+        let mut img = RgbaImage::from_pixel(64, 64, image::Rgba([255, 255, 255, 255]));
+        for y in 20..44 {
+            for x in 20..44 {
+                img.put_pixel(x, y, image::Rgba([200, 0, 0, 255]));
+            }
+        }
+        let cfg = BatchConfig {
+            size: 96,
+            background: Arc::new(RgbaImage::new(0, 0)),
+            placement: Placement::default(),
+            segment: SegmentOptions::default(),
+            threads: 1,
+            lucent: Some(crate::lucent::LucentParams::dark()),
+            ai: None,
+            effects: Effects { recolor: Some([0, 255, 0]), ..Effects::default() },
+        };
+        let job = Job {
+            id: "a".into(),
+            name: "a".into(),
+            source: Source::Bytes(Arc::new(Vec::new())),
+            output: PathBuf::new(),
+            segment: None,
+            placement: None,
+            skip_isolation: false,
+            shape: Some(PlateShape::Circle),
+            backdrop: Some([255, 0, 0, 0x66]),
+        };
+        let (out, _) = process_one(&img, &cfg, &job);
+        // the recoloured symbol keeps its alpha and gets the flat colour
+        assert!(out.pixels().any(|p| p.0 == [0, 255, 0, 255]), "no recoloured pixel");
+        assert!(!out.pixels().any(|p| p[0] > 150 && p[1] < 50 && p[3] > 200), "source colour left");
     }
 }
 

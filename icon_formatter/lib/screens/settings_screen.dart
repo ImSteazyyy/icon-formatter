@@ -1,3 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,6 +20,7 @@ import '../widgets/liquid_glass.dart';
 import '../widgets/theme_reveal.dart';
 import '../workspace/adjust_panel.dart';
 import 'bases_screen.dart';
+import 'settings_extras.dart';
 import '../l10n/strings.dart';
 
 const appVersion = '1.0.0';
@@ -103,10 +110,19 @@ class _SettingsHome extends StatelessWidget {
             (S.icone, [SettingsCat.processing, SettingsCat.bases, SettingsCat.pack, SettingsCat.export]),
             (S.system, [SettingsCat.system]),
           ];
+          final st = AppState.I;
+          final backupDue = backupReminderDue(
+            changes: st.backupChanges,
+            lastBackupMs: st.lastBackupMs,
+            snoozeUntilMs: st.snoozeUntilMs,
+            nowMs: DateTime.now().millisecondsSinceEpoch,
+          );
           return ListView(
             padding: EdgeInsets.fromLTRB(20, 12, 20, 24 + GlassInsets.of(context)),
             children: [
               LargeHeader(S.impostazioni),
+              const SettingsUpdateCard(),
+              if (backupDue) ...[const _BackupCard(), const SizedBox(height: 14)],
               for (final (title, cats) in groups) ...[
                 Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(title)),
                 _CatGroup(cats: cats, onOpen: onOpen),
@@ -114,10 +130,44 @@ class _SettingsHome extends StatelessWidget {
               ],
               Padding(padding: const EdgeInsets.only(left: 6), child: SectionTitle(S.info)),
               const _ProfileCard(),
+              const SizedBox(height: 14),
+              const SettingsWhatsNewTile(),
+              const SizedBox(height: 14),
+              const SettingsTourTile(),
+              const SizedBox(height: 14),
+              const _SupportCard(),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+/// Gentle backup reminder after many changes: "Fai il backup" or "Più tardi".
+class _BackupCard extends StatelessWidget {
+  const _BackupCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final st = AppState.I;
+    return Glass(
+      key: const ValueKey('settings-backup-reminder'),
+      radius: st.appearance.radius + 8,
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.save_alt_rounded, size: 22, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 14),
+          Expanded(child: Text(S.comodoBkPromemoria, style: TextStyle(fontSize: 14.5, color: Palette.text))),
+        ]),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+          TextButton(onPressed: st.snoozeBackupReminder, child: Text(S.comodoBkPiuTardi)),
+          const SizedBox(width: 8),
+          FilledButton(onPressed: () => backupSave(context), child: Text(S.comodoBkFai)),
+        ]),
+      ]),
     );
   }
 }
@@ -148,6 +198,43 @@ class _ProfileCard extends StatelessWidget {
           ]),
         ),
       ]),
+    );
+  }
+}
+
+/// Page where people can support the project (everything in the app is free).
+const kKofiUrl = 'https://ko-fi.com/imsteazyy';
+
+/// "Sostieni il progetto": opens the Ko-fi page.
+class _SupportCard extends StatelessWidget {
+  const _SupportCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final st = AppState.I;
+    return Glass(
+      key: const ValueKey('settings-support'),
+      radius: st.appearance.radius + 8,
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(st.appearance.radius + 8),
+        onTap: () => launchUrl(Uri.parse(kKofiUrl), mode: LaunchMode.externalApplication),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Icon(Icons.favorite_rounded, size: 26, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(S.sostieniTitolo, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
+                const SizedBox(height: 2),
+                Text(S.sostieniSub, style: TextStyle(fontSize: 13, color: Palette.text2)),
+              ]),
+            ),
+            Icon(Icons.open_in_new_rounded, size: 18, color: Palette.text3),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -265,8 +352,16 @@ class _AppearancePage extends StatelessWidget {
         value: a.style,
         onChanged: (v) => ThemeReveal.run(() => st.update(() => a.style = v)),
       ),
-      // light or dark, in both styles; the new look spreads from the switch
-      SettingSwitch(icon: Icons.light_mode_outlined, title: S.modalitaChiara, value: a.light, onChanged: (v) => ThemeReveal.run(() => st.update(() => a.light = v))),
+      // follow the phone, or light / dark, in both styles; the new look spreads from the choice
+      SectionTitle(S.comodoTema),
+      ChoiceRows<ThemeChoice>(
+        options: [(ThemeChoice.system, S.comodoTemaSistema), (ThemeChoice.light, S.comodoTemaChiaro), (ThemeChoice.dark, S.comodoTemaScuro)],
+        value: a.themeChoice,
+        onChanged: (v) => ThemeReveal.run(() => st.update(() {
+          a.themeChoice = v;
+          a.syncLight();
+        })),
+      ),
       Text(a.style == UiStyle.nothing ? S.stileNothingSub : S.stileVetroSub, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
       if (a.style == UiStyle.glass) ...[
         SectionTitle(S.accento),
@@ -279,7 +374,15 @@ class _AppearancePage extends StatelessWidget {
         onChanged: (v) => st.update(() => a.language = v),
       ),
       SectionTitle(S.interfaccia),
-      SettingSwitch(icon: Icons.animation_rounded, title: S.animazioni, value: a.animations, onChanged: (v) => st.update(() => a.animations = v)),
+      // off while power saving is on: its value is put back when it goes off
+      SettingSwitch(icon: Icons.animation_rounded, title: S.animazioni, value: a.animations, onChanged: a.powerSaving ? null : (v) => st.update(() => a.animations = v)),
+      SettingSwitch(
+        icon: Icons.battery_saver_rounded,
+        title: S.comodoRisparmio,
+        subtitle: S.comodoRisparmioSub,
+        value: a.powerSaving,
+        onChanged: (v) => st.setPowerSaving(v),
+      ),
       // only with the Glass style: its material, colour, edges and where it is used
       if (glass) ...[
         ...glassControls(context),
@@ -438,6 +541,30 @@ class _ExportPage extends StatelessWidget {
     final st = AppState.I;
     final ex = st.export;
     return SettingsList(children: [
+      SectionTitle(S.packPersonalizzato),
+      ListTile(
+        key: const ValueKey('pack-name'),
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.badge_outlined),
+        title: Text(S.packNome),
+        subtitle: Text(ex.packName.trim().isEmpty ? 'Icon Formatter Pack' : ex.packName.trim()),
+        onTap: () async {
+          if (!context.mounted) return;
+          final n = await askText(context, S.packNome, initial: ex.packName);
+          if (n != null) st.update(() => ex.packName = n.trim());
+        },
+      ),
+      ListTile(
+        key: const ValueKey('pack-accent'),
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(Icons.circle, color: Color(ex.packAccent ?? st.appearance.accent)),
+        title: Text(S.packColore),
+        trailing: ex.packAccent == null ? null : TextButton(onPressed: () => st.update(() => ex.packAccent = null), child: Text(S.ripristina)),
+        onTap: () async {
+          if (!context.mounted) return;
+          showColorPicker(context, initial: ex.packAccent ?? st.appearance.accent, title: S.packColore, onChanged: (c) => st.update(() => ex.packAccent = c));
+        },
+      ),
       SectionTitle(S.formato),
       Text(S.pngRgbaTrasparenzaReale8, style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
@@ -479,6 +606,17 @@ class _ExportPage extends StatelessWidget {
   }
 }
 
+/// Saves the backup file (shared by System and the reminder card); a saved file resets the reminder.
+Future<void> backupSave(BuildContext context) async {
+  final bytes = Uint8List.fromList(utf8.encode(AppState.I.backupJson()));
+  final path = await FilePicker.platform.saveFile(fileName: 'icon-formatter-backup.json', bytes: bytes, type: FileType.custom, allowedExtensions: ['json']);
+  if (path == null) return;
+  // desktop only returns the chosen path; mobile has already written the bytes
+  if (!Platform.isAndroid && !Platform.isIOS) await File(path).writeAsBytes(bytes);
+  AppState.I.markBackupMade();
+  if (context.mounted) showMsg(context, S.bkSalvato);
+}
+
 class _SystemPage extends StatefulWidget {
   const _SystemPage();
 
@@ -496,6 +634,21 @@ class _SystemPageState extends State<_SystemPage> {
     _refresh();
   }
 
+  Future<void> _backupRestore() async {
+    final r = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['json'], withData: true);
+    final f = r?.files.firstOrNull;
+    if (f == null) return;
+    try {
+      final data = f.bytes ?? await File(f.path!).readAsBytes();
+      await AppState.I.restoreBackup(utf8.decode(data));
+      if (mounted) showMsg(context, S.bkRipristinato);
+    } on FormatException {
+      if (mounted) showMsg(context, S.bkNonValido, error: true);
+    } catch (e) {
+      if (mounted) showMsg(context, S.errore(e), error: true);
+    }
+  }
+
   Future<void> _refresh() async {
     final c = await AppPaths.I.cacheSize();
     final o = await AppPaths.I.outputsSize();
@@ -510,6 +663,25 @@ class _SystemPageState extends State<_SystemPage> {
   @override
   Widget build(BuildContext context) {
     return SettingsList(children: [
+      SectionTitle(S.bkTitolo),
+      ListTile(
+        key: const ValueKey('backup-save'),
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.save_alt_rounded),
+        title: Text(S.bkSalva),
+        subtitle: Text(S.bkSalvaSub),
+        onTap: () => backupSave(context),
+      ),
+      ListTile(
+        key: const ValueKey('backup-restore'),
+        contentPadding: EdgeInsets.zero,
+        leading: const Icon(Icons.settings_backup_restore_rounded),
+        title: Text(S.bkRipristina),
+        subtitle: Text(S.bkRipristinaSub),
+        onTap: _backupRestore,
+      ),
+      const SettingsAutoBackupTile(),
+      const SettingsWatchFolderTile(),
       SectionTitle(S.cache),
       ListTile(
         contentPadding: EdgeInsets.zero,
@@ -539,7 +711,7 @@ class _SystemPageState extends State<_SystemPage> {
       ),
       const SizedBox(height: 14),
       SectionTitle(S.performance),
-      Text(S.coreRustElaborazioneParallelaRayon(AppState.I.threads == 0 ? 'automatici' : AppState.I.threads),
+      Text(AppState.I.threads == 0 ? S.elaborazioneParallelaAuto : S.coreRustElaborazioneParallelaRayon(AppState.I.threads),
           style: TextStyle(fontSize: 12, color: Palette.text2)),
       const SizedBox(height: 14),
       SectionTitle(S.ripristino),
@@ -555,6 +727,10 @@ class _SystemPageState extends State<_SystemPage> {
       SectionTitle(S.versione),
       Text(S.iconFormatterCore(appVersion, coreVersion()), style: TextStyle(fontSize: 12, color: Palette.text2)),
       Text(S.datiApp(AppPaths.I.root.path), style: TextStyle(fontSize: 11, color: Palette.text3)),
+      const SizedBox(height: 14),
+      const SettingsUpdateSwitch(),
+      SettingsDiagnosticsTile(version: appVersion),
+      if (!Platform.isAndroid) const SettingsShortcutsTile(),
     ]);
   }
 }
@@ -820,7 +996,15 @@ List<Widget> glassControls(BuildContext context) {
         (GlassQualityLevel.quality, S.qualita),
       ],
       value: g.quality,
-      onChanged: (v) => set(() => g.quality = v),
+      onChanged: (v) {
+        if (v == GlassQualityLevel.quality && premiumGlassSupported) {
+          // tell the user first, then switch after the message has been painted
+          showMsg(context, S.vetroApplico);
+          WidgetsBinding.instance.addPostFrameCallback((_) => Future.delayed(const Duration(milliseconds: 150), () => set(() => g.quality = v)));
+        } else {
+          set(() => g.quality = v);
+        }
+      },
     ),
     if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
     SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.vetroNativo, subtitle: S.vetroNativoSub, value: g.native, onChanged: (v) => set(() => g.native = v)),

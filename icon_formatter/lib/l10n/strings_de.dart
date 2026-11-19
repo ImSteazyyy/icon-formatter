@@ -461,6 +461,8 @@ class StringsDe extends Strings {
   @override
   String coreRustElaborazioneParallelaRayon(Object? a) => 'Parallele Verarbeitung auf $a Prozessoren.';
   @override
+  String get elaborazioneParallelaAuto => 'Parallele Verarbeitung, die Zahl der Prozessoren wird automatisch gewählt.';
+  @override
   String get ripristino => 'Zurücksetzen';
   @override
   String get ripristinareImpostazioni => 'Einstellungen zurücksetzen?';
@@ -909,6 +911,8 @@ class StringsDe extends Strings {
   @override
   String get calendarioDaPackSub => 'Nur die Kalender-Icons, die sich täglich ändern';
   @override
+  String get calendarioNonInstallati => 'Keine der Kalender-Apps des Packs ist auf diesem Telefon installiert';
+  @override
   String get calendarioNessuno => 'Dieses Icon-Pack hat keine wechselnden Kalender-Icons';
   @override
   String calendarioImportato(int n, int apps) => "$n Kalender-Icons importiert (${apps == 1 ? '1 App' : '$apps Apps'}): Verarbeite sie und sende sie an das Pack";
@@ -1137,6 +1141,22 @@ class StringsDe extends Strings {
   @override
   String get packViewerSearch => 'Nach Name oder Paket suchen';
   @override
+  String get packViewerCopy => 'Paket kopieren';
+  @override
+  String get packViewerOpen => 'App öffnen';
+  @override
+  String get packViewerCopied => 'Paket kopiert';
+  @override
+  String get packViewerFilterAll => 'Alle';
+  @override
+  String get packViewerFilterInstalled => 'Installiert';
+  @override
+  String get packViewerFilterMissing => 'Fehlend';
+  @override
+  String get packViewerSortName => 'A–Z';
+  @override
+  String get packViewerSortInstalled => 'Installierte zuerst';
+  @override
   String get linguaSistema => 'Wie das Telefon';
   @override
   String get interfaccia => 'Oberfläche';
@@ -1236,4 +1256,486 @@ class StringsDe extends Strings {
   String get autoMandaAlPack => 'Nach „Alle verarbeiten" die Icons an das Pack senden';
   @override
   String get autoMandaAlPackSub => 'Die Studio-Icons kommen von selbst ins Pack und werden zugeordnet';
+  @override
+  String get packPersonalizzato => 'Dein Pack';
+  @override
+  String get packNome => 'Name des Packs';
+  @override
+  String get packColore => 'Farbe des Packs';
+  @override
+  String get asOgni => 'Prüfen alle';
+  @override
+  String asOre(int h) => '$h Stunden';
+  @override
+  String get asSoloInCarica => 'Nur beim Laden';
+  @override
+  String get bkTitolo => 'Backup';
+  @override
+  String get bkSalva => 'Backup speichern';
+  @override
+  String get bkSalvaSub => 'Aussehen, Stile und Einstellungen in einer Datei';
+  @override
+  String get bkRipristina => 'Aus Backup wiederherstellen';
+  @override
+  String get bkRipristinaSub => 'Ersetzt die aktuellen Einstellungen';
+  @override
+  String get bkSalvato => 'Backup gespeichert';
+  @override
+  String get bkRipristinato => 'Einstellungen wiederhergestellt';
+  @override
+  String get bkNonValido => 'Die Datei ist kein gültiges Backup';
+  @override
+  String get sostieniTitolo => 'Projekt unterstützen';
+  @override
+  String get sostieniSub => 'Die App ist kostenlos. Wenn sie dir gefällt, kannst du mir auf Ko-fi einen Kaffee spendieren.';
+  @override
+  String get applicaATutte => 'Auf alle Icons anwenden';
+  @override
+  String get applicaATutteOk => 'Anwenden';
+  @override
+  String applicaATutteConferma(Object? n) => 'Zu aktualisierende Icons: $n. Die Korrekturen dieses Icons werden auf alle anderen kopiert und neu verarbeitet.';
+  @override
+  String applicaATutteFatto(Object? n) => 'Korrekturen angewendet: $n';
+  @override
+  String get cercaLista => 'In der Liste suchen';
+  @override
+  String get anteprimaHome => 'Startbildschirm-Vorschau';
+  @override
+  String get anteprimaTitolo => 'Vorschau des Startbildschirms';
+  @override
+  String get anteprimaScuro => 'Dunkel';
+  @override
+  String get anteprimaChiaro => 'Hell';
+  @override
+  String get anteprimaVuota => 'Keine generierten Symbole zum Anzeigen.';
+  @override
+  String get confrontoTitolo => 'Vorher und nachher';
+  @override
+  String get confrontoSuggerimento => 'Ziehe die Linie, um zu vergleichen.';
+  @override
+  String get presetCondividiCondividi => 'Preset teilen';
+  @override
+  String get presetCondividiImporta => 'Preset importieren';
+  @override
+  String get presetCondividiSalvato => 'Preset gespeichert';
+  @override
+  String get presetCondividiNonValido => 'Ungültige Datei: Sie enthält keine Icon-Formatter-Presets.';
+  @override
+  String presetCondividiImportati(Object? n) => 'Presets importiert: $n';
+  @override
+  String get comodoOrarioGiorno => 'Tag aktualisieren um';
+  @override
+  String get comodoAllaPrimaOccasione => 'Bei der nächsten Gelegenheit';
+  @override
+  String get comodoOrarioGiornoAzzera => 'Zeit löschen';
+  @override
+  String get extraSfondo => 'Hintergrund';
+  @override
+  String get extraConfrontaStili => 'Stile vergleichen';
+  @override
+  String get extraStileA => 'Stil A';
+  @override
+  String get extraStileB => 'Stil B';
+  @override
+  String get extraNessunCampione => 'Keine Icon zum Vergleichen: importiere zuerst eine.';
+  @override
+  String get comodoTema => 'Design';
+  @override
+  String get comodoTemaSistema => 'Wie das Telefon';
+  @override
+  String get comodoTemaChiaro => 'Hell';
+  @override
+  String get comodoTemaScuro => 'Dunkel';
+  @override
+  String get comodoBkPromemoria => 'Du hast viele Einstellungen geändert: speichere eine Sicherung.';
+  @override
+  String get comodoBkFai => 'Sicherung erstellen';
+  @override
+  String get comodoBkPiuTardi => 'Später';
+  @override
+  String get comodoRisparmio => 'Energiesparmodus';
+  @override
+  String get comodoRisparmioSub => 'Weniger Effekte und Animationen, mehr Akkulaufzeit';
+  @override
+  String get packQualita => 'Qualitätsprüfung';
+  @override
+  String packQualitaScan(Object? a, Object? b) => 'Prüfung $a von $b';
+  @override
+  String get packQualitaOk => 'Keine Probleme in den Icons gefunden';
+  @override
+  String packQualitaN(Object? n) => '$n Icons zu prüfen';
+  @override
+  String packQualitaRielabora(Object? n) => '$n erneut verarbeiten';
+  @override
+  String get packProbVuota => 'Fast leer';
+  @override
+  String get packProbPiccola => 'Zu klein';
+  @override
+  String get packProbDecentrata => 'Nicht zentriert';
+  @override
+  String get packProbScura => 'Zu dunkel';
+  @override
+  String packMancanti(Object? n) => '$n fehlende verarbeiten';
+  @override
+  String get packRegistro => 'Pack-Protokoll';
+  @override
+  String get packRegistroVuoto => 'Noch keine Aktivität protokolliert';
+  @override
+  String get packRegistroCopia => 'Kopieren';
+  @override
+  String get packRegistroCopiato => 'Protokoll in die Zwischenablage kopiert';
+  @override
+  String packLogCreate(Object? n) => '$n Icons erstellt';
+  @override
+  String packLogRielabora(Object? n) => '$n Icons erneut verarbeitet';
+  @override
+  String packLogEsportata(Object? n, Object? nuove, Object? cambiate, Object? rimosse) => '$n Icons exportiert: $nuove neu, $cambiate geändert, $rimosse entfernt';
+  @override
+  String packLogEsportataPrima(Object? n) => '$n Icons exportiert (erster Export)';
+  @override
+  String packLogEsportataSolo(Object? n) => 'Nur geänderte Icons exportiert: $n';
+  @override
+  String packLogApplicato(Object? n, Object? v) => 'Pack auf dem Telefon angewendet: $n Icons, Version $v';
+  @override
+  String packLogProfilo(Object? name) => 'Gespeichertes Pack $name geladen';
+  @override
+  String get packProfili => 'Gespeicherte Packs';
+  @override
+  String get packSalvaCome => 'Pack speichern als…';
+  @override
+  String get packProfiliVuoto => 'Keine gespeicherten Packs';
+  @override
+  String packProfiloN(Object? n, Object? data) => '$n Korrekturen · $data';
+  @override
+  String packSalvato(Object? name) => 'Pack gespeichert als $name';
+  @override
+  String packCaricaConferma(Object? name) => '$name laden?';
+  @override
+  String get packCaricaCorpo => 'Die aktuellen Korrekturen werden ersetzt. Handgemachte Icons bleiben.';
+  @override
+  String get packCarica => 'Laden';
+  @override
+  String packEliminaConferma(Object? name) => '$name löschen?';
+  @override
+  String get packEliminaCorpo => 'Das gespeicherte Pack wird entfernt. Die aktuellen Korrekturen bleiben.';
+  @override
+  String get packEsportaModificate => 'Nur geänderte';
+  @override
+  String get packEsportaModificateSub => 'Seit dem letzten Export geändert';
+  @override
+  String get packEsportaPrimaSub => 'Erster Export: nur handgemachte';
+  @override
+  String get packNessunaModificata => 'Kein geändertes Icon zum Exportieren';
+  @override
+  String get tourSalta => 'Überspringen';
+  @override
+  String get tourAvanti => 'Weiter';
+  @override
+  String get tourIndietro => 'Zurück';
+  @override
+  String get tourInizia => 'Loslegen';
+  @override
+  String get tourBenvenutoSub => 'Erstelle Icon-Pakete für dein Handy mit wenigen Tippern.';
+  @override
+  String get tourStileSub => 'Du kannst es jederzeit ändern.';
+  @override
+  String get tourStileNothing => 'Schwarz, flach, Nothing-Rot';
+  @override
+  String get tourStileVetro => 'Transparente Glasflächen';
+  @override
+  String get tourPermessi => 'Berechtigungen';
+  @override
+  String get tourPermSub => 'Alles ist optional. Du kannst jede Wahl später in den Einstellungen ändern.';
+  @override
+  String get tourNotifiche => 'Benachrichtigungen';
+  @override
+  String get tourNotificheDesc => 'Meldet sich, wenn eine neue App ihr Symbol braucht.';
+  @override
+  String get tourSorgenti => 'Unbekannte Apps installieren';
+  @override
+  String get tourSorgentiDesc => 'Nur nötig, um das Paket zu installieren. Das System fragt im richtigen Moment.';
+  @override
+  String get tourShizukuDesc => 'Optional: Paket ohne Systemdialog installieren und anwenden.';
+  @override
+  String get tourStatoConcesso => 'Erteilt';
+  @override
+  String get tourStatoNonConcesso => 'Nicht erteilt';
+  @override
+  String get tourStatoInfo => 'Wird bei der Installation abgefragt';
+  @override
+  String get tourConcedi => 'Erlauben';
+  @override
+  String get tourLinguaSub => 'Du kannst sie jederzeit ändern.';
+  @override
+  String get tourFineTitolo => 'Alles bereit';
+  @override
+  String get tourFineSub => 'Drei nützliche Dinge.';
+  @override
+  String get tourFine1 => 'Im Studio bearbeitest du Symbole und erstellst das Paket.';
+  @override
+  String get tourFine2 => 'In den Einstellungen findest du Stil, Sprache und Berechtigungen.';
+  @override
+  String get tourFine3 => 'Diese Anleitung kannst du in den Einstellungen erneut öffnen.';
+  @override
+  String get studioDuplicato => 'Gleiche Datei wie eine andere Icon';
+  @override
+  String get studioGuidaArea => 'Sicherheitsbereich-Hilfe';
+  @override
+  String get studioGuidaAreaSub => 'Plattenkante und Mittelkreuz, nur in der Vorschau';
+  @override
+  String get studioAltreIcona => 'Weitere Aktionen für dieses Icon';
+  @override
+  String get studioOrdinaFiltra => 'Sortieren und filtern';
+  @override
+  String get studioFiltroSub => 'Nur die Liste: Alle verarbeiten wirkt weiterhin auf alle aktiven Icons';
+  @override
+  String get studioOrdineAggiunta => 'Importreihenfolge';
+  @override
+  String get studioOrdinaNome => 'Name';
+  @override
+  String get studioOrdinaStato => 'Status';
+  @override
+  String get studioFiltroTutte => 'Alle';
+  @override
+  String get studioFiltroModificate => 'Nur bearbeitete';
+  @override
+  String get studioFiltroErrori => 'Nur mit Fehlern';
+  @override
+  String get studioFiltroEscluse => 'Nur ausgeschlossene';
+  @override
+  String get studioNessunaIconaFiltrata => 'Kein Icon passt zu diesem Filter';
+  @override
+  String studioSelezionate(Object? n) => 'Ausgewählt: $n';
+  @override
+  String get studioApplicaCorrezioni => 'Korrekturen anwenden';
+  @override
+  String get studioNessunaCorrezione => 'Keine Korrektur zum Kopieren: korrigiere zuerst das Icon in der Vorschau';
+  @override
+  String studioCorrezioniApplicate(Object? n) => 'Korrekturen auf $n Icons angewendet';
+  @override
+  String get studioEscludi => 'Ausschließen';
+  @override
+  String get studioRimuovi => 'Entfernen';
+  @override
+  String studioRimuoviSelezioneTitolo(Object? n) => '$n Icons aus der Liste entfernen?';
+  @override
+  String get studioRimuoviSelezioneSub => 'Die Icons verlassen die Liste. Die Originaldateien bleiben unverändert.';
+  @override
+  String get studioDeselezionaTutte => 'Auswahl aufheben';
+  @override
+  String get studioIncollaAppunti => 'Aus der Zwischenablage einfügen';
+  @override
+  String get studioIncollaAppuntiSub => 'Ein kopiertes Bild oder eine im Explorer kopierte Datei';
+  @override
+  String get studioAppuntiVuoti => 'In der Zwischenablage liegt kein Bild oder keine Bilddatei.';
+  @override
+  String get studioAnnullaModifica => 'Änderung rückgängig';
+  @override
+  String get studioAnnullaModificaSub => 'Zur vorherigen Korrektur zurückkehren';
+  @override
+  String get studioRipristinaModifica => 'Änderung wiederholen';
+  @override
+  String get studioRipristinaModificaSub => 'Die rückgängig gemachte Korrektur erneut anwenden';
+  @override
+  String get studioEscludiDuplicati => 'Duplikate ausschließen';
+  @override
+  String studioEscludiDuplicatiSub(Object? n) => 'Icons mit derselben Datei: $n';
+  @override
+  String studioDuplicatiEsclusi(Object? n) => 'Duplikate ausgeschlossen: $n';
+  @override
+  String get androidIgnorateTitolo => 'Von Aktualisierungen ausgenommene Apps';
+  @override
+  String get androidIgnorateSub => 'Diese Apps erscheinen nicht in Änderungen oder Benachrichtigungen';
+  @override
+  String get androidIgnorateCerca => 'Apps suchen';
+  @override
+  String get androidIgnorateSalva => 'Speichern';
+  @override
+  String get androidIgnorateNessuna => 'Keine Apps gefunden';
+  @override
+  String androidIgnorateConteggio(Object? n) => '$n ignoriert';
+  @override
+  String get extra2DiagTitolo => 'Infos für eine Problemmeldung kopieren';
+  @override
+  String get extra2DiagSub => 'Version, System und Einstellungen, ohne persönliche Daten';
+  @override
+  String get extra2DiagCopiata => 'Infos in die Zwischenablage kopiert';
+  @override
+  String get extra2NovitaTitolo => 'Neuigkeiten';
+  @override
+  String get extra2NovitaSub => 'Was sich in dieser Version ändert';
+  @override
+  String get extra2BkAutoTitolo => 'Automatische Sicherung';
+  @override
+  String get extra2BkAutoSub => 'Speichert nach vielen Änderungen eine Kopie in einem Ordner und behält die letzten 3';
+  @override
+  String get extra2BkAutoCartella => 'Ordner der Sicherung';
+  @override
+  String get extra2BkAutoNonScrivibile => 'In diesen Ordner kann nicht geschrieben werden. Wähle unter Android einen, in den die App speichern darf, zum Beispiel Downloads.';
+  @override
+  String get extra2BkAutoFallito => 'Die automatische Sicherung ist fehlgeschlagen. Sie wird nach weiteren Änderungen erneut versucht.';
+  @override
+  String get extra2ScorTitolo => 'Tastenkürzel';
+  @override
+  String get extra2ScorSub => 'Tasten für den Computer. Mit Strg funktionieren sie auch in Textfeldern.';
+  @override
+  String get extra2ScorTileSub => 'Liste der Computertasten';
+  @override
+  String get extra2ScorTab => 'Öffnet die ersten vier Bereiche der Seitenleiste';
+  @override
+  String get extra2ScorImp => 'Öffnet die Einstellungen';
+  @override
+  String get extra2ScorTema => 'Wechselt zwischen hellem und dunklem Design';
+  @override
+  String get vetroApplico => 'Qualität wird angewendet…';
+  @override
+  String get pack2Anteprima => 'Vorschau exportieren';
+  @override
+  String get pack2AnteprimaVuota => 'Keine erzeugten Symbole zum Anzeigen.';
+  @override
+  String pack2AnteprimaProgresso(Object? n, Object? m) => 'Vorschau: $n von $m Symbolen';
+  @override
+  String get pack2AnteprimaTitolo => 'Symbol-Vorschau';
+  @override
+  String get pack2UsaPerAltre => 'Für andere Apps verwenden…';
+  @override
+  String get pack2AliasTitolo => 'Für andere Apps verwenden';
+  @override
+  String get pack2AliasCerca => 'App suchen';
+  @override
+  String get pack2AliasVuoto => 'Keine andere App zur Auswahl.';
+  @override
+  String get pack2Rinomina => 'Im Pack umbenennen';
+  @override
+  String get pack2RinominaTitolo => 'Name im Pack';
+  @override
+  String pack2Copertura(Object? n, Object? m, Object? p) => '$n Symbole bei $m installierten Apps ($p%)';
+  @override
+  String get pack2Varianti => 'Varianten';
+  @override
+  String get pack2VarianteAggiungi => 'Variante hinzufügen';
+  @override
+  String get pack2VariantiMax => 'Höchstens drei Symbole pro App.';
+  @override
+  String get pack2VarianteTogli => 'Variante lange drücken zum Entfernen';
+  @override
+  String get pack2VarianteScelta => 'Gewählte Variante';
+  @override
+  String get pack2ProbContrasto => 'Geringer Kontrast';
+  @override
+  String get pack2OriginaleCambiata => 'Das Originalsymbol hat sich geändert';
+  @override
+  String get studio2Ricolora => 'Umfärben';
+  @override
+  String get studio2ColoreSimbolo => 'Symbolfarbe';
+  @override
+  String get studio2PiattoDalSimbolo => 'Plättchen aus dem Symbol';
+  @override
+  String get studio2Nitidezza => 'Schärfe';
+  @override
+  String get studio2CentraturaOttica => 'Optische Zentrierung';
+  @override
+  String get studio2FormaPiattoMenu => 'Plättchenform…';
+  @override
+  String get studio2ColorePiattoMenu => 'Plättchenfarbe…';
+  @override
+  String get studio2FormaPredefinita => 'Standard';
+  @override
+  String get studio2PredefinitoColore => 'Standard';
+  @override
+  String get studio2ColorePiattoTitolo => 'Plättchenfarbe';
+  @override
+  String get studio2ColoreScegli => 'Farbe wählen';
+  @override
+  String get studio2Applica => 'Übernehmen';
+  @override
+  String get pack3Conflitti => 'Konflikte';
+  @override
+  String get pack3ConflittiOk => 'Keine Konflikte zwischen den Icons.';
+  @override
+  String pack3ConflittiN(Object? n) => '$n Konflikte';
+  @override
+  String get pack3ConflittoCondiviso => 'Gleiches Motiv für mehrere Apps';
+  @override
+  String get pack3ConflittoComponente => 'Gleiche Komponente, verschiedene Motive';
+  @override
+  String get pack3ConflittoVuoto => 'Leeres Motiv';
+  @override
+  String get pack3ConflittoPacchetto => 'Leeres Paket';
+  @override
+  String get pack3Suggerisci => 'Vorschlagen';
+  @override
+  String get pack3SuggerimentiTitolo => 'Vorgeschlagene Icons';
+  @override
+  String get pack3NessunSuggerimento => 'Kein passendes freies Icon.';
+  @override
+  String get pack3ImportaAbbinamenti => 'Zuordnungen aus einem Pack importieren';
+  @override
+  String get pack3ImportaSub => 'APK oder ZIP eines anderen Packs';
+  @override
+  String get pack3AbbinamentiTitolo => 'Gefundene Zuordnungen';
+  @override
+  String get pack3ImportaNessuno => 'Keine Zuordnung für Apps ohne Icon.';
+  @override
+  String get pack3MatchComponente => 'Exakte Komponente';
+  @override
+  String get pack3MatchPacchetto => 'Gleiches Paket';
+  @override
+  String get pack3MatchEtichetta => 'Gleicher Name';
+  @override
+  String get pack3Applica => 'Anwenden';
+  @override
+  String pack3AbbinamentiApplicati(Object? n) => '$n Icons zugewiesen.';
+  @override
+  String get pack3Liste => 'Listen';
+  @override
+  String get pack3ListeSub => 'Auswahlen speichern und laden';
+  @override
+  String get pack3ListeTitolo => 'App-Listen';
+  @override
+  String get pack3ListaSalvaSelezione => 'Auswahl als Liste speichern';
+  @override
+  String get pack3ListaSalvaCome => 'Name der Liste';
+  @override
+  String get pack3ListaVuota => 'Keine gespeicherten Listen.';
+  @override
+  String get pack3ListaSelezioneVuota => 'Wähle zuerst mindestens eine App aus.';
+  @override
+  String pack3ListaN(Object? n) => '$n Apps';
+  @override
+  String get pack3ListaCarica => 'Laden';
+  @override
+  String get pack3ListaRinomina => 'Umbenennen';
+  @override
+  String get pack3ListaRinominaTitolo => 'Neuer Name';
+  @override
+  String pack3ListaCaricata(Object? name) => 'Liste geladen: $name.';
+  @override
+  String pack3ListaSalvata(Object? name) => 'Liste gespeichert: $name.';
+  @override
+  String pack3ListaEliminaConferma(Object? name) => 'Liste $name löschen?';
+  @override
+  String get pack3ListaEliminaCorpo => 'Die Liste wird entfernt: die Apps ändern sich nicht.';
+  @override
+  String get tourRivedi => 'Tour erneut ansehen';
+  @override
+  String get wireAppIgnorate => 'Ignorierte Apps';
+  @override
+  String wireAppIgnorateN(int n) => 'Ignorierte Apps ($n)';
+  @override
+  String wireNuovaVersione(Object? v) => 'Neue Version $v verfügbar';
+  @override
+  String get wireControllaAggiornamenti => 'Auf Updates prüfen';
+  @override
+  String get wireControllaAggiornamentiSub => 'Einmal pro Start, bei GitHub. Aus: keine Netzwerkanfrage.';
+  @override
+  String get wireCartellaOsservata => 'Überwachter Ordner';
+  @override
+  String get wireCartellaOsservataSub => 'Neue Bilder in diesem Ordner werden in Studio importiert';
+  @override
+  String get wireScegliCartella => 'Ordner zum Überwachen wählen';
+  @override
+  String get wireCartellaNonLeggibile => 'Ordner von hier nicht lesbar';
+  @override
+  String get wireRimuoviCartella => 'Ordner entfernen';
 }

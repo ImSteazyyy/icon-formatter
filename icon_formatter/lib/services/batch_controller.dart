@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../app/state.dart';
 import '../src/rust/api/engine.dart';
+import 'platform_service.dart';
 
 /// Wraps the Rust batch stream: progress, results per item, cancellation.
 /// The UI stays responsive because all work happens on Rust worker threads.
@@ -40,6 +41,10 @@ class BatchController extends ChangeNotifier {
     notifyListeners();
     final completer = Completer<void>();
     var lastNotify = DateTime.now();
+    // Android: a notification with progress while a long batch runs
+    final notify = Platform.isAndroid && items.length > 8;
+    var lastPush = DateTime.fromMillisecondsSinceEpoch(0);
+    if (notify) unawaited(PlatformService.processingStart(items.length));
     ImageStamps.busy++;
     _sub = runBatch(items: items, settings: settings, threads: AppState.I.threads, cancel: token).listen(
       (ev) {
@@ -56,6 +61,10 @@ class BatchController extends ChangeNotifier {
           lastNotify = now;
           notifyListeners();
         }
+        if (notify && (ev.done == ev.total || now.difference(lastPush).inMilliseconds >= 500)) {
+          lastPush = now;
+          unawaited(PlatformService.processingProgress(ev.done, ev.total));
+        }
       },
       onError: (Object e) {
         fatal = e.toString();
@@ -66,7 +75,11 @@ class BatchController extends ChangeNotifier {
       },
       cancelOnError: true,
     );
-    await completer.future;
+    try {
+      await completer.future;
+    } finally {
+      if (notify) unawaited(PlatformService.processingStop());
+    }
     ImageStamps.busy--;
     running = false;
     cancelled = token.isCancelled();

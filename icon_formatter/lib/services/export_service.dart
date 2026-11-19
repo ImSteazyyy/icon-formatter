@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../src/rust/api/engine.dart';
+import 'extra_contact_sheet.dart';
 import 'platform_service.dart';
 import '../l10n/strings.dart';
 
@@ -128,5 +129,25 @@ class ExportService {
     final z = p.join(await AppPaths.I.workDir('share'), '$name.zip');
     await zipDirectory(dir: dir, zipPath: z);
     await share([z]);
+  }
+
+  /// Contact sheet PNGs of the generated icons (names under each, up to 400
+  /// icons, 96 per sheet). Writes to the cache and returns the first sheet's
+  /// path, or null when there is nothing to draw.
+  static Future<String?> exportContactSheet(List<({String name, Uint8List png})> icons) async {
+    if (icons.isEmpty) return null;
+    final dir = await AppPaths.I.workDir('sheet');
+    final pages = contactSheetPages(icons.length);
+    String? first;
+    var start = 0;
+    for (var i = 0; i < pages.length; i++) {
+      final png = await renderContactSheet(icons.sublist(start, start + pages[i]));
+      start += pages[i];
+      if (png == null) continue;
+      final path = p.join(dir, 'contact_sheet_${i + 1}.png');
+      await File(path).writeAsBytes(png);
+      first ??= path;
+    }
+    return first;
   }
 }

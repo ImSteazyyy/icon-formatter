@@ -11,6 +11,9 @@ import '../app/storage.dart';
 import '../services/batch_controller.dart';
 import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
+import 'studio_duplicates.dart';
+import 'studio_history.dart';
+import 'studio_list.dart';
 
 /// One icon in a workspace.
 class WorkItem {
@@ -38,6 +41,10 @@ class WorkItem {
   /// Per-app symbol mode (Rigenera › Modalità); null = Automatica.
   LucentStrategy? strategyOverride;
 
+  /// Per-icon plate shape and colour (Lucent only); null = the global ones.
+  LucentShape? shapeOverride;
+  int? backdropOverride;
+
   /// 1..31: one day of a dynamic calendar icon taken from an icon pack.
   int? calendarDay;
 
@@ -46,8 +53,15 @@ class WorkItem {
   bool matchPlate = false;
   ItemResult? result;
 
+  /// Size and hash of the source file, set by the duplicate scan (null: not checked).
+  String? fingerprint;
+
+  /// Id of the first icon with the same file, when this one is a duplicate.
+  String? duplicateOf;
+  bool get isDuplicate => duplicateOf != null;
+
   String? get outputPath => result?.ok == true ? result!.output : null;
-  bool get hasOverride => segOverride != null || placementOverride != null || strategyOverride != null || matchPlate;
+  bool get hasOverride => segOverride != null || placementOverride != null || strategyOverride != null || shapeOverride != null || backdropOverride != null || matchPlate;
 }
 
 /// Shared processing state: items, selection, mode, preview, batch.
@@ -78,6 +92,21 @@ class WorkspaceController extends ChangeNotifier {
 
   /// When true, adjustments are stored on the selected item only.
   bool editSelectedOnly = false;
+
+  /// Undo/redo of the corrections (values only, see StudioHistory).
+  final StudioHistory<Map<String, ItemCorrection>> _history = StudioHistory();
+  bool get canUndo => _history.canUndo;
+  bool get canRedo => _history.canRedo;
+
+  /// Icons picked with a long press (ids); the selection bar acts on them.
+  final Set<String> selection = {};
+  bool get selecting => selection.isNotEmpty;
+
+  StudioSort sort = StudioSort.added;
+  StudioFilter filter = StudioFilter.all;
+
+  /// Preview overlay: plate edge and centre cross (never baked into the output).
+  bool safeGuide = false;
 
   Uint8List? previewPng;
   PreviewResult? previewInfo;
@@ -153,6 +182,7 @@ class WorkspaceController extends ChangeNotifier {
     selectedId ??= items.isEmpty ? null : items.first.id;
     notifyListeners();
     schedulePreview(immediate: true);
+    scanDuplicates();
     return added;
   }
 
@@ -161,9 +191,11 @@ class WorkspaceController extends ChangeNotifier {
 
   /// "Dimensione": sets the size of [its] only and re-renders them.
   Future<void> setItemsScale(List<WorkItem> its, double v) async {
-    for (final it in its) {
-      it.placementOverride = copyPlacement(it.placementOverride ?? settings.placement, scaleMul: v);
-    }
+    _edit('scale', its, () {
+      for (final it in its) {
+        it.placementOverride = copyPlacement(it.placementOverride ?? settings.placement, scaleMul: v);
+      }
+    });
     notifyListeners();
     await process(only: its);
     notifyListeners();
@@ -206,20 +238,165 @@ class WorkspaceController extends ChangeNotifier {
     previewInfo = null;
     batch.clear();
     outputDir = null;
+    _history.clear();
+    selection.clear();
+    _dupScan++;
     notifyListeners();
   }
 
   void remove(WorkItem it) {
     items.remove(it);
     _names.remove(it.name.toLowerCase());
+    selection.remove(it.id);
     if (selectedId == it.id) selectedId = items.isEmpty ? null : items.first.id;
+    _markDuplicates();
     notifyListeners();
     schedulePreview(immediate: true);
   }
 
   void toggleExcluded(WorkItem it) {
-    it.excluded = !it.excluded;
+    _edit('exclude', [it], () => it.excluded = !it.excluded);
     notifyListeners();
+  }
+
+  // ------------------------------------------------------------------ selection
+
+  bool isSelected(WorkItem it) => selection.contains(it.id);
+
+  List<WorkItem> get selectedItems => [for (final i in items) if (selection.contains(i.id)) i];
+
+  void toggleSelect(WorkItem it) {
+    if (!selection.remove(it.id)) selection.add(it.id);
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    if (selection.isEmpty) return;
+    selection.clear();
+    notifyListeners();
+  }
+
+  /// Selection bar: excludes or includes the selected icons (undoable).
+  Future<void> setSelectedExcluded(bool excluded) async {
+    final its = selectedItems;
+    if (its.isEmpty) return;
+    _edit('exclude', its, () {
+      for (final i in its) {
+        i.excluded = excluded;
+      }
+    });
+    selection.clear();
+    notifyListeners();
+    // an icon included again without output is processed now
+    final missing = [for (final i in its) if (!excluded && i.outputPath == null) i];
+    if (missing.isNotEmpty) await process(only: missing);
+    notifyListeners();
+  }
+
+  /// Selection bar: takes the icons out of the list (the files stay).
+  void removeSelected() {
+    final its = selectedItems;
+    for (final it in its) {
+      items.remove(it);
+      _names.remove(it.name.toLowerCase());
+    }
+    selection.clear();
+    if (selectedId != null && items.every((i) => i.id != selectedId)) selectedId = items.isEmpty ? null : items.first.id;
+    _markDuplicates();
+    notifyListeners();
+    schedulePreview(immediate: true);
+  }
+
+  // ------------------------------------------------------------------ sort / filter
+
+  void setSort(StudioSort s) {
+    if (s == sort) return;
+    sort = s;
+    notifyListeners();
+  }
+
+  void setFilter(StudioFilter f) {
+    if (f == filter) return;
+    filter = f;
+    notifyListeners();
+  }
+
+  void toggleSafeGuide() {
+    safeGuide = !safeGuide;
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------------------ duplicates
+
+  /// Icons flagged as duplicates and not excluded yet.
+  int get duplicateCount => items.where((i) => i.isDuplicate && !i.excluded).length;
+
+  /// Icons that are the same file as an earlier one are excluded (undoable).
+  int excludeDuplicates() {
+    final d = [for (final i in items) if (i.isDuplicate && !i.excluded) i];
+    if (d.isEmpty) return 0;
+    _edit('exclude', d, () {
+      for (final i in d) {
+        i.excluded = true;
+      }
+    });
+    notifyListeners();
+    return d.length;
+  }
+
+  /// Bumped by every scan and by clear(): an older scan stops when it sees a newer one.
+  int _dupScan = 0;
+
+  /// Files over this size are not hashed (they are not flagged as duplicates).
+  static const _dupMaxBytes = 8 * 1024 * 1024;
+
+  /// Only the first icons are checked: a long list must not stall the import.
+  static const _dupMaxItems = 400;
+
+  /// Background check: files of equal size are hashed and compared. Each
+  /// file is hashed once (the fingerprint is kept on the item).
+  Future<void> scanDuplicates() async {
+    final gen = ++_dupScan;
+    final bySize = <int, List<WorkItem>>{};
+    // calendar pages of a pack are never duplicates: each day is its own icon
+    for (final it in items.take(_dupMaxItems).toList()) {
+      if (it.fingerprint != null || it.calendarDay != null) continue;
+      final size = await _sizeOf(it);
+      if (gen != _dupScan) return;
+      if (size != null && size <= _dupMaxBytes) bySize.putIfAbsent(size, () => []).add(it);
+    }
+    for (final e in bySize.entries) {
+      if (e.value.length < 2) continue;
+      for (final it in e.value) {
+        if (gen != _dupScan) return;
+        try {
+          final bytes = it.bytes ?? await File(it.path!).readAsBytes();
+          it.fingerprint = '${e.key}:${studioHash(bytes)}';
+        } catch (_) {
+          // unreadable file: not a duplicate candidate
+        }
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    if (gen != _dupScan) return;
+    _markDuplicates();
+    notifyListeners();
+  }
+
+  Future<int?> _sizeOf(WorkItem it) async {
+    if (it.bytes != null) return it.bytes!.length;
+    try {
+      return await File(it.path!).length();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _markDuplicates() {
+    final dups = studioDuplicates([for (final i in items) if (i.fingerprint != null && i.calendarDay == null) MapEntry(i.id, i.fingerprint!)]);
+    for (final i in items) {
+      i.duplicateOf = dups[i.id];
+    }
   }
 
   // ------------------------------------------------------------------ settings
@@ -239,25 +416,28 @@ class WorkspaceController extends ChangeNotifier {
     final s = settings;
     var bg = s.background;
     final st = it.strategyOverride;
-    if (st != null && bg is BackgroundSettings_Lucent) {
+    if (bg is BackgroundSettings_Lucent && (st != null || it.shapeOverride != null || it.backdropOverride != null)) {
       final l = bg.params;
       bg = BackgroundSettings.lucent(
         params: LucentSettings(
           ink: l.ink,
-          backdrop: l.backdrop,
-          shape: l.shape,
+          backdrop: it.backdropOverride ?? l.backdrop,
+          shape: it.shapeOverride ?? l.shape,
           monochrome: l.monochrome,
           keepComposition: l.keepComposition,
           glyphScale: l.glyphScale,
           rim: l.rim,
           launcherShadow: l.launcherShadow,
           launcherEncode: l.launcherEncode,
-          strategy: st,
+          strategy: st ?? l.strategy,
         ),
       );
     }
-    return ProcessSettings(size: s.size, background: bg, placement: it.placementOverride ?? s.placement, segment: it.segOverride ?? s.segment);
+    return ProcessSettings(size: s.size, background: bg, placement: _placementOf(it, s), segment: it.segOverride ?? s.segment, effects: s.effects);
   }
+
+  /// Placement of [it] with the global optical-centre switch applied.
+  PlacementSettings _placementOf(WorkItem it, ProcessSettings s) => copyPlacement(it.placementOverride ?? s.placement, opticalCentre: AppState.I.look.opticalCentre);
 
   /// Current effective placement for the editor (item override or global).
   PlacementSettings get editPlacement {
@@ -275,7 +455,9 @@ class WorkspaceController extends ChangeNotifier {
   void setPlacement(PlacementSettings pl) {
     final it = selected;
     if (editSelectedOnly && it != null) {
-      it.placementOverride = pl;
+      _edit('placement', [it], () {
+        it.placementOverride = pl;
+      });
       notifyListeners();
       schedulePreview();
     } else {
@@ -290,7 +472,9 @@ class WorkspaceController extends ChangeNotifier {
   void setSegment(SegmentSettings s) {
     final it = selected;
     if (editSelectedOnly && it != null) {
-      it.segOverride = s;
+      _edit('segment', [it], () {
+        it.segOverride = s;
+      });
       notifyListeners();
       schedulePreview();
     } else {
@@ -306,7 +490,21 @@ class WorkspaceController extends ChangeNotifier {
 
   /// Rigenera › Modalità: forces how the symbol is taken for one icon.
   void setStrategy(WorkItem it, LucentStrategy? st) {
-    it.strategyOverride = st == LucentStrategy.auto ? null : st;
+    _edit('strategy', [it], () {
+      it.strategyOverride = st == LucentStrategy.auto ? null : st;
+    });
+    notifyListeners();
+    process(only: [it]);
+    schedulePreview(immediate: true);
+  }
+
+  /// Per-icon plate shape / colour (Lucent): undoable, and the icon is processed again.
+  void setItemShape(WorkItem it, LucentShape? v) => _setLook('shape', it, () => it.shapeOverride = v);
+
+  void setItemBackdrop(WorkItem it, int? v) => _setLook('backdrop', it, () => it.backdropOverride = v);
+
+  void _setLook(String kind, WorkItem it, void Function() change) {
+    _edit(kind, [it], change);
     notifyListeners();
     process(only: [it]);
     schedulePreview(immediate: true);
@@ -318,19 +516,130 @@ class WorkspaceController extends ChangeNotifier {
   bool keepsInnerWhite(WorkItem it) => !(it.segOverride ?? settings.segment).removeHoles;
 
   void setKeepInnerWhite(WorkItem it, bool keep) {
-    it.segOverride = copySegment(it.segOverride ?? settings.segment, removeHoles: !keep);
+    _edit('white', [it], () {
+      it.segOverride = copySegment(it.segOverride ?? settings.segment, removeHoles: !keep);
+    });
     notifyListeners();
     process(only: [it]);
     schedulePreview(immediate: true);
   }
 
   void clearOverrides(WorkItem it) {
-    it.segOverride = null;
-    it.placementOverride = null;
-    it.strategyOverride = null;
-    it.matchPlate = false;
+    _edit('clear', [it], () {
+      it.segOverride = null;
+      it.placementOverride = null;
+      it.strategyOverride = null;
+      it.shapeOverride = null;
+      it.backdropOverride = null;
+      it.matchPlate = false;
+    });
     notifyListeners();
     schedulePreview();
+  }
+
+  /// Icons that take the corrections of [src]; calendar pages keep their own.
+  List<WorkItem> overrideTargets(WorkItem src) => [for (final i in active) if (i != src && i.calendarDay == null) i];
+
+  /// "Applica a tutte le icone": copies the corrections of [src] onto the
+  /// [overrideTargets] (replacing theirs) and processes them again.
+  /// Returns how many icons were changed.
+  Future<int> applyOverridesToAll(WorkItem src) => applyOverridesTo(src, overrideTargets(src));
+
+  /// The corrections of [src] onto [targets] (calendar pages and [src] itself
+  /// are skipped), then processed again. Returns how many icons changed.
+  Future<int> applyOverridesTo(WorkItem src, List<WorkItem> targets) async {
+    final its = [for (final i in targets) if (i != src && i.calendarDay == null && !i.excluded) i];
+    if (its.isEmpty || batch.running) return 0;
+    _edit('apply', its, () {
+      for (final it in its) {
+        it.segOverride = src.segOverride;
+        it.placementOverride = src.placementOverride;
+        it.strategyOverride = src.strategyOverride;
+        it.shapeOverride = src.shapeOverride;
+        it.backdropOverride = src.backdropOverride;
+        it.matchPlate = src.matchPlate;
+      }
+    });
+    notifyListeners();
+    await process(only: its);
+    schedulePreview();
+    return its.length;
+  }
+
+  /// Selection bar: the corrections of the previewed icon go to the other
+  /// selected icons. Returns how many icons changed (0: nothing to copy).
+  Future<int> applySelectionCorrections() async {
+    final src = selected;
+    if (src == null || !src.hasOverride || batch.running) return 0;
+    final n = await applyOverridesTo(src, selectedItems);
+    selection.clear();
+    notifyListeners();
+    return n;
+  }
+
+  // ------------------------------------------------------------------ undo / redo
+
+  /// Records one correction: the state of [its] before and after [change].
+  /// Steps of the same kind on the same icons within a moment are merged.
+  void _edit(String kind, List<WorkItem> its, void Function() change) {
+    if (its.isEmpty) {
+      change();
+      return;
+    }
+    final before = _snapshot(its);
+    change();
+    final after = _snapshot(its);
+    final changed = [for (final id in before.keys) if (!before[id]!.sameAs(after[id]!)) id];
+    if (changed.isEmpty) return;
+    _history.push('$kind:${its.length}:${its.first.id}', before, after, DateTime.now());
+  }
+
+  Map<String, ItemCorrection> _snapshot(List<WorkItem> its) => {
+        for (final i in its)
+          i.id: ItemCorrection(
+            seg: i.segOverride,
+            placement: i.placementOverride,
+            strategy: i.strategyOverride,
+            shape: i.shapeOverride,
+            backdrop: i.backdropOverride,
+            matchPlate: i.matchPlate,
+            excluded: i.excluded,
+          ),
+      };
+
+  /// Undoes the last correction. Does nothing while a batch runs.
+  Future<void> undo() async {
+    if (batch.running || !_history.canUndo) return;
+    final s = _history.undo();
+    if (s != null) await _restore(s);
+  }
+
+  /// Redoes the last undone correction.
+  Future<void> redo() async {
+    if (batch.running || !_history.canRedo) return;
+    final s = _history.redo();
+    if (s != null) await _restore(s);
+  }
+
+  /// Writes the states back and processes the icons whose look changed.
+  Future<void> _restore(Map<String, ItemCorrection> state) async {
+    final toRun = <WorkItem>[];
+    for (final i in items) {
+      final s = state[i.id];
+      if (s == null) continue;
+      final touches = !s.sameLook(ItemCorrection(seg: i.segOverride, placement: i.placementOverride, strategy: i.strategyOverride, shape: i.shapeOverride, backdrop: i.backdropOverride, matchPlate: i.matchPlate));
+      i.segOverride = s.seg;
+      i.placementOverride = s.placement;
+      i.strategyOverride = s.strategy;
+      i.shapeOverride = s.shape;
+      i.backdropOverride = s.backdrop;
+      i.matchPlate = s.matchPlate;
+      i.excluded = s.excluded;
+      if (touches || (!s.excluded && i.outputPath == null)) toRun.add(i);
+    }
+    notifyListeners();
+    if (toRun.isNotEmpty) await process(only: toRun);
+    schedulePreview(immediate: true);
   }
 
   // ------------------------------------------------------------------ preview
@@ -357,7 +666,7 @@ class WorkspaceController extends ChangeNotifier {
       if (AppState.I.bgProvider == BgProvider.removeBg) {
         final cut = await BgRemovalService.cutout(cacheKey: it.id + (it.path ?? ''), path: it.path, bytes: it.bytes);
         if (seq != _previewSeq) return;
-        s = ProcessSettings(size: s.size, background: s.background, placement: s.placement, segment: _keepAlpha(s.segment));
+        s = ProcessSettings(size: s.size, background: s.background, placement: s.placement, segment: _keepAlpha(s.segment), effects: s.effects);
         r = await previewFile(path: cut, settings: s);
       } else {
         r = it.path != null ? await previewFile(path: it.path!, settings: s) : await previewBytes(bytes: it.bytes!, settings: s);
@@ -432,8 +741,10 @@ class WorkspaceController extends ChangeNotifier {
           bytes: !cloud && it.path == null ? it.bytes : null,
           output: out,
           segment: it.segOverride,
-          placement: it.placementOverride,
+          placement: _placementOf(it, s),
           skipIsolation: cloud,
+          shape: it.shapeOverride,
+          backdrop: it.backdropOverride,
         ),
       );
     }
@@ -448,7 +759,7 @@ class WorkspaceController extends ChangeNotifier {
     for (final e in byMode.entries) {
       if (batch.cancelRequested) break;
       final first = itemById[e.value.first.id]!;
-      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment));
+      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment, effects: s.effects));
     }
     // icons marked "Sfondo come il pack" keep it through a new processing
     final marked = list.where((i) => i.matchPlate).toList();
@@ -460,9 +771,11 @@ class WorkspaceController extends ChangeNotifier {
   /// style. Remembered per icon, so a new processing keeps it. Null when
   /// there is nothing processed to work on.
   Future<PlateMatch?> matchPlateOf(List<WorkItem> its) async {
-    for (final it in its) {
-      it.matchPlate = true;
-    }
+    _edit('plate', its, () {
+      for (final it in its) {
+        it.matchPlate = true;
+      }
+    });
     return _applyPlateMatch(its);
   }
 
@@ -515,11 +828,9 @@ class WorkspaceController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<WorkItem> get visibleItems {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return items;
-    return items.where((i) => i.name.toLowerCase().contains(q) || (i.label?.toLowerCase().contains(q) ?? false) || (i.path?.toLowerCase().contains(q) ?? false)).toList();
-  }
+  /// What the grid shows: search, filter and sort (display only; processing
+  /// always works on [active]).
+  List<WorkItem> get visibleItems => studioArrange(items, query: query, sort: sort, filter: filter);
 
   int get processedCount => items.where((i) => !i.excluded && i.outputPath != null).length;
 
@@ -527,6 +838,7 @@ class WorkspaceController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _dupScan++;
     gridScroll.dispose();
     AppState.I.removeListener(_onSettings);
     batch.removeListener(_onBatch);

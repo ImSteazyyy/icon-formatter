@@ -1,13 +1,18 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/services.dart';
 
 import '../screens/bases_screen.dart';
+import '../screens/settings_extras.dart';
+import '../screens/settings_whats_new.dart';
 import '../screens/installed_apps_screen.dart';
 import '../screens/pack_builder_screen.dart';
 import '../services/platform_service.dart';
+import '../services/update_check.dart';
 import '../screens/pack_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/studio_screen.dart';
@@ -165,12 +170,29 @@ class _ShellState extends State<Shell> {
   late final List<_Dest> dests = _dests;
   late final List<Widget> pages;
 
+  /// True while the Studio tab is shown (its folder watch runs only then).
+  final studioShown = ValueNotifier<bool>(true);
+  Timer? _updateTimer;
+  static bool _updateScheduled = false;
+
   /// Android: sections side by side, reachable with a horizontal swipe.
   final _pager = PageController();
 
   @override
   void initState() {
     super.initState();
+    // after the first frame: "Novità" after an update, one message if the automatic backup fails
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) checkWhatsNew(context, appVersion);
+    });
+    AppState.I.autoBackupFailed.addListener(_onAutoBackupFailed);
+    // one check per start, a few seconds after the first frame; off = no timer
+    if (!_updateScheduled && AppState.I.checkUpdates) {
+      _updateScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateTimer = Timer(const Duration(seconds: 3), _checkUpdate);
+      });
+    }
     if (Platform.isAndroid) {
       // opened from the "icon pack da aggiornare" notification
       PlatformService.takeLaunchAction().then((a) {
@@ -185,6 +207,8 @@ class _ShellState extends State<Shell> {
             onOpenBases: _openBases,
             onOpenPack: () => _go('builder'),
             onOpenApps: Platform.isAndroid ? () => _go('apps') : null,
+            onShow: () => _go('studio'),
+            tabShown: studioShown,
           ),
           'pack' => PackScreen(onOpenBases: _openBases),
           'builder' => const PackBuilderScreen(),
@@ -197,9 +221,35 @@ class _ShellState extends State<Shell> {
 
   @override
   void dispose() {
+    AppState.I.autoBackupFailed.removeListener(_onAutoBackupFailed);
+    _updateTimer?.cancel();
+    studioShown.dispose();
     _pager.dispose();
     super.dispose();
   }
+
+  /// Looks for a newer release; the Settings card shows it. Never throws.
+  Future<void> _checkUpdate() async {
+    if (!AppState.I.checkUpdates) return;
+    final info = await checkForUpdate(currentVersion: appVersion);
+    if (info != null) AppState.I.newRelease.value = info;
+  }
+
+  void _onAutoBackupFailed() {
+    if (AppState.I.autoBackupFailed.value && mounted) showMsg(context, S.extra2BkAutoFallito, error: true);
+  }
+
+  static const _digitKeys = [LogicalKeyboardKey.digit1, LogicalKeyboardKey.digit2, LogicalKeyboardKey.digit3, LogicalKeyboardKey.digit4];
+
+  /// Desktop shortcuts: Ctrl+1..4 sections, Ctrl+, settings, Ctrl+Shift+T light / dark.
+  late final Map<ShortcutActivator, VoidCallback> _shortcuts = {
+    for (var i = 0; i < 4; i++)
+      SingleActivator(_digitKeys[i], control: true): () {
+        if (i < dests.length) _select(i);
+      },
+    const SingleActivator(LogicalKeyboardKey.comma, control: true): () => _go('settings'),
+    const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true): toggleLightDark,
+  };
 
   void _go(String id) => _select(dests.indexWhere((d) => d.id == id));
 
@@ -212,6 +262,7 @@ class _ShellState extends State<Shell> {
       index = i;
       _navFolded = _barsDown = _wantFold = false;
     });
+    studioShown.value = dests[i].id == 'studio';
     if (!_pager.hasClients) return;
     if ((i - from).abs() == 1 && AppState.I.appearance.animations) {
       _pager.animateToPage(
@@ -238,6 +289,7 @@ class _ShellState extends State<Shell> {
           index = i;
           _navFolded = _barsDown = _wantFold = false;
         });
+        studioShown.value = dests[i].id == 'studio';
       }
     },
     children: [for (final p in pages) _KeepAlive(child: p)],
@@ -341,8 +393,14 @@ class _ShellState extends State<Shell> {
         ),
       );
     }
-    // Windows / desktop: sidebar
-    return Scaffold(
+    // Windows / desktop: sidebar. The shortcuts need a focus scope below them: a
+    // text field that loses focus hands it to its nearest scope, and a scope above
+    // this one would silence the shortcuts.
+    return CallbackShortcuts(
+      bindings: _shortcuts,
+      child: FocusScope(
+        autofocus: true,
+        child: Scaffold(
       body: Backdrop(
         child: Column(
           children: [
@@ -371,7 +429,7 @@ class _ShellState extends State<Shell> {
                             child: _SideItem(
                               d: dests[i],
                               selected: i == index,
-                              onTap: () => setState(() => index = i),
+                              onTap: () => _select(i),
                             ),
                           ),
                         const Spacer(),
@@ -424,6 +482,8 @@ class _ShellState extends State<Shell> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

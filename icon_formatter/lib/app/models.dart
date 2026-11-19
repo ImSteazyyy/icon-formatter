@@ -95,6 +95,7 @@ PlacementSettings copyPlacement(
   double? scaleMul,
   double? offsetX,
   double? offsetY,
+  bool? opticalCentre,
 }) =>
     PlacementSettings(
       glyphRatio: glyphRatio ?? p.glyphRatio,
@@ -105,6 +106,7 @@ PlacementSettings copyPlacement(
       scaleMul: scaleMul ?? p.scaleMul,
       offsetX: offsetX ?? p.offsetX,
       offsetY: offsetY ?? p.offsetY,
+      opticalCentre: opticalCentre ?? p.opticalCentre,
     );
 
 Map<String, dynamic> segmentToJson(SegmentSettings s) => {
@@ -238,13 +240,48 @@ class BaseIcon {
 /// Look of the whole app: "Stile Nothing" (default) or "Vetro".
 enum UiStyle { nothing, glass }
 
+/// Theme: follow the phone, or fixed light / dark.
+enum ThemeChoice { system, light, dark }
+
+/// Light mode for a choice; `system` follows the platform brightness.
+bool effectiveLight(ThemeChoice c, ui.Brightness platform) => switch (c) {
+      ThemeChoice.light => true,
+      ThemeChoice.dark => false,
+      ThemeChoice.system => platform == ui.Brightness.light,
+    };
+
+/// Choice from a saved state: the new field, else the old `light` bool
+/// (true = light, false = dark); a fresh state follows the phone.
+ThemeChoice themeChoiceFrom(Map<String, dynamic> j) {
+  final saved = ThemeChoice.values.where((v) => v.name == j['themeChoice']);
+  if (saved.isNotEmpty) return saved.first;
+  if (j['light'] is bool) return (j['light'] as bool) ? ThemeChoice.light : ThemeChoice.dark;
+  return ThemeChoice.system;
+}
+
+/// Backup reminder: after this many changes since the last backup.
+const kBackupReminderChanges = 40;
+
+/// Whether the backup banner shows: enough changes, no backup or an old one, not snoozed.
+bool backupReminderDue({required int changes, required int lastBackupMs, required int snoozeUntilMs, required int nowMs}) {
+  if (changes < kBackupReminderChanges || nowMs < snoozeUntilMs) return false;
+  return lastBackupMs == 0 || nowMs - lastBackupMs > const Duration(days: 30).inMilliseconds;
+}
+
 class Appearance {
   double radius = 18;
 
   UiStyle style = UiStyle.nothing;
 
-  /// Light mode (both styles).
+  /// Theme choice; [light] is the resolved value the whole app reads.
+  ThemeChoice themeChoice = ThemeChoice.system;
   bool light = false;
+
+  /// Power saving: glass fast and no animations. The values replaced are kept
+  /// here and put back when it goes off.
+  bool powerSaving = false;
+  String? savedGlassQuality;
+  bool savedAnimations = true;
 
   /// App language code ('' = the phone's language, English when not available).
   String language = '';
@@ -273,8 +310,12 @@ class Appearance {
         'animations': animations,
         'compact': compact,
         'style': style.name,
+        'themeChoice': themeChoice.name,
         'light': light,
         'language': language,
+        'powerSaving': powerSaving,
+        'savedGlassQuality': savedGlassQuality,
+        'savedAnimations': savedAnimations,
       };
 
   void load(Map<String, dynamic> j) {
@@ -284,7 +325,19 @@ class Appearance {
     compact = j['compact'] as bool? ?? compact;
     style = UiStyle.values.firstWhere((v) => v.name == j['style'], orElse: () => style);
     language = j['language'] as String? ?? language;
-    light = j['light'] as bool? ?? light;
+    themeChoice = themeChoiceFrom(j);
+    powerSaving = j['powerSaving'] as bool? ?? powerSaving;
+    savedGlassQuality = j['savedGlassQuality'] as String? ?? savedGlassQuality;
+    savedAnimations = j['savedAnimations'] as bool? ?? savedAnimations;
+    syncLight();
+  }
+
+  /// Resolves [light] from the choice and the phone's brightness; true if it changed.
+  bool syncLight() {
+    final v = effectiveLight(themeChoice, ui.PlatformDispatcher.instance.platformBrightness);
+    final changed = v != light;
+    light = v;
+    return changed;
   }
 }
 
@@ -298,7 +351,16 @@ class ExportSettings {
   bool zip = false;
   String? destination;
 
+  /// Own name and colour for the pack (launcher picker and pack viewer).
+  String packName = '';
+  int? packAccent;
+
+  String packNameOr(String fallback) => packName.trim().isNotEmpty ? packName.trim() : fallback;
+  int packAccentOr(int fallback) => packAccent ?? fallback;
+
   Map<String, dynamic> toJson() => {
+        'packName': packName,
+        'packAccent': packAccent,
         'customSize': customSize,
         'size': size,
         'naming': naming.name,
@@ -314,6 +376,8 @@ class ExportSettings {
     prefix = j['prefix'] as String? ?? prefix;
     zip = j['zip'] as bool? ?? zip;
     destination = j['destination'] as String?;
+    packName = j['packName'] as String? ?? '';
+    packAccent = (j['packAccent'] as num?)?.toInt();
   }
 
   /// Output file name for a source name (without extension handling).
@@ -522,6 +586,59 @@ class LucentConfig {
       };
 
   void reset() => load(LucentConfig().toJson());
+}
+
+/// Global colour and look options, applied to the whole batch and the preview.
+/// Neutral values give null effects, so the engine skips the pass.
+class LookConfig {
+  double brightness = 0;
+  double saturation = 0;
+  double hue = 0;
+  bool recolorOn = false;
+
+  /// Symbol colour (ARGB) used when [recolorOn].
+  int recolor = 0xFFFFFFFF;
+  double plateTint = 0;
+  double sharpen = 0;
+
+  /// Optical centring of the symbol (placement, all icons).
+  bool opticalCentre = false;
+
+  EffectSettings? get effects {
+    if (brightness == 0 && saturation == 0 && hue == 0 && !recolorOn && plateTint == 0 && sharpen == 0) return null;
+    return EffectSettings(brightness: brightness, saturation: saturation, hue: hue, recolor: recolorOn ? recolor : null, plateTint: plateTint, sharpen: sharpen);
+  }
+
+  void resetColor() {
+    brightness = 0;
+    saturation = 0;
+    hue = 0;
+    recolorOn = false;
+    plateTint = 0;
+    sharpen = 0;
+  }
+
+  void load(Map<String, dynamic> j) {
+    brightness = (j['brightness'] as num?)?.toDouble() ?? brightness;
+    saturation = (j['saturation'] as num?)?.toDouble() ?? saturation;
+    hue = (j['hue'] as num?)?.toDouble() ?? hue;
+    recolorOn = j['recolorOn'] as bool? ?? recolorOn;
+    recolor = (j['recolor'] as num?)?.toInt() ?? recolor;
+    plateTint = (j['plateTint'] as num?)?.toDouble() ?? plateTint;
+    sharpen = (j['sharpen'] as num?)?.toDouble() ?? sharpen;
+    opticalCentre = j['opticalCentre'] as bool? ?? opticalCentre;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'brightness': brightness,
+        'saturation': saturation,
+        'hue': hue,
+        'recolorOn': recolorOn,
+        'recolor': recolor,
+        'plateTint': plateTint,
+        'sharpen': sharpen,
+        'opticalCentre': opticalCentre,
+      };
 }
 
 /// Local AI background removal model catalogue (optional downloads).

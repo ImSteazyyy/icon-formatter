@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- compartir, accesos directos, notificaciones de procesado -->
+<resources>
+    <string name="share_label">Compartir con Icon Formatter</string>
+    <string name="shortcut_check_short">Comprobar ahora</string>
+    <string name="shortcut_check_long">Comprobar apps ahora</string>
+    <string name="shortcut_refresh_short">Actualizar día</string>
+    <string name="shortcut_refresh_long">Actualizar el día del pack</string>
+    <string name="toast_check_none">Sin cambios en las apps</string>
+    <string name="toast_check_some">%d cambios en las apps por revisar</string>
+    <string name="toast_refresh_done">Día actualizado en el pack</string>
+    <string name="toast_refresh_current">El día ya está actualizado</string>
+    <string name="toast_refresh_no_calendar">El pack no tiene calendarios</string>
+    <string name="toast_failed">La operación no se completó</string>
+    <string name="processing_channel">Procesado de iconos</string>
+    <string name="processing_title">Procesando iconos %1$d/%2$d</string>
+</resources>

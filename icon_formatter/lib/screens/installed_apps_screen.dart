@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
+import '../services/app_lists.dart';
 import '../services/export_service.dart';
 import '../services/platform_service.dart';
 import '../src/rust/api/engine.dart';
@@ -74,7 +75,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       error = null;
     });
     try {
-      final list = await PlatformService.listApps(includeSystem: true);
+      // by name: the system lists them in no fixed order (no install time to sort by)
+      final list = [...await PlatformService.listApps(includeSystem: true)]..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
       final pack = await PlatformService.activeIconPack().catchError((_) => null);
       setState(() {
         apps = list;
@@ -184,6 +186,94 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
       items.add(it);
     }
     return items;
+  }
+
+  /// "Liste": saved selections of apps. Loading one replaces the selection.
+  Future<void> _lists() async {
+    await showAppSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          final lists = AppState.I.appLists;
+          void changed() => setS(() {});
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(padding: const EdgeInsets.fromLTRB(22, 0, 22, 8), child: Text(S.pack3ListeTitolo, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text))),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 22),
+                  leading: const Icon(Icons.bookmark_add_outlined),
+                  title: Text(S.pack3ListaSalvaSelezione),
+                  onTap: () async {
+                    if (selected.isEmpty) {
+                      showMsg(context, S.pack3ListaSelezioneVuota);
+                      return;
+                    }
+                    final name = await askText(context, S.pack3ListaSalvaCome);
+                    if (name == null || name.trim().isEmpty) return;
+                    final list = AppState.I.appLists.addList(name: name, packages: {...selected});
+                    AppState.I.update();
+                    if (mounted) showMsg(context, S.pack3ListaSalvata(list.name));
+                    changed();
+                  },
+                ),
+                if (lists.isEmpty) Padding(padding: const EdgeInsets.fromLTRB(22, 8, 22, 16), child: Text(S.pack3ListaVuota, style: TextStyle(color: Palette.text2))),
+                for (final l in lists)
+                  ListTile(
+                    contentPadding: const EdgeInsets.only(left: 22, right: 8),
+                    title: Text(l.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(S.pack3ListaN(l.packages.length), style: TextStyle(fontSize: 12, color: Palette.text3)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: S.pack3ListaCarica,
+                          icon: const Icon(Icons.playlist_add_check_rounded),
+                          onPressed: () {
+                            // only the apps still installed are selected
+                            final known = {for (final a in apps) a.key};
+                            setState(() {
+                              selected
+                                ..clear()
+                                ..addAll(l.packages.where(known.contains));
+                            });
+                            Navigator.pop(ctx);
+                            showMsg(context, S.pack3ListaCaricata(l.name));
+                          },
+                        ),
+                        IconButton(
+                          tooltip: S.pack3ListaRinomina,
+                          icon: const Icon(Icons.drive_file_rename_outline),
+                          onPressed: () async {
+                            final name = await askText(context, S.pack3ListaRinominaTitolo, initial: l.name);
+                            if (name == null) return;
+                            AppState.I.update(() => AppState.I.appLists.renameList(l.id, name));
+                            changed();
+                          },
+                        ),
+                        IconButton(
+                          tooltip: S.elimina,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          onPressed: () async {
+                            final ok = await confirm(context, S.pack3ListaEliminaConferma(l.name), S.pack3ListaEliminaCorpo, ok: S.elimina);
+                            if (!ok) return;
+                            AppState.I.update(() => AppState.I.appLists.deleteList(l.id));
+                            changed();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _process() async {
@@ -554,6 +644,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                     ),
                     more: [
                       MoreAction(Icons.refresh_rounded, S.ricarica, S.ricaricaSub, loading ? null : _load),
+                      MoreAction(Icons.list_alt_rounded, S.pack3Liste, S.pack3ListeSub, _lists),
                       MoreAction(Icons.folder_zip_outlined, S.iconPackZipAppfilterXml, S.esportaZipSub, () => _exportPack(kind: 'zip')),
                       MoreAction(Icons.drive_folder_upload_outlined, S.iconPackCartella, S.esportaCartellaSub, () => _exportPack(kind: 'folder')),
                       MoreAction(Icons.image_outlined, S.soloPngIndividuali, S.esportaCartellaSub, () => _exportPack(kind: 'png')),

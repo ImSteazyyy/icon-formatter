@@ -119,11 +119,40 @@ class PlatformService {
   static Future<Map<String, dynamic>> calendarDailySet(bool on) async =>
       ((await _ch.invokeMethod<Map>('calendarDailySet', {'enabled': on})) ?? {}).cast<String, dynamic>();
 
+  /// Hour (0..23) of the daily calendar refresh; -1 runs it at the first check.
+  static Future<Map<String, dynamic>> calendarHourSet(int hour) async =>
+      ((await _ch.invokeMethod<Map>('calendarHourSet', {'hour': hour})) ?? {}).cast<String, dynamic>();
+
+  /// Hours between two checks (6, 12, 24) and "only while charging".
+  static Future<Map<String, dynamic>> autoSyncScheduleSet(int hours, bool charging) async =>
+      ((await _ch.invokeMethod<Map>('autoSyncScheduleSet', {'hours': hours, 'charging': charging})) ?? {}).cast<String, dynamic>();
+
   /// Puts today's day into the installed pack now (Shizuku): {state, changed, day, message}.
   static Future<Map<String, dynamic>> calendarRefreshNow() async =>
       ((await _ch.invokeMethod<Map>('calendarRefreshNow')) ?? {}).cast<String, dynamic>();
 
   static Future<void> autoSyncClear([List<String>? components]) => _ch.invokeMethod('autoSyncClear', {'components': components});
+
+  /// Packages left out of the change check (replaces the whole list). Returns the status.
+  static Future<Map<String, dynamic>> autoSyncIgnoredSet(List<String> packages) async =>
+      ((await _ch.invokeMethod<Map>('autoSyncIgnoredSet', {'packages': packages})) ?? {}).cast<String, dynamic>();
+
+  // --- background notification while a batch runs (ProcessingService.kt) ---
+  /// Starts the "Elaborazione icone 0/total" notification. False when Android refuses or on other platforms.
+  static Future<bool> processingStart(int total) => _ok('processingStart', {'total': total});
+  static Future<bool> processingProgress(int done, int total) => _ok('processingProgress', {'done': done, 'total': total});
+  /// Idempotent: safe to call when nothing runs.
+  static Future<bool> processingStop() => _ok('processingStop');
+
+  static Future<bool> _ok(String method, [Map<String, Object?>? args]) async {
+    if (!isAndroid) return false;
+    try {
+      await _ch.invokeMethod<Object?>(method, args);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// "builder" when the app was opened from the change notification.
   static Future<String?> takeLaunchAction() => _ch.invokeMethod<String>('takeLaunchAction');
@@ -149,6 +178,14 @@ class PlatformService {
               'style': AppState.I.appearance.style.name,
               'sub': S.packViewerSub('%1\$d', '%2\$d'),
               'search': S.packViewerSearch,
+              'copy': S.packViewerCopy,
+              'open': S.packViewerOpen,
+              'copied': S.packViewerCopied,
+              'filter_all': S.packViewerFilterAll,
+              'filter_installed': S.packViewerFilterInstalled,
+              'filter_missing': S.packViewerFilterMissing,
+              'sort_name': S.packViewerSortName,
+              'sort_installed': S.packViewerSortInstalled,
             },
           }) ??
           {});

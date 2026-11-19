@@ -6,7 +6,7 @@
 use crate::frb_generated::StreamSink;
 use anyhow::{anyhow, Result};
 use icon_core::{
-    ai, matching, batch, calibrate, compose, iconpack, imageops, lucent, pack, platealpha, segment, squircle, translucent,
+    ai, batch, calibrate, compose, effects, iconpack, imageops, lucent, matching, pack, platealpha, segment, squircle, translucent,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,6 +40,31 @@ pub struct PlacementSettings {
     pub scale_mul: f32,
     pub offset_x: f32,
     pub offset_y: f32,
+    /// Centre the symbol's alpha centroid instead of its box (default off).
+    pub optical_centre: Option<bool>,
+}
+
+/// Global look options, applied to every icon (see icon_core effects.rs).
+/// Neutral values: brightness, saturation, hue, plate_tint, sharpen 0, recolor null.
+#[derive(Clone, Debug)]
+pub struct EffectSettings {
+    /// -1..1
+    pub brightness: f32,
+    /// -1..1 (-1 greyscale)
+    pub saturation: f32,
+    /// Hue rotation in degrees.
+    pub hue: f32,
+    /// Monochrome symbol colour (ARGB). None keeps the colours.
+    pub recolor: Option<u32>,
+    /// 0..1: plate colour pulled towards the symbol's mean colour (Lucent).
+    pub plate_tint: f32,
+    /// 0..1: unsharp strength for symbols scaled up more than 2x.
+    pub sharpen: f32,
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn default_effect_settings() -> EffectSettings {
+    EffectSettings { brightness: 0.0, saturation: 0.0, hue: 0.0, recolor: None, plate_tint: 0.0, sharpen: 0.0 }
 }
 
 #[derive(Clone, Debug)]
@@ -137,6 +162,35 @@ impl From<&LucentSettings> for lucent::LucentParams {
                 LucentStrategy::CleanEdge => lucent::GlyphStrategy::CleanEdge,
                 LucentStrategy::Tile => lucent::GlyphStrategy::Tile,
             },
+            optical_centre: false,
+        }
+    }
+}
+
+fn plate_shape(s: LucentShape) -> lucent::PlateShape {
+    match s {
+        LucentShape::Original => lucent::PlateShape::Original,
+        LucentShape::Circle => lucent::PlateShape::Circle,
+        LucentShape::Squircle => lucent::PlateShape::Squircle(squircle::Shape::default()),
+    }
+}
+
+/// ARGB to RGBA bytes.
+fn argb_bytes(v: u32) -> [u8; 4] {
+    [((v >> 16) & 255) as u8, ((v >> 8) & 255) as u8, (v & 255) as u8, (v >> 24) as u8]
+}
+
+fn effects_of(e: &Option<EffectSettings>) -> effects::Effects {
+    match e {
+        None => effects::Effects::default(),
+        Some(e) => {
+            let c = argb_bytes(e.recolor.unwrap_or(0));
+            effects::Effects {
+                adjust: effects::Adjust { brightness: e.brightness, saturation: e.saturation, hue: e.hue },
+                recolor: e.recolor.map(|_| [c[0], c[1], c[2]]),
+                plate_tint: e.plate_tint,
+                sharpen: e.sharpen,
+            }
         }
     }
 }
@@ -173,6 +227,8 @@ pub struct ProcessSettings {
     pub segment: SegmentSettings,
     /// When set, the glyph is isolated by the local AI model.
     pub ai: Option<AiSettings>,
+    /// Global look options (brightness, recolour, ...); None = off.
+    pub effects: Option<EffectSettings>,
 }
 
 fn ai_kind(k: AiModelKind) -> ai::ModelKind {
@@ -228,6 +284,7 @@ impl From<&PlacementSettings> for compose::Placement {
             scale_mul: p.scale_mul,
             offset_x: p.offset_x,
             offset_y: p.offset_y,
+            optical_centre: p.optical_centre.unwrap_or(false),
         }
     }
 }
@@ -242,6 +299,7 @@ fn placement_dto(p: &compose::Placement) -> PlacementSettings {
         scale_mul: p.scale_mul,
         offset_x: p.offset_x,
         offset_y: p.offset_y,
+        optical_centre: Some(p.optical_centre),
     }
 }
 
@@ -370,21 +428,23 @@ pub struct PreviewResult {
 fn preview_image(img: &image::RgbaImage, s: &ProcessSettings) -> Result<PreviewResult> {
     let size = check_size(s.size)?;
     let placement: compose::Placement = (&s.placement).into();
-    let (out, res) = if let Some(lp) = lucent_of(&s.background) {
-        // same function the batch uses: preview == export
-        let res = isolate_with(img, s)?;
-        let mut o = lucent::render(img, &res.glyph, res.bbox, size, &lucent::with_placement(&lp, &placement));
-        imageops::clean_transparent(&mut o.image);
-        let mut res = res;
-        res.notes.extend(o.notes);
-        (o.image, res)
-    } else {
-        let mut bg = background_image(&s.background, size)?;
-        let res = isolate_with(img, s)?;
-        compose::place_on_plate(&mut bg, img, &res, &placement);
-        imageops::clean_transparent(&mut bg);
-        (bg, res)
+    let lucent = lucent_of(&s.background);
+    // the batch's own canvas code: preview == export
+    let background = Arc::new(if lucent.is_some() { image::RgbaImage::new(0, 0) } else { background_image(&s.background, size)? });
+    let cfg = batch::BatchConfig {
+        size,
+        background,
+        placement: placement.clone(),
+        segment: segment::SegmentOptions::default(),
+        threads: 1,
+        lucent,
+        ai: None,
+        effects: effects_of(&s.effects),
     };
+    let mut res = isolate_with(img, s)?;
+    let (mut out, notes) = batch::compose_canvas(img, &mut res, &cfg, &placement, None, None);
+    imageops::clean_transparent(&mut out);
+    res.notes.extend(notes);
     Ok(PreviewResult {
         png: imageops::encode_png(&out)?,
         glyph_png: imageops::encode_png(&res.glyph)?,
@@ -562,6 +622,10 @@ pub struct BatchItem {
     pub segment: Option<SegmentSettings>,
     pub placement: Option<PlacementSettings>,
     pub skip_isolation: bool,
+    /// Per-icon plate shape (Lucent only); None = the global shape.
+    pub shape: Option<LucentShape>,
+    /// Per-icon plate colour, ARGB (Lucent only); None = the global colour.
+    pub backdrop: Option<u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -628,6 +692,8 @@ pub fn run_batch(
             segment: it.segment.as_ref().map(Into::into),
             placement: it.placement.as_ref().map(Into::into),
             skip_isolation: it.skip_isolation,
+            shape: it.shape.map(plate_shape),
+            backdrop: it.backdrop.map(argb_bytes),
         });
     }
     let cfg = batch::BatchConfig {
@@ -638,6 +704,7 @@ pub fn run_batch(
         threads: threads as usize,
         lucent: lucent_of(&settings.background),
         ai: ai_of(&settings.ai)?,
+        effects: effects_of(&settings.effects),
     };
     let flag = cancel.handle();
     let sink = std::sync::Mutex::new(sink);

@@ -25,7 +25,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Share target for images (singleTop: a share while open arrives in onNewIntent) -->
+            <intent-filter android:label="@string/share_label">
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+        <!-- Ongoing notification while a batch runs (dataSync foreground service) -->
+        <service
+            android:name=".ProcessingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <!-- Light change detection for the icon pack (JobScheduler, no foreground service) -->
         <service
             android:name=".AutoSyncJob"
@@ -85,4 +100,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- fallback install of the generated pack when Shizuku is not available (user confirms) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- batch notification (ProcessingService) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 </manifest>

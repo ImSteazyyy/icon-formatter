@@ -12,7 +12,7 @@ Icon Formatter trasforma le icone delle app in uno stile uniforme e crea icon pa
 
 ## Requisiti
 
-- **Android 8 o successivo.** Per installare e applicare il pack senza PC serve [Shizuku](https://shizuku.rikka.app/) attivo (Debug wireless). Senza Shizuku il pack si installa con la conferma di sistema e si sceglie a mano dalle impostazioni del launcher.
+- **Consigliato: Nothing OS 5.0 (Android 16)**, per cui sono pensati lo stile Lucent e l'applicazione automatica. Minimo: Android 7.0. Per installare e applicare il pack senza PC serve [Shizuku](https://shizuku.rikka.app/) attivo (Debug wireless). Senza Shizuku il pack si installa con la conferma di sistema e si sceglie a mano dalle impostazioni del launcher.
 - **Windows 10 o 11 a 64 bit.** Per creare l'APK del pack da Windows servono Android SDK e JDK.
 
 ## Aspetto

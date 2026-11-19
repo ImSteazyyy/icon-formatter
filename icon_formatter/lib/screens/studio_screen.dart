@@ -1,16 +1,21 @@
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../services/export_service.dart';
+import '../services/folder_watch.dart';
 import '../services/import_service.dart';
+import '../services/platform_service.dart';
+import '../services/share_intake.dart';
 import '../widgets/common.dart';
 import '../widgets/glass_menu.dart';
 import '../widgets/liquid_glass.dart' show nothingStyle, NothingColors;
 import 'pack_builder_screen.dart';
+import '../workspace/studio_clipboard.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
 import '../l10n/strings.dart';
@@ -18,7 +23,7 @@ import '../src/rust/api/engine.dart' show PackImage;
 
 /// Original Composition / Translucent / Custom Presets.
 class StudioScreen extends StatefulWidget {
-  const StudioScreen({super.key, required this.onOpenBases, this.onOpenPack, this.onOpenApps});
+  const StudioScreen({super.key, required this.onOpenBases, this.onOpenPack, this.onOpenApps, this.onShow, this.tabShown});
 
   final VoidCallback onOpenBases;
 
@@ -28,19 +33,83 @@ class StudioScreen extends StatefulWidget {
   /// Switches to the Pack tab (after "Manda al Pack").
   final VoidCallback? onOpenPack;
 
+  /// Shows this tab (images shared to the app while another tab is open).
+  final VoidCallback? onShow;
+
+  /// True while this tab is shown; the folder watch runs only then.
+  final ValueListenable<bool>? tabShown;
+
   @override
   State<StudioScreen> createState() => _StudioScreenState();
 }
 
-class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClientMixin {
+class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final c = WorkspaceController(tag: 'studio', mode: StudioMode.translucent);
   bool dragging = false;
+  FolderWatch? _watch;
+  String? _watchedDir;
+  bool _tabShown = true;
+  bool _appActive = true;
 
   @override
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _tabShown = widget.tabShown?.value ?? true;
+    widget.tabShown?.addListener(_onTabShown);
+    AppState.I.addListener(_syncWatch);
+    _syncWatch();
+    // after the first frame: images shared to the app before it was opened
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takeShared());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // inactive (window unfocused, e.g. files saved in Explorer) keeps the watch
+    _appActive = state == AppLifecycleState.resumed || state == AppLifecycleState.inactive;
+    _syncWatch();
+    if (state == AppLifecycleState.resumed) _takeShared();
+  }
+
+  void _onTabShown() {
+    _tabShown = widget.tabShown?.value ?? true;
+    _syncWatch();
+  }
+
+  /// Runs the folder watch only while this tab is shown and the app is active.
+  void _syncWatch() {
+    final dir = AppState.I.watchDir;
+    if (dir == null || !_tabShown || !_appActive) {
+      _watch?.stop();
+      _watchedDir = null;
+      return;
+    }
+    if (_watchedDir == dir && (_watch?.isRunning ?? false)) return;
+    _watchedDir = dir;
+    (_watch ??= FolderWatch()).start(dir, _onWatched);
+  }
+
+  void _onWatched(List<String> paths) {
+    if (mounted) _import(() => ImportService.expand(paths));
+  }
+
+  /// Images sent to the app from the share sheet: shown here and imported.
+  Future<void> _takeShared() async {
+    final paths = await takeSharedImages();
+    if (paths.isEmpty || !mounted) return;
+    widget.onShow?.call();
+    await _import(() => ImportService.expand(paths));
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.tabShown?.removeListener(_onTabShown);
+    AppState.I.removeListener(_syncWatch);
+    _watch?.stop();
     c.dispose();
     super.dispose();
   }
@@ -120,6 +189,31 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     if (!c.batch.cancelled && AppState.I.autoSendToPack) await _sendToPack(auto: true);
   }
 
+  /// "Incolla dagli appunti": image files or a copied bitmap on the clipboard.
+  Future<void> _paste() async {
+    final paths = await clipboardImagePaths();
+    if (!mounted) return;
+    if (paths.isEmpty) {
+      showMsg(context, S.studioAppuntiVuoti, error: true);
+      return;
+    }
+    await _import(() => ImportService.expand(paths));
+  }
+
+  /// Undo, redo and duplicates, as toolbar buttons (desktop; enabled state
+  /// read on each rebuild). The phone has them in "Altro".
+  List<Widget> _studioTools() => [
+        ToolButton(key: const ValueKey('studio-undo'), icon: Icons.undo_rounded, label: S.studioAnnullaModifica, onTap: c.canUndo ? () => c.undo() : null),
+        ToolButton(key: const ValueKey('studio-redo'), icon: Icons.redo_rounded, label: S.studioRipristinaModifica, onTap: c.canRedo ? () => c.redo() : null),
+        if (c.duplicateCount > 0)
+          ToolButton(key: const ValueKey('studio-dup'), icon: Icons.content_copy_outlined, label: S.studioEscludiDuplicati, onTap: () => _excludeDuplicates()),
+      ];
+
+  void _excludeDuplicates() {
+    final n = c.excludeDuplicates();
+    if (mounted) showMsg(context, S.studioDuplicatiEsclusi(n));
+  }
+
   /// The one import menu (centre button and "+"): files, folder, ZIP/APK
   /// and, on Android, the phone's apps. Glass pop-up.
   Future<void> _importMenu(Rect anchor) async {
@@ -127,6 +221,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       GlassMenuItem(value: 'file', label: S.importaImmagini, subtitle: S.importaImmaginiSub, icon: Icons.image_outlined),
       GlassMenuItem(value: 'folder', label: S.importaCartella, subtitle: S.importaCartellaSub, icon: Icons.folder_open_outlined),
       GlassMenuItem(value: 'ready', label: S.importaPronti, subtitle: S.importaProntiSub, icon: Icons.crop_free_rounded),
+      GlassMenuItem(value: 'paste', label: S.studioIncollaAppunti, subtitle: S.studioIncollaAppuntiSub, icon: Icons.content_paste_rounded),
       GlassMenuItem(value: 'calendar', label: S.calendarioDaPack, subtitle: S.calendarioDaPackSub, icon: Icons.calendar_month_outlined),
       if (Platform.isAndroid && widget.onOpenApps != null)
         GlassMenuItem(value: 'apps', label: S.usaAppDelTelefono, subtitle: S.usaAppDelTelefonoSub, icon: Icons.apps_rounded),
@@ -138,13 +233,25 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         await _import(ImportService.pickFolderImages);
       case 'ready':
         await _import(ImportService.pickFiles, placeOnly: true);
+      case 'paste':
+        await _paste();
       case 'calendar':
         try {
-          final days = await ImportService.pickCalendarPack();
+          var days = await ImportService.pickCalendarPack();
           if (!mounted) return;
           if (days.isEmpty) {
             showMsg(context, S.calendarioNessuno, error: true);
             return;
+          }
+          // only the calendar apps installed on this phone, not every launcher's
+          if (Platform.isAndroid) {
+            final have = {for (final a in await PlatformService.listApps()) a.package};
+            days = [for (final d in days) if (have.contains(d.package)) d];
+            if (!mounted) return;
+            if (days.isEmpty) {
+              showMsg(context, S.calendarioNonInstallati, error: true);
+              return;
+            }
           }
           c.addCalendar(days);
           final apps = days.map((d) => d.package).toSet().length;
@@ -242,7 +349,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         c: c,
         title: S.studio,
         // nothing to act on yet: only the empty-state action is shown
-        toolbar: c.items.isEmpty ? const [] : toolbar,
+        toolbar: c.items.isEmpty ? const [] : [...toolbar, ..._studioTools()],
         bottomActions: c.items.isEmpty ? const [] : buildActions(),
         // phones: "+" next to Personalizza, one start button, the rest in "Altro"
         onAdd: _importMenu,
@@ -272,6 +379,10 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                 ),
               ),
         moreActions: [
+          MoreAction(Icons.undo_rounded, S.studioAnnullaModifica, S.studioAnnullaModificaSub, c.canUndo ? () => c.undo() : null),
+          MoreAction(Icons.redo_rounded, S.studioRipristinaModifica, S.studioRipristinaModificaSub, c.canRedo ? () => c.redo() : null),
+          MoreAction(Icons.crop_square_outlined, S.studioGuidaArea, S.studioGuidaAreaSub, c.toggleSafeGuide),
+          if (c.duplicateCount > 0) MoreAction(Icons.content_copy_outlined, S.studioEscludiDuplicati, S.studioEscludiDuplicatiSub(c.duplicateCount), _excludeDuplicates),
           if (c.items.any((i) => i.calendarDay != null))
             MoreAction(Icons.opacity_rounded, S.sfondoComePack, S.sfondoComePackSub, () async {
               final r = await c.matchPlateAll();

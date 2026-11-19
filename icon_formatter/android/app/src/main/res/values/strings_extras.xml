@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- share target, launcher shortcuts, toasts and the processing notification -->
+<resources>
+    <string name="share_label">Share with Icon Formatter</string>
+    <string name="shortcut_check_short">Check now</string>
+    <string name="shortcut_check_long">Check apps now</string>
+    <string name="shortcut_refresh_short">Update day</string>
+    <string name="shortcut_refresh_long">Update the pack day</string>
+    <string name="toast_check_none">No app changes</string>
+    <string name="toast_check_some">%d app changes to review</string>
+    <string name="toast_refresh_done">Day updated in the pack</string>
+    <string name="toast_refresh_current">The day is already up to date</string>
+    <string name="toast_refresh_no_calendar">The pack has no calendars</string>
+    <string name="toast_failed">Action failed</string>
+    <string name="processing_channel">Icon processing</string>
+    <string name="processing_title">Processing icons %1$d/%2$d</string>
+</resources>

@@ -11,6 +11,7 @@ pub mod calendar;
 pub mod calibrate;
 pub mod color;
 pub mod compose;
+pub mod effects;
 pub mod error;
 pub mod iconpack;
 pub mod lucent;
