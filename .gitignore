@@ -24,3 +24,6 @@ Thumbs.db
 
 # Grafo locale del codice (graphify)
 graphify-out/
+
+# Archivio locale delle vecchie release (zip con asset e note)
+/archivio-release/

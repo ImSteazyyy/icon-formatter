@@ -1,242 +1,30 @@
 # Novità
 
-## 1.5.0 — 2026-11-06
+## 1.0.0 — 2026-11-19
 
-### Icone
-- **Fotocamera e icone con una grande lente scura:** l'interno nero non diventa più grigio. Lo schiarimento dei grigi resta solo per i dettagli scuri piccoli (strade, tasti, contorni).
-- **Icone già in stile vetro:** il contorno chiaro dell'icona originale viene tolto, e il bordo è quello del nuovo piatto.
+Prima release pubblica.
 
-### Modifica icona (Pack)
-- **"Solo posizione e dimensione"** lascia l'immagine com'è: non scontorna e non schiarisce i colori. Una piastrella intera arriva fino al bordo del piatto.
-- **Pulsante "Personalizza"** con le stesse regolazioni di Studio.
-- **Icone modificate a mano:** quando rigeneri il pack con un altro stile vengono rifatte sul nuovo sfondo, con l'immagine e il trattamento che avevi scelto.
+### Cosa fa
 
-### Interfaccia
-- **Ricerca sempre visibile** mentre scorri, in Studio, Pack e "Le tue app".
-- **Due frecce in basso a destra** per andare subito in cima o in fondo alla lista.
+- **Studio:** importi immagini, cartelle, icon pack o le app del telefono e le porti tutte nello stesso stile (forma, sfondo, dimensione), con regolazioni per ogni icona e la rimozione dello sfondo.
+- **Pack:** abbina le icone nuove alle app installate, controlli ogni abbinamento e crei l'icon pack. Su Android, con Shizuku, lo installa e lo applica direttamente; senza Shizuku lo esporti e lo installi a mano.
+- **Le tue app:** elabori le icone delle app installate e le mandi al pack.
+- **Calendario dinamico:** l'icona del calendario cambia con il giorno.
+- **Aggiornamento automatico:** quando installi un'app nuova, il pack si aggiorna da solo.
 
-## 1.4.0 — 2026-11-06
+## Aspetto
 
-### Icone
-- **Barra bianca in alto su alcune icone:** il riflesso chiaro sul bordo superiore delle icone sorgente veniva preso come parte del simbolo. Ora resta fuori, e il simbolo torna centrato.
-- **Forma "Originale":** le icone a schermo intero non diventano più rotonde. Tengono il contorno della sorgente.
-- **Loghi multicolore:** un segmento giallo chiaro non viene più tolto insieme allo sfondo bianco. La rimozione dello sfondo segue le sfumature di luminosità, non i colori diversi.
-- **Bordi scalettati:** sulle icone senza anti-aliasing il bordo viene ammorbidito di un pixel, solo sulla trasparenza: niente aloni né sbavature.
-- **Opzione "Mantieni il bianco interno"** per la singola icona (Studio e Pack). Le icone calendario e simili tengono la pagina bianca.
-- **La modalità scelta per la singola icona ora vale anche per "Elabora tutte"**; prima la applicava solo l'anteprima.
-- **Modalità "Bordo pieno senza alone"** per la singola icona. Toglie l'alone scuro attorno alle strisce colorate sul bordo; di default le icone restano come prima.
+- **Due stili:** Stile Nothing (predefinito) e Vetro, con il materiale liquid glass regolabile.
+- **Modalità chiara e scura** per entrambi; il cambio si apre a cerchio dal punto toccato.
+- Barra in basso che si piega mentre scorri, con le azioni compatte accanto.
+- Basi Cerchio e Squircle incluse, più quelle che importi tu.
 
-### Calendario dinamico
-- **Studio › Aggiungi › "Calendario da un icon pack":** da un icon pack (APK o ZIP) prende solo le icone calendario (`<calendar>` nell'appfilter, un'icona per giorno del mese). Le scontorna come le altre e le manda al Pack.
-- Il pack generato contiene tutti i giorni e la voce `<calendar>`: il launcher mostra da solo l'icona del giorno. Mese e anno restano quelli disegnati nelle icone del pack.
-- Le icone calendario vengono elaborate in modalità **"Pagina intera"**: la pagina arriva fino al bordo del piatto, con il bianco e i colori originali. La stessa modalità si può scegliere per qualsiasi icona.
+## Lingue
 
-### Pack
-- **Pack disinstallato:** l'app se ne accorge e, se il launcher lo usava ancora, torna alle icone di prima. Mostra i dati rimasti in Android (disinstallazione con "mantieni dati", altri utenti) e li può pulire con Shizuku.
-- **Niente più INSTALL_FAILED_VERSION_DOWNGRADE:** la nuova versione del pack parte sempre sopra quella che Android ricorda. Se l'installazione lo rifiuta comunque, l'app riprova da sola con il numero giusto.
-- **Le icone di Studio hanno la priorità** su quelle già nel Pack, anche dopo "Genera con lo Studio". Le corrispondenze si trovano per componente, package o nome file; una tua modifica manuale successiva resta.
-- **Filtri a icona compatti**, con nome e numero del filtro attivo sotto. La frase "Tieni premuto" è centrata.
-- **Dettaglio e "Scegli icona" non escono più dallo schermo**, anche con la tastiera aperta.
+Italiano, inglese, spagnolo, francese, tedesco e portoghese. La lingua segue quella del telefono e si cambia in Impostazioni › Aspetto.
 
-### Le tue app
-- **Icone del pack in uso nel launcher** (letto dal launcher); per le app che il pack non copre, l'icona originale.
-- **Ricerca e filtri scorrono con la lista**, che sale sotto la barra di stato con una sfumatura.
+## Note
 
-### Studio
-- **Anteprima Prima/Dopo compatta** accanto a nome e dettagli: la lista ha molto più spazio.
-- **Ricerca per nome file.**
-- **Scacchiera più chiara** in modalità scura, per vedere i bordi delle icone trasparenti.
-- **Barra "Elabora tutte / Altro" più bassa.**
-- **I menu in vetro non escono più dallo schermo:** scorrono se sono lunghi.
-
-### Windows
-- Tutte le modifiche sopra valgono anche per Windows. Shizuku, il pack sul telefono e l'icon pack del launcher restano solo su Android.
-- **Niente più finestra bianca con il vetro in "Qualità":** il vetro premium richiede Vulkan o Metal, mentre su Windows il motore grafico usa OpenGL ES. Lì "Qualità" usa il vetro standard e le impostazioni lo spiegano.
-- **Ricerca per nome file** anche nella vista larga di Studio.
-
-## 1.3.1 — 2026-11-05
-
-### Fluidità e batteria (misurate su un telefono reale)
-- **120 Hz.** Il sistema teneva l'app a 90 Hz; ora l'app chiede la modalità più veloce dello schermo mentre è aperta e la rilascia quando esce.
-- **Swipe tra le sezioni: da 22 ms a 8,4 ms per frame (120 fps).** Le ombre del testo erano sfocate, e su Impeller ogni ombra sfocata è un passaggio di sfocatura per riga di testo a ogni frame. Ora sono fatte di copie nitide semitrasparenti: stesso aspetto, costo quasi nullo, e ora ci sono su tutti i testi e le icone, pulsanti compresi.
-- **Vetro statico.** Le superfici in vetro sopra lo sfondo fisso non rifanno più la sfocatura a ogni frame; solo il vetro sopra contenuto che si muove (barra in basso, barra azioni, menu) la fa dal vivo.
-- **Durante l'elaborazione: 120 fps invece di scatti fino a 275 ms.**
-  - I thread Rust ereditavano una priorità più alta di quella del disegno: ora girano in sottofondo, solo sui core efficienti, lasciando i core veloci all'interfaccia.
-  - Il sottotitolo di Studio controllava sul disco tutte le icone a ogni aggiornamento (circa 650 letture al secondo sul thread dell'interfaccia): ora usa un conteggio in memoria, e le miniature non leggono il disco mentre il batch scrive.
-  - La barra di avanzamento è una superficie piena, senza sfocatura.
-
-### Icone
-- **Smart Center** perdeva tutto tranne il pallino rosso: la X veniva presa per una piastrella. Ora una piastrella deve avere i quattro lati pieni.
-- **Icone già nello stile traslucido** non vengono più rimpicciolite in un riquadro dentro il riquadro: sono riportate intere sulla nuova forma, senza schiarire due volte i toni scuri.
-- **Icone rotonde su sfondo chiaro con il disegno fino al bordo**: lo sfondo chiaro e le forme grigie chiare su di esso vengono tolti, e il disegno occupa il piatto.
-
-### Interfaccia
-- Titoli e sottotitoli centrati; i pulsanti dell'intestazione stanno su una riga sotto il titolo, alla stessa larghezza (Studio: "Aggiungi" e "Personalizza").
-- Tutti i pulsanti, i filtri e le ricerche sono alti 48 dp; i pulsanti dentro le schede sono pieni con il colore d'accento, due per riga.
-- Pack e impostazioni di nuovo con schede in vetro; filtri e schede AI con le stesse pillole della sezione App.
-- "Le tue app": righe più compatte; il numero di app selezionate e "Seleziona tutte" stanno nella barra in basso.
-- AI online senza chiave: un'icona di avviso sulla scheda spiega cosa fare, al posto del riquadro.
-- Color picker vero per il colore dell'app e la tinta del vetro, in una finestra in vetro al centro, con anteprima dal vivo.
-- Testi bianchi nelle barre in basso e sui pulsanti disattivati; la tastiera non fa più salire le barre sopra i filtri; la barra azioni di Studio non ha più i bordi tagliati; niente riquadro verde di focus con le tastiere fisiche.
-
-### Repository
-- Le icone di app di terzi usate come riferimento non sono più nella repository (restano solo in locale).
-- Aggiunte attribuzioni di terze parti, avviso sui marchi e la nota "Sviluppato con Claude".
-
-## 1.3.0 — 2026-11-05
-
-### Correzioni
-- **"Rimuovi sempre lo sfondo" cancellava i loghi.** Con sensibilità alta il controllo del piatto scambiava un anello multicolore per un piatto uniforme e toglieva tutto il logo. Ora il piatto è giudicato con una tolleranza stretta, un "piatto" che si porterebbe via quasi tutto viene mantenuto, e le sorgenti già scontornate saltano la rimozione.
-- **Miniature vecchie.** Un'icona rielaborata nello stesso file continuava a mostrare l'immagine precedente. Ora le immagini sono identificate da percorso e data di modifica.
-- **Icone sbagliate da alcune app installate.** Per le icone adattive l'app leggeva il livello in primo piano a 108 dp interi, senza la maschera di sistema, così nell'icona finiva grafica che il launcher non mostra mai: strisce e linguette oltre il bordo, o un pallino rosso fuori dal piatto. Ora il livello è disegnato come lo disegna il launcher (i 72 dp centrali, ritagliati dalla maschera). I disegni che arrivano al bordo della maschera sono trattati come piastrelle piene.
-- **Simbolo su piatto colorato.**
-  - Vengono ricolorati anche i simboli grigio medio, per esempio un robot Android su un disco blu.
-  - Il colore del piatto è calcolato con una mediana, quindi sfumature e riflessi non bloccano più il rilevamento.
-  - Viene riconosciuto anche un disco colorato sopra una piastrella scura.
-  - I simboli bianchi restano bianchi.
-- **Puntini sulle sfumature.** Lo schiarimento dei grigi sul piatto scuro usava una soglia netta sulla saturazione e schiariva un pixel sì e uno no sulle sfumature. Ora sfuma gradualmente.
-- **Controller della sezione Pack**: veniva distrutto insieme alla schermata, anche se è condiviso da tutta l'app.
-
-### Modifiche: un'interfaccia che si spiega da sola
-- **Studio.**
-  - Un solo pulsante "Importa icone" apre un menu pop-up in vetro: immagini, cartella, ZIP/APK, PNG pronti, app del telefono.
-  - Il "+" in alto, accanto a "Personalizza", compare solo quando ci sono già icone.
-  - La barra in basso ha un pulsante di avvio e "Altro" per tutte le altre azioni (manda al Pack, esporta, condividi, svuota), senza scorrimento orizzontale.
-- **Menu pop-up in vetro**, che si aprono dal controllo toccato. Sono usati per l'import, per "Altro", per il menu delle app nel Pack e per la scelta dello stile. Si chiudono toccando fuori o trascinando verso il basso.
-- **Intestazioni uniformi.**
-  - Titolo e sottotitolo stanno in una sola colonna, e i pulsanti non finiscono mai sopra il testo.
-  - Il margine laterale è di 20 dp ovunque, e le barre flottanti sono allineate alla barra di navigazione.
-- **Progresso e completamento** galleggiano sotto il titolo della sezione senza spostare il contenuto e si tolgono con uno swipe laterale (Studio, App, Pack).
-- **App.**
-  - Titolo breve, filtri a tutta larghezza, app di sistema visibili di default.
-  - La scelta dello stile sta dentro "Personalizza"; ricarica ed esportazioni sono in "Altro".
-- **AI.**
-  - Due schede, "Tema AI online" e "AI locale", e il modello locale si scarica con un tocco.
-  - Le impostazioni "Servizio AI" spiegano che per lo scontorno non serve una chiave API.
-  - I metodi di scontorno sono elencati con la spiegazione di ciascuno.
-- **Valori predefiniti del vetro**: quelli scelti sul telefono di prova.
-  - Sfocatura 22,6, smerigliatura 61, saturazione 2,5, tinta 8.
-  - Spessore 0, rifrazione 1,0, aberrazione 12, profondità attiva.
-  - Luce 0, angolo luce 74°, bordo lucido spento.
-- **Scorrimento fluido.** Le celle delle griglie lunghe e le card delle pagine che scorrono sono superfici antracite piene. Un pannello in vetro ricattura e sfoca ciò che ha dietro a ogni movimento, e decine di pannelli rendevano costoso ogni frame. Il vetro resta su barre, pulsanti, pannelli fissi e menu.
-
-### Aggiunte
-- **Avvisi in alto** sullo schermo, che si tolgono con uno swipe laterale. Togliere un avviso non interrompe il lavoro in corso.
-- **Swipe tra le sezioni** su Android. La barra in basso segue, e le sezioni restano in memoria, quindi non vengono ricaricate.
-- **Catalogo completo delle app nel Pack.** Compaiono tutte le app con icona nel launcher: quelle di sistema, Icon Formatter stesso e i suoi pack.
-  - Stati: Abbinata, Da verificare (il nome corrisponde ma il disegno è diverso), Dubbia, Icona mancante, Verificata, Esclusa.
-  - La schermata mostra quante app del launcher rileva Android.
-- **Modifica icona** (tenendo premuta un'app nel Pack).
-  - Si importa un PNG, JPG o WEBP e lo si elabora con la pipeline del pack.
-  - Trattamenti disponibili:
-    - Automatica, Colore del piatto, Bordo pieno, Normale;
-    - "Solo posizione e dimensione": nessuno scontorno, il PNG viene solo ritagliato al contenuto, centrato e dimensionato come le altre icone sullo sfondo del pack;
-    - "così com'è".
-  - Si confronta Prima/Dopo, poi si conferma o si annulla. "Ripristina icona precedente" annulla la modifica.
-  - L'icona resta collegata a package e activity, e il pack installato con Shizuku viene ricostruito.
-- **Apri un pack (Pack › passo 2).**
-  - Apre un pack creato con Icon Formatter: quello installato sul telefono, oppure un APK/ZIP da un altro telefono. Le icone tornano collegate alle loro app e si possono modificare.
-  - "Installa e applica" aggiorna poi quel pack, e la numerazione delle versioni continua (la versione di un APK aperto viene ricordata).
-  - Android non permette di aggiornare un pack firmato su un altro telefono. Dopo una conferma esplicita Icon Formatter lo sostituisce tramite Shizuku e lo riseleziona.
-  - Verificato sull'emulatore: cancellati dati e chiave di firma, pack 1.3 aperto e sostituito, ora 1.4, selezione nel launcher ripristinata.
-- **Condividi APK (Pack › Esporta, Android).** L'APK del pack viene creato e firmato sul telefono e passato al foglio di condivisione, senza installarlo.
-- **Studio › Importa icone › PNG pronti.** I PNG già pronti non vengono scontornati né ricolorati: sono solo ritagliati al contenuto, centrati e dimensionati sullo sfondo delle icone. "Modifica icona" nel Pack ha lo stesso trattamento ("Solo posizione e dimensione").
-- **Persistenza.** Gli elenchi del Pack (icone generate, importate e modificate a mano) restano dopo il riavvio.
-
-### Prestazioni e batteria
-- **Abbinamento.** Le firme visive sono calcolate su una copia a 160 px e messe in cache per file, e le chiavi di testo una volta per icona invece che per coppia. Con 250 + 250 icone su PC l'abbinamento richiede 0,11 s invece di 1,41 s, e 0,02 s quando viene ripetuto.
-- **Catalogo.** Le icone vengono generate una volta su un piccolo pool nativo e salvate su disco; si rigenerano solo per le app aggiornate.
-- **Griglia del Pack.** È caricata solo dove serve (sliver), e le miniature sono decodificate alla dimensione mostrata.
-- **Misure sull'emulatore** (stessa schermata Pack, scorrimento, tempi dei frame da SurfaceFlinger):
-  - 1.2.0: circa 175 ms per frame (≈6 fps) con 5 card;
-  - 1.3.0: mediana di circa 17 ms con 24 card, p90 19 ms, solo il 5% dei frame oltre 20 ms;
-  - schermate ferme: nessun frame disegnato, 0% di CPU.
-- **Android.**
-  - I thread Rust sono limitati a 4 di default (il Dimensity 7350 Pro ha 2 core grandi e 6 piccoli).
-  - Durante i batch l'interfaccia si aggiorna al massimo 4 volte al secondo, quindi ci sono meno ridisegni sotto le barre in vetro sfocate.
-
-## 1.2.0 — 2026-11-05
-
-### Aggiunte
-- **Applicazione del pack sul telefono con Shizuku (senza PC, senza root).** Icon Formatter crea l'APK del pack sul telefono, lo firma, lo installa e lo seleziona in Nothing Launcher.
-  - **Creazione:** l'APK base (`assets/iconpack_base.apk`, 2000 slot drawable vuoti, creato da `tool/make_base_apk.py`) viene riempito con i PNG del pack, più `appfilter.xml` / `drawable.xml` binari, `mapping.json` e `pack.json`. Poi viene firmato con apksig, con una chiave tenuta nell'Android Keystore.
-  - **Installazione e selezione:** `pm install`, poi la sequenza di selezione: il selettore di icon pack di Nothing Launcher si apre dietro l'app, e `nothing_icon_pack` viene impostato a `THEMED_ICONS_NOTHING` e riportato al pack 0,5 s dopo.
-  - **Un'app separata:** il pack ha il suo package (`com.iconformatter.pack.device`), quindi i pack di sistema non vengono toccati. Ogni build lo aggiorna con una versione progressiva (1.0, 1.1, 1.2, …), e "Ripristina pack precedente" rimette la selezione precedente.
-  - **Permessi:** il permesso Shizuku viene chiesto all'avvio, solo se manca.
-  - **Senza Shizuku:** l'installazione passa dall'installer di sistema con conferma, e il pack si sceglie a mano nel launcher.
-- **Studio → Pack:** un pulsante "Manda al Pack" e un passaggio automatico facoltativo dopo "Elabora tutte"; entrambi alimentano il passo 2 del Pack e abbinano subito.
-- **Rigenera con modalità… (per singola icona):**
-  - Automatica.
-  - Colore del piatto: il simbolo prende il colore del piatto originale.
-  - Bordo pieno: da bordo a bordo, come le icone di mappe o tastiere.
-  - Normale.
-- **Ricolorazione automatica:** un simbolo scuro e neutro su un disco o una piastrella colorati (per esempio un cartellino scuro su un disco giallo) prende il colore del piatto, e i buchi nel simbolo diventano trasparenti. I simboli bianchi restano bianchi.
-- **Scheda AI › Modelli locali:**
-  - U²-Net-p, per telefono e Windows (~0,9 s per icona su PC).
-  - ISNet General, solo Windows (~7,5 s per icona, ingresso 1024 px).
-  - Scarica, elimina e scegli il modello, con l'interruttore facoltativo "Usa il modello AI locale". L'algoritmo classico resta quello predefinito.
-- **Nuove icone:** l'icona dell'app e quella dei pack hanno sfondo trasparente, bordi puliti e le stesse proporzioni delle altre icone.
-
-### Modifiche
-- **Nuova interfaccia**, seguendo gli screenshot di riferimento:
-  - Impostazioni: home con titolo grande, card profilo e griglia di categorie a due colonne. Le pagine hanno un pulsante indietro rotondo e un titolo grande, le sezioni sono card scure con separatori sottili, gli slider hanno icona, nome e valore in alto con il controllo sotto, e interruttori e liste di scelta sono moderni.
-  - Pack: passi numerati.
-  - Studio: quando è vuoto mostra una guida in 3 passi.
-  - Ovunque: titoli grandi, pulsanti in vetro nelle intestazioni, finestre, fogli e menu ridisegnati.
-- **Vetro globale (Impostazioni › Vetro):**
-  - I parametri guidano ogni superficie in vetro: barra in basso, pannelli e card, pulsanti e finestre (con lo schermo dietro sfocato).
-  - L'effetto si applica in tempo reale, senza riavvio.
-  - Impostazioni: qualità (Più veloce / Bilanciato / Qualità), sfocatura, smerigliatura, saturazione, colore e intensità della tinta, spessore, curvatura, rifrazione, aberrazione cromatica, profondità (ombra), luce, bordo lucido, leggibilità, lente e dove usarlo.
-  - L'anteprima fissa in alto riproduce la schermata base dello Studio.
-  - La riduzione automatica della qualità del pacchetto è disattivata, così viene rispettata la qualità scelta.
-- **Icone a tutto bordo:** una piastrella piena con margine trasparente (come la restituiscono i launcher) ora viene riconosciuta, quindi le icone a tutto bordo non escono più piccole dentro il piatto.
-- **Prestazioni su Android:** le icone delle griglie sono decodificate alla dimensione mostrata (`cacheWidth`) dentro un `RepaintBoundary`.
-
-### Correzioni
-- **Barre d'azione scorrevoli:** in Studio, AI e App le azioni non vengono più tagliate da una linea dritta e seguono il bordo arrotondato.
-- **Barra di avanzamento:** quando ha finito si chiude con uno swipe verso il basso (o con ×).
-
-## 1.1.1 — 2026-11-05
-
-### Correzioni
-- Lucent: le icone prese dalle app installate (icone adattive rese come piastrella arrotondata piena, per esempio mappe o tastiere) perdevano gran parte del contenuto, perché la segmentazione esterna trattava tutta la piastrella come un logo nudo. Quando la sorgente è essa stessa una piastrella piena, ora il suo sfondo interno viene rimosso direttamente. Il contenuto (strade, tasti, figure) resta intero, arriva al bordo del piatto ed è ritagliato su di esso, sia nell'anteprima sia nell'esportazione.
-
-## 1.1.0 — 2026-11-05
-
-### Aggiunte
-- **Render Lucent**: un nuovo modulo Rust (`lucent.rs`) crea il piatto traslucido smerigliato (`#66000000` scuro / `#66FFFFFF` chiaro) sulla forma dell'icona, con la conversione facoltativa del simbolo a un solo colore e la compensazione per i launcher che disegnano due volte le icone. Componenti di terze parti in THIRD_PARTY_NOTICES.md.
-  - Il glifo mantiene i colori originali.
-  - Il piatto è lo squircle di riferimento; sono disponibili anche il cerchio o la sagoma dell'icona caricata.
-  - Il contenuto è ritagliato sul bordo del piatto.
-  - Anteprima ed esportazione usano la stessa funzione.
-- **"Icona dentro l'icona"**: quando un'icona è essa stessa una piastrella piena con sfondo scuro (icone già a tema), lo sfondo viene rimosso con una crescita per regioni (ombre e sfumature comprese). Gli oggetti restano interi e arrivano al bordo del piatto. I bordi morbidi usano una maschera di luminanza, e grigi scuri o glifi bianchi diventano leggibili sia su piatti scuri sia chiari.
-- **Icon Pack Builder**:
-  - Gli originali possono venire da app installate, cartella, ZIP o APK. Per gli APK è supportato `appfilter.xml` binario e viene tenuta la densità più alta.
-  - Le icone si generano con lo Studio o si importano.
-  - L'abbinamento automatico usa nome dell'app, package, nome del file e somiglianza visiva.
-  - I risultati compaiono in una griglia Prima/Dopo con gli stati Sicura/Dubbia/Mancante/Esclusa/Verificata.
-  - Le associazioni si correggono con la ricerca, si sostituiscono con un file, si escludono, si verificano o si rielaborano. Le correzioni vengono salvate tra una sessione e l'altra.
-  - Esportazione in cartella o ZIP con `appfilter.xml`.
-- **APK dell'icon pack** (Windows, con Android SDK + JDK): "Crea APK" produce un icon pack installabile (riconosciuto dai launcher che supportano gli icon pack). Al suo interno un visualizzatore di icone nello stile dell'app mostra per ogni icona l'app e il package, e se l'app è installata.
-- **Scontorno con AI locale**: modello facoltativo U²-Net-p (4,6 MB, Apache-2.0) eseguito con `tract` (Rust puro, CPU) su Windows e Android.
-  - Il modello si scarica e si carica su richiesta e resta in cache in memoria.
-  - La rimozione viene saltata se lo sfondo è già trasparente.
-  - Un'anteprima della maschera alpha offre soglie regolabili.
-  - I risultati incerti vengono segnalati.
-- **Automazione Android**: controllo leggero con un job JobScheduler persistente (6 ore) e un controllo allo sblocco finché l'app è in memoria.
-  - `getChangedPackages` evita ogni lavoro se nulla è cambiato.
-  - Rileva app installate, disinstallate e aggiornate, e icone cambiate.
-  - Notifica silenziosa, pulsante "Controlla ora" e rielaborazione delle sole app cambiate.
-- **Slider con valore numerico**: si tocca il valore, si scrive, poi Invio o un tocco fuori per confermare, Esc per annullare. Con controllo di minimo/massimo, virgola decimale e aggancio alle divisioni.
-- Testi in italiano centralizzati (`lib/l10n/strings.dart`), con tutte le schermate tradotte.
-- Nuova icona dell'app (`.ico` per Windows, icona adattiva Android con sfondo trasparente, barra del titolo).
-
-### Modifiche
-- Navigazione in basso: lente di selezione grigio scuro con accento rosa-lilla desaturato.
-- I pulsanti di import "ZIP" ora sono "ZIP o APK".
-- Composizione su una base: i glifi che arrivano al bordo (o le piastrelle) vengono mappati sul piatto e ritagliati sulla sua forma.
-- Licenza: AGPL-3.0-only (vedi THIRD_PARTY_NOTICES.md).
-
-### Note e limiti
-- L'aggiornamento silenzioso del pack nel launcher non è disponibile: vedi README › Limiti.
-- I modelli Silueta / IS-Net sono stati provati con `tract`: circa 93 s per icona su CPU, quindi non sono proposti.
+- Al primo avvio un breve setup chiede la lingua, gli aggiornamenti automatici e, facoltativamente, Shizuku.
+- L'AI serve solo per la rimozione dello sfondo; il modello locale si scarica solo se lo chiedi.
+- Licenze dei componenti di terze parti in `THIRD_PARTY_NOTICES.md` e nella pagina Licenze dell'app.
