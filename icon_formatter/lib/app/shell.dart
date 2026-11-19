@@ -119,7 +119,7 @@ class _ShellState extends State<Shell> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(d),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
                 child: ColoredBox(
                   color: NothingColors.navPill,
                   // the tabs only once there is room for them

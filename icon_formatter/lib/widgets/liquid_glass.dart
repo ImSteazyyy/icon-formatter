@@ -31,7 +31,7 @@ class NothingColors {
   static Color get onOn => _light ? Colors.white : Colors.black;
 
   /// Blurred pill of the bottom bar.
-  static Color get navPill => _light ? const Color(0xC8FFFFFF) : const Color(0xB8282828);
+  static Color get navPill => _light ? const Color(0x99FFFFFF) : const Color(0x8C2E2E2E);
 }
 
 /// Space at the bottom covered by floating glass bars (Android phone
@@ -393,7 +393,7 @@ class LiquidGlass extends StatelessWidget {
             return ClipRRect(
               borderRadius: BorderRadius.circular(radius),
               child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
                 child: Container(padding: padding, color: NothingColors.navPill, child: child),
               ),
             );
