@@ -6,7 +6,7 @@
 use crate::frb_generated::StreamSink;
 use anyhow::{anyhow, Result};
 use icon_core::{
-    ai, matching, batch, calibrate, compose, iconpack, imageops, lucent, pack, segment, squircle, translucent,
+    ai, matching, batch, calibrate, compose, iconpack, imageops, lucent, pack, platealpha, segment, squircle, translucent,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -469,6 +469,43 @@ pub fn import_as_png(src: String, dest: String) -> Result<Vec<u32>> {
     let img = imageops::decode_file(Path::new(&src))?;
     imageops::write_png(&img, Path::new(&dest))?;
     Ok(vec![img.width(), img.height()])
+}
+
+/// Result of [`match_plate_alpha`].
+#[derive(Clone, Debug)]
+pub struct PlateMatch {
+    /// Plate alpha (0..1) the targets were brought to.
+    pub reference: f32,
+    /// Targets rewritten.
+    pub changed: u32,
+    /// Targets left as they were (already equal, or a fully opaque plate).
+    pub unchanged: u32,
+}
+
+/// Brings the plate of every `targets` icon (PNG files, rewritten in place) to
+/// the transparency of the pack: the median plate alpha of `references`, or
+/// `fallback` (0..1, ignored when 0) when no reference can be measured.
+pub fn match_plate_alpha(targets: Vec<String>, references: Vec<String>, fallback: f32) -> Result<PlateMatch> {
+    let mut measured: Vec<f32> = references
+        .iter()
+        .filter_map(|r| imageops::decode_file(Path::new(r)).ok())
+        .filter_map(|img| platealpha::plate_alpha(&img))
+        .collect();
+    let reference = platealpha::median(&mut measured).or(if fallback > 0.0 { Some(fallback) } else { None }).ok_or_else(|| anyhow!("no reference icon to measure"))?;
+    let (mut changed, mut unchanged) = (0u32, 0u32);
+    for t in &targets {
+        let path = Path::new(t);
+        let mut img = imageops::decode_file(path)?;
+        let own = platealpha::plate_alpha(&img);
+        match own {
+            Some(own) if platealpha::remap_plate_alpha(&mut img, own, reference) => {
+                imageops::write_png(&img, path)?;
+                changed += 1;
+            }
+            _ => unchanged += 1,
+        }
+    }
+    Ok(PlateMatch { reference, changed, unchanged })
 }
 
 // ---------------------------------------------------------------- batch

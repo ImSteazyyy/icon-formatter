@@ -98,10 +98,11 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
             count += 1;
         }
     }
-    // An app with a calendar gets no plain <item>: a launcher that takes the
-    // <item> first and froze the icon on the day the pack was made. The
-    // installed app's own component (from its plain entry) gets the
-    // <calendar> too, in case the source pack named another activity.
+    // A calendar app gets both: <calendar> (the launcher picks today's day)
+    // and a plain <item> with today's day, the way real packs do: a launcher
+    // without dynamic calendars shows the <item> instead of the app's own
+    // icon. The installed app's own component (from its plain entry) gets
+    // the <calendar> too, in case the source pack named another activity.
     let cal_prefix: std::collections::HashMap<String, String> =
         calendars.iter().map(|((pkg, _), prefix)| (pkg.clone(), prefix.clone())).collect();
     let mut cal_components: std::collections::BTreeMap<(String, String), String> = calendars.clone();
@@ -116,7 +117,7 @@ pub fn build(entries: &[IconPackEntry], out_dir: &Path, pack_name: &str, zip_pat
 "));
         mapping.push(serde_json::json!({ "package": pkg, "activity": act, "calendar": prefix }));
     }
-    for e in entries.iter().filter(|e| e.calendar_day == 0 && !cal_prefix.contains_key(&e.package)) {
+    for e in entries.iter().filter(|e| e.calendar_day == 0) {
         if !e.png.exists() {
             notes.push(format!("{}: processed icon missing, skipped", e.package));
             continue;
@@ -217,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn calendar_app_has_no_plain_item() {
+    fn calendar_app_has_item_and_calendar() {
         let t = tempfile::tempdir().unwrap();
         let png = t.path().join("x.png");
         image::RgbaImage::new(4, 4).save(&png).unwrap();
@@ -231,7 +232,8 @@ mod tests {
         let out = t.path().join("pack");
         build(&entries, &out, "Test", None).unwrap();
         let xml = fs::read_to_string(out.join("res/xml/appfilter.xml")).unwrap();
-        assert!(!xml.contains("<item component=\"ComponentInfo{com.cal"), "{xml}");
+        // the plain <item> of the installed activity stays, as the fallback
+        assert!(xml.contains("<item component=\"ComponentInfo{com.cal/com.cal.Main}\""), "{xml}");
         assert!(xml.contains("<calendar component=\"ComponentInfo{com.cal/com.cal.Old}\" prefix=\"calendar_com_cal_\""));
         assert!(xml.contains("<calendar component=\"ComponentInfo{com.cal/com.cal.Main}\" prefix=\"calendar_com_cal_\""));
     }

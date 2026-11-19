@@ -975,6 +975,30 @@ class StringsDe extends Strings {
   @override
   String get modalitaChiara => 'Heller Modus';
   @override
+  String get sfondoComePack => 'Hintergrund wie das Pack';
+  @override
+  String get sfondoComePackSub => 'Gleicht die Transparenz des Hintergrunds an die der anderen Icons an';
+  @override
+  String get sfondoNientePack => 'Verarbeite zuerst die Icons';
+  @override
+  String get sfondoGiaUguale => 'Der Hintergrund hat bereits die Transparenz des Packs';
+  @override
+  String sfondoUniformato(Object? n, Object? pct) => 'Hintergrund bei $n Icons angeglichen (Transparenz $pct%)';
+  @override
+  String get calGiornaliero => 'Kalender: der heutige Tag jeden Morgen';
+  @override
+  String get calGiornalieroInfo => 'Wenn der Launcher den Tag nicht selbst wechselt, aktualisiert sich das Pack beim ersten Entsperren des Tages (Shizuku nötig).';
+  @override
+  String get calAggiornaOra => 'Tag jetzt aktualisieren';
+  @override
+  String calAggiornato(Object? n) => 'Tag auf $n Icons aktualisiert';
+  @override
+  String get calGiaOggi => 'Das Pack zeigt schon den heutigen Tag';
+  @override
+  String get calServeShizuku => 'Shizuku ist nötig, um das Pack selbst zu aktualisieren';
+  @override
+  String get calNessuno => 'Das installierte Pack hat keinen Kalender zum Aktualisieren';
+  @override
   String pbTutte(Object? n) => 'Alle $n';
   @override
   String get pbVuoto => 'Füge die Apps hinzu, um zu beginnen.';

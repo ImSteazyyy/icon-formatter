@@ -217,6 +217,7 @@ object DevicePack {
             sign(unsigned, signed)
             unsigned.delete()
             base.delete()
+            if (groups.isNotEmpty()) AutoSync.calendarPackBuilt(context)
             return Built(signed, plainPngs.size, vName)
         }
     }
@@ -592,6 +593,140 @@ object DevicePack {
         return buf(8 + all.size).apply {
             putShort(0x0003); putShort(8); putInt(8 + all.size); put(all)
         }.array()
+    }
+
+    // ----------------------------------------------------------- calendar day
+
+    /** A calendar app of the pack: its day slots (calNN_) and the slots of its plain <item>s. */
+    private class CalendarSlots(val prefix: String) {
+        val plain = mutableListOf<String>()
+    }
+
+    private fun calendarSlots(mapping: String): Map<String, CalendarSlots> {
+        val arr = JSONArray(mapping)
+        val out = LinkedHashMap<String, CalendarSlots>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val cal = o.optString("calendar")
+            if (cal.isNotEmpty()) out.getOrPut(o.optString("package")) { CalendarSlots(cal) }
+        }
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            val d = o.optString("drawable")
+            if (d.isNotEmpty()) out[o.optString("package")]?.plain?.add(d)
+        }
+        return out
+    }
+
+    /**
+     * What the installed pack needs to show today's day: the entries of the
+     * plain <item> icons of its calendar apps, with the day PNG that should be
+     * in them. `has` is false for a pack without calendars (or built before
+     * the calendar apps got an <item>).
+     */
+    private class CalendarPlan(val has: Boolean, val replace: Map<String, ByteArray>)
+
+    private fun calendarPlan(zip: ZipFile, day: Int): CalendarPlan {
+        val mapping = zip.getEntry("assets/mapping.json")?.let { e -> zip.getInputStream(e).use { String(it.readBytes()) } }
+            ?: return CalendarPlan(false, emptyMap())
+        val cals = calendarSlots(mapping).filterValues { it.plain.isNotEmpty() }
+        if (cals.isEmpty()) return CalendarPlan(false, emptyMap())
+        val entryOf = zip.entries().asSequence().map { it.name }
+            .filter { it.startsWith("res/") && it.endsWith(".png") }
+            .associateBy { it.substringAfterLast('/').removeSuffix(".png") }
+        fun bytes(entry: String) = zip.getInputStream(zip.getEntry(entry)).use { it.readBytes() }
+        val replace = HashMap<String, ByteArray>()
+        for (c in cals.values) {
+            val dayBytes = bytes(entryOf["${c.prefix}$day"] ?: continue)
+            for (slot in c.plain) {
+                val target = entryOf[slot] ?: continue
+                if (!bytes(target).contentEquals(dayBytes)) replace[target] = dayBytes
+            }
+        }
+        return CalendarPlan(true, replace)
+    }
+
+    private fun today(): Int = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+
+    /** `has`: the installed pack has calendar apps; `current`: it already shows today's day. */
+    fun calendarInfo(context: Context): Map<String, Any?> {
+        val src = installedSource(context) ?: return mapOf("has" to false, "current" to true)
+        return try {
+            ZipFile(src).use { zip ->
+                val plan = calendarPlan(zip, today())
+                mapOf("has" to plan.has, "current" to plan.replace.isEmpty())
+            }
+        } catch (_: Exception) {
+            mapOf("has" to false, "current" to true)
+        }
+    }
+
+    /**
+     * Puts today's day into the plain <item> icon of every calendar app of the
+     * installed pack. A launcher that reads <calendar> changes the day by
+     * itself; one that does not keeps showing the day the pack was made, so the
+     * day PNG (all 31 travel inside the pack) is copied over that icon, the
+     * pack is signed and installed again through Shizuku and, when it is the
+     * selected one, selected again so the launcher reloads it.
+     *
+     * `state`: updated | current | no_calendar | not_installed | no_shizuku |
+     * error (with `message`). `changed` counts the icons rewritten.
+     */
+    fun refreshCalendar(context: Context): Map<String, Any?> {
+        val src = installedSource(context) ?: return mapOf("state" to "not_installed")
+        val day = today()
+        try {
+            ZipFile(src).use { zip ->
+                val plan = calendarPlan(zip, day)
+                if (!plan.has) return mapOf("state" to "no_calendar")
+                if (plan.replace.isEmpty()) return mapOf("state" to "current", "day" to day)
+                if (!canShell()) return mapOf("state" to "no_shizuku", "day" to day)
+                val (vCode, vName) = nextVersion(context)
+                val work = File(context.cacheDir, "devicepack").apply { deleteRecursively(); mkdirs() }
+                val unsigned = File(work, "unsigned.apk")
+                ZipOutputStream(unsigned.outputStream().buffered()).use { out ->
+                    for (e in zip.entries()) {
+                        val n = e.name
+                        if (n.startsWith("META-INF/") && (n.endsWith(".SF") || n.endsWith(".RSA") || n.endsWith(".EC") || n.endsWith("MANIFEST.MF"))) continue
+                        val raw = zip.getInputStream(e).use { it.readBytes() }
+                        val bytes = plan.replace[n] ?: if (n == "AndroidManifest.xml") patchManifest(raw, vCode, vName) else raw
+                        val ze = ZipEntry(n)
+                        if (e.method == ZipEntry.STORED) {
+                            ze.method = ZipEntry.STORED
+                            ze.size = bytes.size.toLong()
+                            ze.compressedSize = bytes.size.toLong()
+                            ze.crc = CRC32().apply { update(bytes) }.value
+                        }
+                        out.putNextEntry(ze)
+                        out.write(bytes)
+                        out.closeEntry()
+                    }
+                }
+                val signed = File(work, "IconFormatterPack.apk")
+                sign(unsigned, signed)
+                unsigned.delete()
+                installShizuku(context, signed)
+                signed.delete()
+                if (currentSelector() == PACKAGE) reselect(context)
+                return mapOf("state" to "updated", "changed" to plan.replace.size, "day" to day)
+            }
+        } catch (e: Exception) {
+            return mapOf("state" to "error", "message" to (e.message ?: e.toString()))
+        }
+    }
+
+    /** The launcher reads the pack again: picker behind, then the selector off and on. */
+    private fun reselect(context: Context) {
+        if (launcherInstalled(context) != null) {
+            shell(
+                "am start -a com.nothing.launcher.icon_pack_picker -p $LAUNCHER_PKG --activity-no-history " +
+                    "--activity-exclude-from-recents --activity-no-animation --activity-multiple-task --activity-new-task",
+            )
+            Thread.sleep(1500)
+        }
+        shell("settings put system $SELECTOR $TEMPORARY_PACK")
+        Thread.sleep(500)
+        shell("settings put system $SELECTOR $PACKAGE")
     }
 
     // ---------------------------------------------------------------- install

@@ -112,6 +112,11 @@ class MainActivity : FlutterActivity() {
                     background(result) { AutoSync.setEnabled(applicationContext, on); AutoSync.status(applicationContext) }
                 }
                 "autoSyncCheckNow" -> background(result) { AutoSync.check(applicationContext, notify = false); AutoSync.status(applicationContext) }
+                "calendarDailySet" -> background(result) {
+                    AutoSync.setCalendarDaily(applicationContext, call.argument<Boolean>("enabled") ?: true)
+                    AutoSync.status(applicationContext)
+                }
+                "calendarRefreshNow" -> background(result) { DevicePack.refreshCalendar(applicationContext) }
                 "autoSyncClear" -> background(result) { AutoSync.clearPending(applicationContext, call.argument<List<String>>("components")); true }
                 "takeLaunchAction" -> {
                     val open = intent?.getBooleanExtra("openBuilder", false) ?: false

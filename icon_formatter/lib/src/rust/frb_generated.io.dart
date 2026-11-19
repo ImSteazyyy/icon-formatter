@@ -205,6 +205,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlacementSettings dco_decode_placement_settings(dynamic raw);
 
   @protected
+  PlateMatch dco_decode_plate_match(dynamic raw);
+
+  @protected
   PreviewResult dco_decode_preview_result(dynamic raw);
 
   @protected
@@ -435,6 +438,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlacementSettings sse_decode_placement_settings(SseDeserializer deserializer);
+
+  @protected
+  PlateMatch sse_decode_plate_match(SseDeserializer deserializer);
 
   @protected
   PreviewResult sse_decode_preview_result(SseDeserializer deserializer);
@@ -740,6 +746,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     PlacementSettings self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_plate_match(PlateMatch self, SseSerializer serializer);
 
   @protected
   void sse_encode_preview_result(PreviewResult self, SseSerializer serializer);

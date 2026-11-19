@@ -115,6 +115,14 @@ class PlatformService {
   static Future<Map<String, dynamic>> autoSyncCheckNow() async =>
       ((await _ch.invokeMethod<Map>('autoSyncCheckNow')) ?? {}).cast<String, dynamic>();
 
+  /// Calendar day of the installed pack: turns the daily refresh on or off.
+  static Future<Map<String, dynamic>> calendarDailySet(bool on) async =>
+      ((await _ch.invokeMethod<Map>('calendarDailySet', {'enabled': on})) ?? {}).cast<String, dynamic>();
+
+  /// Puts today's day into the installed pack now (Shizuku): {state, changed, day, message}.
+  static Future<Map<String, dynamic>> calendarRefreshNow() async =>
+      ((await _ch.invokeMethod<Map>('calendarRefreshNow')) ?? {}).cast<String, dynamic>();
+
   static Future<void> autoSyncClear([List<String>? components]) => _ch.invokeMethod('autoSyncClear', {'components': components});
 
   /// "builder" when the app was opened from the change notification.

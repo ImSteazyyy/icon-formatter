@@ -1068,7 +1068,8 @@ class StepCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (children.isNotEmpty) ...[const SizedBox(height: 10), Wrap(spacing: 8, runSpacing: 8, children: children)],
+            // a lone or last button sits in the middle, not on the left
+            if (children.isNotEmpty) ...[const SizedBox(height: 10), Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: children)],
           ],
         ),
       ),
@@ -1172,14 +1173,21 @@ class IconFilterPill extends StatelessWidget {
               height: kButtonHeight,
               child: Builder(builder: (context) {
                 final fg = nothingStyle ? (on ? NothingColors.onOn : Palette.text2) : color;
-                return Center(
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(icon, size: 20, color: fg),
-                    if (count != null) ...[
-                      const SizedBox(width: 5),
-                      Text('$count', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
-                    ],
-                  ]),
+                // a long count (222) shrinks a little instead of leaving the pill
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(icon, size: 20, color: fg),
+                        if (count != null) ...[
+                          const SizedBox(width: 5),
+                          Text('$count', maxLines: 1, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
+                        ],
+                      ]),
+                    ),
+                  ),
                 );
               }),
             ),

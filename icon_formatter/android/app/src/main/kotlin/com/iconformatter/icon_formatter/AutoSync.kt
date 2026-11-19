@@ -47,15 +47,46 @@ object AutoSync {
 
     fun isEnabled(c: Context) = prefs(c).getBoolean("enabled", false)
 
+    /** Refresh of the calendar day in the pack (DevicePack.refreshCalendar): on unless turned off. */
+    fun calendarDaily(c: Context) = prefs(c).getBoolean("calendarDaily", true)
+
+    /** The job is wanted for the change check, or for the calendar day of a pack that has calendars. */
+    fun wanted(c: Context) = isEnabled(c) || (calendarDaily(c) && prefs(c).getBoolean("calendarPack", false))
+
+    private fun cancelIfUnwanted(c: Context) {
+        if (wanted(c)) return
+        val js = c.getSystemService(JobScheduler::class.java)
+        js.cancel(JOB_PERIODIC)
+        js.cancel(JOB_NOW)
+    }
+
     fun setEnabled(c: Context, on: Boolean) {
         prefs(c).edit().putBoolean("enabled", on).apply()
         if (on) {
             schedule(c)
             if (!prefs(c).contains("snapshot")) check(c, notify = false, baseline = true)
         } else {
-            val js = c.getSystemService(JobScheduler::class.java)
-            js.cancel(JOB_PERIODIC)
-            js.cancel(JOB_NOW)
+            cancelIfUnwanted(c)
+        }
+    }
+
+    fun setCalendarDaily(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean("calendarDaily", on).apply()
+        if (on) schedule(c) else cancelIfUnwanted(c)
+    }
+
+    /** A pack with calendar days was built: the daily refresh needs the periodic job. */
+    fun calendarPackBuilt(c: Context) {
+        prefs(c).edit().putBoolean("calendarPack", true).apply()
+        if (calendarDaily(c)) schedule(c)
+    }
+
+    /** From the job: today's day into the pack, when that is wanted. */
+    fun refreshCalendarIfDue(c: Context) {
+        if (!calendarDaily(c)) return
+        try {
+            DevicePack.refreshCalendar(c)
+        } catch (_: Throwable) {
         }
     }
 
@@ -71,7 +102,7 @@ object AutoSync {
 
     /** One-shot check as soon as the system allows it (after unlock). */
     fun scheduleNow(c: Context) {
-        if (!isEnabled(c)) return
+        if (!wanted(c)) return
         val js = c.getSystemService(JobScheduler::class.java)
         js.schedule(
             JobInfo.Builder(JOB_NOW, ComponentName(c, AutoSyncJob::class.java))
@@ -208,6 +239,8 @@ object AutoSync {
             "scheduled" to (js.getPendingJob(JOB_PERIODIC) != null),
             "lastCheck" to p.getLong("lastCheck", 0L),
             "pending" to list,
+            "calendarDaily" to calendarDaily(c),
+            "calendar" to DevicePack.calendarInfo(c),
         )
     }
 
@@ -252,7 +285,8 @@ class AutoSyncJob : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         Thread {
             try {
-                AutoSync.check(applicationContext)
+                if (AutoSync.isEnabled(applicationContext)) AutoSync.check(applicationContext)
+                AutoSync.refreshCalendarIfDue(applicationContext)
             } finally {
                 jobFinished(params, false)
             }
@@ -266,6 +300,6 @@ class AutoSyncJob : JobService() {
 /** Reboot / app update: restore the schedule if automation is on. */
 class AutoSyncBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (AutoSync.isEnabled(context)) AutoSync.schedule(context)
+        if (AutoSync.wanted(context)) AutoSync.schedule(context)
     }
 }

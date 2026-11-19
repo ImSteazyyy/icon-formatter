@@ -975,6 +975,30 @@ class StringsPt extends Strings {
   @override
   String get modalitaChiara => 'Modo claro';
   @override
+  String get sfondoComePack => 'Fundo como o pack';
+  @override
+  String get sfondoComePackSub => 'Iguala a transparência do fundo à dos outros ícones';
+  @override
+  String get sfondoNientePack => 'Processe primeiro os ícones';
+  @override
+  String get sfondoGiaUguale => 'O fundo já tem a transparência do pack';
+  @override
+  String sfondoUniformato(Object? n, Object? pct) => 'Fundo igualado em $n ícones (transparência $pct%)';
+  @override
+  String get calGiornaliero => 'Calendário: o dia de hoje todas as manhãs';
+  @override
+  String get calGiornalieroInfo => 'Se o launcher não mudar o dia sozinho, o pack atualiza-se no primeiro desbloqueio do dia (precisa do Shizuku).';
+  @override
+  String get calAggiornaOra => 'Atualizar o dia agora';
+  @override
+  String calAggiornato(Object? n) => 'Dia atualizado em $n ícones';
+  @override
+  String get calGiaOggi => 'O pack já mostra o dia de hoje';
+  @override
+  String get calServeShizuku => 'É preciso o Shizuku para atualizar o pack sozinho';
+  @override
+  String get calNessuno => 'O pack instalado não tem calendário para atualizar';
+  @override
   String pbTutte(Object? n) => 'Todas $n';
   @override
   String get pbVuoto => 'Adicione as apps para começar.';

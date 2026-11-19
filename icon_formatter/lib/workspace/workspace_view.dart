@@ -104,6 +104,7 @@ class WorkTile extends StatelessWidget {
       PopupMenuItem(value: 'size', child: Text(S.dimensione)),
       PopupMenuItem(value: 'mode', child: Text(S.rigeneraConModalita)),
       PopupMenuItem(value: 'white', child: Text(c.keepsInnerWhite(it) ? S.togliBiancoInterno : S.mantieniBiancoInterno)),
+      PopupMenuItem(value: 'plate', child: Text(S.sfondoComePack)),
       if (it.hasOverride) PopupMenuItem(value: 'reset', child: Text(S.rimuoviCorrezioni)),
       PopupMenuItem(value: 'remove', child: Text(S.rimuoviDallaLista)),
     ];
@@ -113,10 +114,15 @@ class WorkTile extends StatelessWidget {
     } else {
       v = await showAppSheet<String>(
         context: context,
-        builder: (ctx) => SafeArea(
+        // scrolls when the actions are taller than the sheet
+        builder: (ctx) => SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: [for (final e in items.whereType<PopupMenuItem<String>>()) ListTile(title: e.child, onTap: () => Navigator.pop(ctx, e.value))],
+            children: [
+              for (final e in items.whereType<PopupMenuItem<String>>())
+                ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 22), title: e.child, onTap: () => Navigator.pop(ctx, e.value)),
+            ],
           ),
         ),
       );
@@ -134,12 +140,15 @@ class WorkTile extends StatelessWidget {
         if (context.mounted) await showIconSizeDialog(context, c, [it]);
       case 'white':
         c.setKeepInnerWhite(it, !c.keepsInnerWhite(it));
+      case 'plate':
+        final r = await c.matchPlateOf([it]);
+        if (context.mounted) showMsg(context, plateMatchMessage(r), error: r == null);
       case 'mode':
         if (!context.mounted) return;
         final cur = it.strategyOverride ?? LucentStrategy.auto;
         final st = await showAppSheet<LucentStrategy>(
           context: context,
-          builder: (ctx) => SafeArea(
+          builder: (ctx) => SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Column(
@@ -177,6 +186,13 @@ class WorkTile extends StatelessWidget {
         c.remove(it);
     }
   }
+}
+
+/// What "Sfondo come il pack" did, for a notice.
+String plateMatchMessage(PlateMatch? r) {
+  if (r == null) return S.sfondoNientePack;
+  if (r.changed == 0) return S.sfondoGiaUguale;
+  return S.sfondoUniformato(r.changed, (r.reference * 100).round());
 }
 
 /// Large preview with Before/After, zoom, alpha checkerboard and diagnostics.

@@ -17,6 +17,7 @@ pub mod lucent;
 pub mod matching;
 pub mod imageops;
 pub mod pack;
+pub mod platealpha;
 pub mod segment;
 pub mod squircle;
 pub mod translucent;

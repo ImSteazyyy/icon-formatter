@@ -975,6 +975,30 @@ class StringsFr extends Strings {
   @override
   String get modalitaChiara => 'Mode clair';
   @override
+  String get sfondoComePack => 'Fond comme le pack';
+  @override
+  String get sfondoComePackSub => 'Aligne la transparence du fond sur celle des autres icônes';
+  @override
+  String get sfondoNientePack => 'Traitez d\'abord les icônes';
+  @override
+  String get sfondoGiaUguale => 'Le fond a déjà la transparence du pack';
+  @override
+  String sfondoUniformato(Object? n, Object? pct) => 'Fond harmonisé sur $n icônes (transparence $pct%)';
+  @override
+  String get calGiornaliero => 'Calendrier : le jour d\'aujourd\'hui chaque matin';
+  @override
+  String get calGiornalieroInfo => 'Si le launcher ne change pas le jour tout seul, le pack se met à jour au premier déverrouillage de la journée (Shizuku requis).';
+  @override
+  String get calAggiornaOra => 'Mettre à jour le jour maintenant';
+  @override
+  String calAggiornato(Object? n) => 'Jour mis à jour sur $n icônes';
+  @override
+  String get calGiaOggi => 'Le pack affiche déjà le jour d\'aujourd\'hui';
+  @override
+  String get calServeShizuku => 'Shizuku est nécessaire pour mettre le pack à jour seul';
+  @override
+  String get calNessuno => 'Le pack installé n\'a pas de calendrier à mettre à jour';
+  @override
   String pbTutte(Object? n) => 'Toutes $n';
   @override
   String get pbVuoto => 'Ajoutez les apps pour commencer.';

@@ -269,6 +269,11 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                 ),
               ),
         moreActions: [
+          if (c.items.any((i) => i.calendarDay != null))
+            MoreAction(Icons.opacity_rounded, S.sfondoComePack, S.sfondoComePackSub, () async {
+              final r = await c.matchPlateAll();
+              if (mounted) showMsg(this.context, plateMatchMessage(r), error: r == null);
+            }),
           MoreAction(Icons.dashboard_customize_outlined, S.mandaAlPack, S.mandaAlPackSub, _sendToPack),
           MoreAction(Icons.drive_folder_upload_outlined, S.esportaCartella, S.esportaCartellaSub, () => _export(zip: false)),
           MoreAction(Icons.archive_outlined, S.esportaZip, S.esportaZipSub, () => _export(zip: true)),

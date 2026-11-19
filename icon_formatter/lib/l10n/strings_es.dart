@@ -975,6 +975,30 @@ class StringsEs extends Strings {
   @override
   String get modalitaChiara => 'Modo claro';
   @override
+  String get sfondoComePack => 'Fondo como el pack';
+  @override
+  String get sfondoComePackSub => 'Iguala la transparencia del fondo a la de los demás iconos';
+  @override
+  String get sfondoNientePack => 'Procesa primero los iconos';
+  @override
+  String get sfondoGiaUguale => 'El fondo ya tiene la transparencia del pack';
+  @override
+  String sfondoUniformato(Object? n, Object? pct) => 'Fondo igualado en $n iconos (transparencia $pct%)';
+  @override
+  String get calGiornaliero => 'Calendario: el día de hoy cada mañana';
+  @override
+  String get calGiornalieroInfo => 'Si el launcher no cambia el día por sí solo, el pack se actualiza en el primer desbloqueo del día (necesita Shizuku).';
+  @override
+  String get calAggiornaOra => 'Actualizar el día ahora';
+  @override
+  String calAggiornato(Object? n) => 'Día actualizado en $n iconos';
+  @override
+  String get calGiaOggi => 'El pack ya muestra el día de hoy';
+  @override
+  String get calServeShizuku => 'Hace falta Shizuku para actualizar el pack solo';
+  @override
+  String get calNessuno => 'El pack instalado no tiene calendario que actualizar';
+  @override
   String pbTutte(Object? n) => 'Todas $n';
   @override
   String get pbVuoto => 'Añade las apps para empezar.';

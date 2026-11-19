@@ -40,10 +40,14 @@ class WorkItem {
 
   /// 1..31: one day of a dynamic calendar icon taken from an icon pack.
   int? calendarDay;
+
+  /// "Sfondo come il pack": after every processing the plate is brought to the
+  /// transparency of the other icons.
+  bool matchPlate = false;
   ItemResult? result;
 
   String? get outputPath => result?.ok == true ? result!.output : null;
-  bool get hasOverride => segOverride != null || placementOverride != null || strategyOverride != null;
+  bool get hasOverride => segOverride != null || placementOverride != null || strategyOverride != null || matchPlate;
 }
 
 /// Shared processing state: items, selection, mode, preview, batch.
@@ -321,6 +325,7 @@ class WorkspaceController extends ChangeNotifier {
     it.segOverride = null;
     it.placementOverride = null;
     it.strategyOverride = null;
+    it.matchPlate = false;
     notifyListeners();
     schedulePreview();
   }
@@ -433,6 +438,44 @@ class WorkspaceController extends ChangeNotifier {
       if (batch.cancelRequested) break;
       final first = itemById[e.value.first.id]!;
       await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment));
+    }
+    // icons marked "Sfondo come il pack" keep it through a new processing
+    final marked = list.where((i) => i.matchPlate).toList();
+    if (marked.isNotEmpty && !batch.cancelRequested) await _applyPlateMatch(marked);
+  }
+
+  /// "Sfondo come il pack": the plate of [its] takes the transparency of the
+  /// other processed icons (their median); with none, the plate of the current
+  /// style. Remembered per icon, so a new processing keeps it. Null when
+  /// there is nothing processed to work on.
+  Future<PlateMatch?> matchPlateOf(List<WorkItem> its) async {
+    for (final it in its) {
+      it.matchPlate = true;
+    }
+    return _applyPlateMatch(its);
+  }
+
+  /// The same for every calendar page of the list.
+  Future<PlateMatch?> matchPlateAll() => matchPlateOf([for (final i in items) if (!i.excluded && i.calendarDay != null) i]);
+
+  Future<PlateMatch?> _applyPlateMatch(List<WorkItem> its) async {
+    bool onDisk(WorkItem i) => i.outputPath != null && File(i.outputPath!).existsSync();
+    final targets = [for (final i in its) if (onDisk(i)) i.outputPath!];
+    if (targets.isEmpty) return null;
+    final ids = {for (final i in its) i.id};
+    // the pack: every other processed icon that is not itself being matched
+    final refs = [
+      for (final i in items)
+        if (!i.excluded && !ids.contains(i.id) && !i.matchPlate && i.calendarDay == null && onDisk(i)) i.outputPath!,
+    ];
+    final bg = settings.background;
+    final fallback = bg is BackgroundSettings_Lucent ? ((bg.params.backdrop >> 24) & 0xFF) / 255.0 : 0.0;
+    try {
+      final r = await matchPlateAlpha(targets: targets, references: refs.take(40).toList(), fallback: fallback);
+      notifyListeners();
+      return r;
+    } catch (_) {
+      return null;
     }
   }
 

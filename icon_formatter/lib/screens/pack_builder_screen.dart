@@ -952,12 +952,13 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
     super.initState();
     c._pickKindImpl = () => showAppSheet<String>(
       context: context,
-      builder: (ctx) => SafeArea(
+      builder: (ctx) => SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: const Icon(Icons.folder_open_outlined), title: Text(S.cartella), onTap: () => Navigator.pop(ctx, 'folder')),
-            ListTile(leading: const Icon(Icons.folder_zip_outlined), title: Text(S.zipOApk), onTap: () => Navigator.pop(ctx, 'zip')),
+            ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 22), leading: const Icon(Icons.folder_open_outlined), title: Text(S.cartella), onTap: () => Navigator.pop(ctx, 'folder')),
+            ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 22), leading: const Icon(Icons.folder_zip_outlined), title: Text(S.zipOApk), onTap: () => Navigator.pop(ctx, 'zip')),
           ],
         ),
       ),
@@ -1885,8 +1886,53 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
             onChanged: busy ? null : (v) => _load(() => PlatformService.autoSyncSetEnabled(v)),
           ),
           Text(S.asInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
+          // the pack has calendar apps: today's day, every morning
+          if ((st['calendar'] as Map?)?['has'] == true) ...[
+            SwitchListTile(
+              key: const ValueKey('calendar-daily-switch'),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text(S.calGiornaliero, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              subtitle: Text(S.calGiornalieroInfo, style: const TextStyle(fontSize: 11)),
+              value: st['calendarDaily'] != false,
+              onChanged: busy ? null : (v) => _load(() => PlatformService.calendarDailySet(v)),
+            ),
+            Align(
+              alignment: Alignment.center,
+              child: OutlinedButton.icon(
+                key: const ValueKey('calendar-refresh-now'),
+                icon: const Icon(Icons.today_rounded, size: 18),
+                label: Text(S.calAggiornaOra),
+                onPressed: busy
+                    ? null
+                    : () async {
+                        setState(() => busy = true);
+                        try {
+                          final r = await PlatformService.calendarRefreshNow();
+                          if (!mounted) return;
+                          final msg = switch (r['state']) {
+                            'updated' => S.calAggiornato(r['changed'] ?? 0),
+                            'current' => S.calGiaOggi,
+                            'no_shizuku' => S.calServeShizuku,
+                            'error' => S.errore(r['message'] ?? ''),
+                            _ => S.calNessuno,
+                          };
+                          showMsg(this.context, msg, error: r['state'] == 'error' || r['state'] == 'no_shizuku');
+                          await _load(PlatformService.autoSyncStatus);
+                        } catch (e) {
+                          if (mounted) showMsg(this.context, S.errore(e), error: true);
+                        } finally {
+                          if (mounted) setState(() => busy = false);
+                        }
+                      },
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
-          Wrap(
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+            alignment: WrapAlignment.center,
             spacing: 8,
             runSpacing: 6,
             children: [
@@ -1928,7 +1974,7 @@ class _AutoSyncCardState extends State<AutoSyncCard> {
                         },
                 ),
             ],
-          ),
+          )),
           if (pending.isNotEmpty) ...[
             const SizedBox(height: 6),
             for (final m in pending.take(6)) Text('· ${m['label']} — ${m['change']}', style: TextStyle(fontSize: 12, color: Palette.text2)),
@@ -2078,6 +2124,7 @@ class _LauncherApplyCardState extends State<LauncherApplyCard> with WidgetsBindi
             Text(S.dpInfo, style: TextStyle(fontSize: 11, color: Palette.text3)),
             const SizedBox(height: 10),
             Wrap(
+              alignment: WrapAlignment.center,
               spacing: 8,
               runSpacing: 8,
               children: [

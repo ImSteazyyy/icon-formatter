@@ -9,7 +9,8 @@ Prima release pubblica.
 - **Studio:** importi immagini, cartelle, icon pack o le app del telefono e le porti tutte nello stesso stile (forma, sfondo, dimensione), con regolazioni per ogni icona e la rimozione dello sfondo.
 - **Pack:** abbina le icone nuove alle app installate, controlli ogni abbinamento e crei l'icon pack. Su Android, con Shizuku, lo installa e lo applica direttamente; senza Shizuku lo esporti e lo installi a mano.
 - **Le tue app:** elabori le icone delle app installate e le mandi al pack.
-- **Calendario dinamico:** l'icona del calendario cambia con il giorno.
+- **Calendario dinamico:** l'icona del calendario cambia con il giorno. Il pack dichiara sia la voce dinamica sia un'icona fissa con il giorno di oggi; se il launcher non cambia il giorno da solo, con Shizuku il pack si aggiorna ogni mattina (o subito, con "Aggiorna il giorno ora").
+- **Sfondo come il pack:** porta la trasparenza dello sfondo di un'icona (per esempio le pagine del calendario) a quella delle altre icone del pack.
 - **Aggiornamento automatico:** quando installi un'app nuova, il pack si aggiorna da solo.
 
 ## Aspetto

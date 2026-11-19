@@ -10,7 +10,7 @@ import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'engine.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `ai_kind`, `ai_of`, `background_image`, `candidates`, `check_size`, `handle`, `isolate_with`, `item_result`, `lucent_of`, `pack_info`, `placement_dto`, `preview_image`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
 SegmentSettings defaultSegmentSettings() =>
     RustLib.instance.api.crateApiEngineDefaultSegmentSettings();
@@ -89,6 +89,19 @@ Future<Uint8List> thumbnailPng({required String path, required int size}) =>
 /// Copies an image into `dest` as PNG RGBA (used to import base icons).
 Future<Uint32List> importAsPng({required String src, required String dest}) =>
     RustLib.instance.api.crateApiEngineImportAsPng(src: src, dest: dest);
+
+/// Brings the plate of every `targets` icon (PNG files, rewritten in place) to
+/// the transparency of the pack: the median plate alpha of `references`, or
+/// `fallback` (0..1, ignored when 0) when no reference can be measured.
+Future<PlateMatch> matchPlateAlpha({
+  required List<String> targets,
+  required List<String> references,
+  required double fallback,
+}) => RustLib.instance.api.crateApiEngineMatchPlateAlpha(
+  targets: targets,
+  references: references,
+  fallback: fallback,
+);
 
 /// Processes all items in parallel, streaming one progress event per item.
 /// Never overwrites the source: an output path equal to the input is rejected.
@@ -942,6 +955,37 @@ class PlacementSettings {
           scaleMul == other.scaleMul &&
           offsetX == other.offsetX &&
           offsetY == other.offsetY;
+}
+
+/// Result of [`match_plate_alpha`].
+class PlateMatch {
+  /// Plate alpha (0..1) the targets were brought to.
+  final double reference;
+
+  /// Targets rewritten.
+  final int changed;
+
+  /// Targets left as they were (already equal, or a fully opaque plate).
+  final int unchanged;
+
+  const PlateMatch({
+    required this.reference,
+    required this.changed,
+    required this.unchanged,
+  });
+
+  @override
+  int get hashCode =>
+      reference.hashCode ^ changed.hashCode ^ unchanged.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlateMatch &&
+          runtimeType == other.runtimeType &&
+          reference == other.reference &&
+          changed == other.changed &&
+          unchanged == other.unchanged;
 }
 
 class PreviewResult {
