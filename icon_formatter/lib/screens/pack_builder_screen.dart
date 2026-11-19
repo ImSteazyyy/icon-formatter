@@ -2871,24 +2871,28 @@ class _IconEditPageState extends State<IconEditPage> {
                 subtitle: S.pbTrattamentoSub,
                 done: result != null,
                 children: [
-                  ToolButton(key: const ValueKey('edit-style'), icon: Icons.tune, label: S.stile, onTap: working ? null : _openStyle),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ChoiceRows<EditTreatment>(
-                      options: [
-                        (EditTreatment.auto, S.modoAuto),
-                        (EditTreatment.plateColor, S.modoColorePiatto),
-                        (EditTreatment.fullBleed, S.modoBordoPieno),
-                        (EditTreatment.asIs, S.modoNormale),
-                        (EditTreatment.placeOnly, S.pbSoloPosizione),
-                        (EditTreatment.raw, S.pbUsaComeE),
-                      ],
-                      value: treatment,
-                      onChanged: (v) {
-                        setState(() => treatment = v);
-                        _render();
-                      },
-                    ),
+                  // one full-width column: the style button, then the options under it
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ButtonRows(children: [ToolButton(key: const ValueKey('edit-style'), icon: Icons.tune, label: S.stile, onTap: working ? null : _openStyle)]),
+                      const SizedBox(height: 10),
+                      ChoiceRows<EditTreatment>(
+                        options: [
+                          (EditTreatment.auto, S.modoAuto),
+                          (EditTreatment.plateColor, S.modoColorePiatto),
+                          (EditTreatment.fullBleed, S.modoBordoPieno),
+                          (EditTreatment.asIs, S.modoNormale),
+                          (EditTreatment.placeOnly, S.pbSoloPosizione),
+                          (EditTreatment.raw, S.pbUsaComeE),
+                        ],
+                        value: treatment,
+                        onChanged: (v) {
+                          setState(() => treatment = v);
+                          _render();
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

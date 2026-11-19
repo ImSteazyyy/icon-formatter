@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
+import 'liquid_glass.dart' show NothingColors, nothingStyle;
 
 /// One notice shown at the top of the app.
 class Toast {
@@ -111,34 +113,56 @@ class _ToastViewState extends State<_ToastView> with SingleTickerProviderStateMi
     final t = widget.toast;
     final accent = Theme.of(context).colorScheme.primary;
     final curve = CurvedAnimation(parent: _in, curve: Curves.easeOutCubic);
+    final row = Row(children: [
+      Icon(t.error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, size: 20, color: t.error ? Palette.danger : accent),
+      const SizedBox(width: 10),
+      Expanded(child: Text(t.message, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Palette.text))),
+      if (t.actionLabel != null)
+        TextButton(
+          onPressed: () {
+            Toasts.dismiss(t.id);
+            t.onAction?.call();
+          },
+          child: Text(t.actionLabel!, style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
+        )
+      else
+        const SizedBox(width: 8),
+    ]);
+    const pad = EdgeInsets.fromLTRB(16, 12, 8, 12);
+    final radius = BorderRadius.circular(18);
+    // Nothing style: the frosted translucent pill of the bars; other styles: a lifted solid surface
+    final surface = nothingStyle
+        ? DecoratedBox(
+            decoration: BoxDecoration(borderRadius: radius, boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 8))]),
+            child: ClipRRect(
+              borderRadius: radius,
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+                child: Container(
+                  padding: pad,
+                  decoration: BoxDecoration(
+                    color: t.error ? const Color(0x994A2724) : NothingColors.navPill,
+                    borderRadius: radius,
+                    border: Border.all(color: (t.error ? Palette.danger : Palette.fg).withValues(alpha: t.error ? 0.55 : 0.14)),
+                  ),
+                  child: row,
+                ),
+              ),
+            ),
+          )
+        : Container(
+            padding: pad,
+            decoration: BoxDecoration(
+              color: t.error ? const Color(0xFF4A2724) : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
+              borderRadius: radius,
+              border: Border.all(color: (t.error ? Palette.danger : accent).withValues(alpha: 0.75), width: 1.4),
+              boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
+            ),
+            child: row,
+          );
     final card = Material(
       type: MaterialType.transparency,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        decoration: BoxDecoration(
-          // clearly lifted from the cards under it: lighter surface, accent outline, deeper shadow
-          color: t.error ? const Color(0xFF4A2724) : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: (t.error ? Palette.danger : accent).withValues(alpha: 0.75), width: 1.4),
-          boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
-        ),
-        child: Row(children: [
-          Icon(t.error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, size: 20, color: t.error ? Palette.danger : accent),
-          const SizedBox(width: 10),
-          Expanded(child: Text(t.message, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Palette.text))),
-          if (t.actionLabel != null)
-            TextButton(
-              onPressed: () {
-                Toasts.dismiss(t.id);
-                t.onAction?.call();
-              },
-              child: Text(t.actionLabel!, style: TextStyle(color: accent, fontWeight: FontWeight.w700)),
-            )
-          else
-            const SizedBox(width: 8),
-        ]),
-      ),
+      child: Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 8), child: surface),
     );
     return SizeTransition(
       sizeFactor: curve,

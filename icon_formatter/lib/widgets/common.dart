@@ -477,11 +477,11 @@ class ProgressStrip extends StatelessWidget {
     final closable = !running && onDismiss != null;
     // the same dark surface as the notices: it floats over moving content,
     // and live glass there costs a full-screen blur on every frame of a batch
-    final strip = Container(
+    final stripBox = Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        // lifted from the content under it, like the notices
-        color: Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
+        // lifted from the content under it, like the notices; Nothing style: the frosted bar colour
+        color: nothingStyle ? NothingColors.navPill : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
         borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
         border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.75), width: 1.4),
         boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
@@ -515,6 +515,10 @@ class ProgressStrip extends StatelessWidget {
         ],
       ),
     );
+    // Nothing style: frosted like the bars (content blurred behind it)
+    final strip = nothingStyle
+        ? ClipRRect(borderRadius: BorderRadius.circular(AppState.I.appearance.radius), child: BackdropFilter(filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32), child: stripBox))
+        : stripBox;
     if (!closable) return strip;
     // finished: swipe left or right to remove it (like the notices)
     return Dismissible(key: const ValueKey('progress-strip'), direction: DismissDirection.horizontal, onDismissed: (_) => onDismiss!(), child: strip);
