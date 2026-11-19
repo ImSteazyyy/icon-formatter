@@ -31,7 +31,7 @@ class NothingColors {
   static Color get onOn => _light ? Colors.white : Colors.black;
 
   /// Blurred pill of the bottom bar.
-  static Color get navPill => _light ? const Color(0xF5FFFFFF) : const Color(0xF5282828);
+  static Color get navPill => _light ? const Color(0xC8FFFFFF) : const Color(0xB8282828);
 }
 
 /// Space at the bottom covered by floating glass bars (Android phone
@@ -387,6 +387,17 @@ class LiquidGlass extends StatelessWidget {
       builder: (context, _) {
         final shadows = glassDepthShadows(radius);
         if (nothingStyle) {
+          // floating chrome (action bar, menus, jump buttons): the same frosted
+          // pill as the tab bar, so the content shows through, blurred
+          if (live) {
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: Container(padding: padding, color: NothingColors.navPill, child: child),
+              ),
+            );
+          }
           return Container(
             padding: padding,
             clipBehavior: Clip.antiAlias,

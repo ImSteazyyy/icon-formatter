@@ -572,7 +572,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
               ),
             ),
           ),
-          if (MediaQuery.viewInsetsOf(context).bottom == 0) Positioned(right: 18, bottom: under + 116, child: ScrollJumpButtons(controller: _scroll)),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) JumpButtonsSlot(controller: _scroll, openBottom: under + 116, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 74),
       // floating liquid-glass action bar (content scrolls underneath);
           // hidden while the keyboard is open, so it never covers the filters
           if (MediaQuery.viewInsetsOf(context).bottom == 0)

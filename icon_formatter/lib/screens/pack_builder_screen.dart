@@ -1618,11 +1618,12 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                     ],
                   ),
                   if (Platform.isAndroid && c.coverTotal > 0) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     _coverageTile(),
                   ],
                   if (c.rows.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    // the same space under the coverage line as above it
+                    SizedBox(height: Platform.isAndroid && c.coverTotal > 0 ? 14 : 6),
                     // one compact icon per state, in the state's colour; the
                     // name and count of the active filter are spelled out below
                     LayoutBuilder(
@@ -1788,7 +1789,7 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
         // jump to the top / bottom, right side, above the navigation bar
         return Stack(children: [
           page,
-          if (MediaQuery.viewInsetsOf(context).bottom == 0) Positioned(right: 18, bottom: GlassInsets.of(context) + 12, child: ScrollJumpButtons(controller: _scroll)),
+          if (MediaQuery.viewInsetsOf(context).bottom == 0) JumpButtonsSlot(controller: _scroll, openBottom: GlassInsets.of(context) + 12, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 12),
         ]);
       },
     );
@@ -2142,8 +2143,8 @@ class _PackBuilderScreenState extends State<PackBuilderScreen> {
                     ),
                     Positioned(left: 6, top: 6, child: Opacity(opacity: 0.9, child: r.original.image(size: 26))),
                     if (r.custom) Positioned(right: 8, top: 8, child: Icon(Icons.edit_rounded, size: 14, color: Palette.text2)),
-                    // the state as a small symbol, bottom left of the icon window
-                    Positioned(left: 7, bottom: 7, child: Tooltip(message: r.original.isSystem ? '${_label(st)} · ${S.pbSistema}' : _label(st), child: Icon(_icon(st), size: 16, color: col))),
+                    // the state as a small symbol, bottom right of the icon window
+                    Positioned(right: 7, bottom: 7, child: Tooltip(message: r.original.isSystem ? '${_label(st)} · ${S.pbSistema}' : _label(st), child: Icon(_icon(st), size: 16, color: col))),
                   ]),
                 ),
               ),

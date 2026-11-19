@@ -182,7 +182,7 @@ public class MainActivity extends Activity {
         row.addView(sortPill, pillLp(false));
         refreshPills();
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rp.setMargins(0, dp(10), 0, 0);
+        rp.setMargins(0, dp(10), 0, dp(8));
         root.addView(row, rp);
 
         GridView grid = new GridView(this);
@@ -190,8 +190,12 @@ public class MainActivity extends Activity {
         grid.setVerticalSpacing(dp(10));
         grid.setHorizontalSpacing(dp(8));
         grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setPadding(0, dp(12), 0, dp(24));
+        grid.setPadding(0, dp(14), 0, dp(24));
         grid.setClipToPadding(false);
+        // rows fade out under the filters instead of being cut by a hard edge
+        grid.setVerticalFadingEdgeEnabled(true);
+        grid.setFadingEdgeLength(dp(28));
+        grid.setOverScrollMode(View.OVER_SCROLL_NEVER);
         final int fAccent = accent;
         final boolean fNothing = nothing;
         adapter = new BaseAdapter() {
@@ -217,7 +221,7 @@ public class MainActivity extends Activity {
                 bg.setCornerRadius(dp(22));
                 cell.setBackground(bg);
                 // the icon on its own window (as in Icon Formatter's cards) with a
-                // small symbol bottom left: the app is installed here or not
+                // small symbol bottom right: the app is installed here or not
                 FrameLayout win = new FrameLayout(MainActivity.this);
                 GradientDrawable wbg = new GradientDrawable();
                 wbg.setColor(fNothing ? 0xFF1C1C1C : 0x14FFFFFF);
@@ -230,8 +234,8 @@ public class MainActivity extends Activity {
                 mark.setText(it.installed ? "\u2713" : "\u2013");
                 mark.setTextSize(12);
                 mark.setTextColor(it.installed ? (fNothing ? 0xFF8FB58A : fAccent) : 0xFF5A5A5A);
-                FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
-                mp.setMargins(dp(8), 0, 0, dp(4));
+                FrameLayout.LayoutParams mp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+                mp.setMargins(0, 0, dp(8), dp(4));
                 win.addView(mark, mp);
                 cell.addView(win, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)));
                 TextView label = new TextView(MainActivity.this);

@@ -675,7 +675,7 @@ class WorkspaceView extends StatelessWidget {
               if (MediaQuery.viewInsetsOf(context).bottom == 0) floating,
               // jump to the top / bottom of the icons, above the action bar
               if (MediaQuery.viewInsetsOf(context).bottom == 0 && c.items.isNotEmpty)
-                Positioned(right: -2, bottom: under + 74, child: ScrollJumpButtons(controller: c.gridScroll)),
+                JumpButtonsSlot(controller: c.gridScroll, right: -2, openBottom: under + 74, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 74),
             ],
           ),
         );

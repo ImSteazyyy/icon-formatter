@@ -1322,6 +1322,29 @@ class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
   }
 }
 
+/// The jump buttons as a floating slot: they stay above the bottom bars while
+/// those are open and slide down to the corner when the bars fold away.
+class JumpButtonsSlot extends StatelessWidget {
+  const JumpButtonsSlot({super.key, required this.controller, required this.openBottom, required this.foldedBottom, this.right = 18});
+
+  final ScrollController controller;
+  final double openBottom;
+  final double foldedBottom;
+  final double right;
+
+  @override
+  Widget build(BuildContext context) {
+    final folded = GlassInsets.foldedOf(context);
+    return AnimatedPositioned(
+      duration: Duration(milliseconds: folded ? 340 : 200),
+      curve: folded ? Curves.easeInOutCubic : Curves.easeOutCubic,
+      right: right,
+      bottom: folded ? foldedBottom : openBottom,
+      child: ScrollJumpButtons(controller: controller),
+    );
+  }
+}
+
 /// Marks the subtree where a [ToolButton] fills the width it is given.
 class _FillButtons extends InheritedWidget {
   const _FillButtons({required super.child});

@@ -117,15 +117,16 @@ class _ToastViewState extends State<_ToastView> with SingleTickerProviderStateMi
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
         decoration: BoxDecoration(
-          color: t.error ? const Color(0xF23A2422) : Palette.toast,
+          // clearly lifted from the cards under it: lighter surface, accent outline, deeper shadow
+          color: t.error ? const Color(0xFF4A2724) : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Palette.fg.withValues(alpha: 0.08)),
-          boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
+          border: Border.all(color: (t.error ? Palette.danger : accent).withValues(alpha: 0.75), width: 1.4),
+          boxShadow: const [BoxShadow(color: Color(0xB3000000), blurRadius: 30, spreadRadius: 1, offset: Offset(0, 10))],
         ),
         child: Row(children: [
           Icon(t.error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, size: 20, color: t.error ? Palette.danger : accent),
           const SizedBox(width: 10),
-          Expanded(child: Text(t.message, style: TextStyle(fontSize: 13.5, color: Palette.text))),
+          Expanded(child: Text(t.message, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Palette.text))),
           if (t.actionLabel != null)
             TextButton(
               onPressed: () {
