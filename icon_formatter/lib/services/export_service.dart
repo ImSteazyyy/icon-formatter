@@ -35,91 +35,27 @@ class ExportService {
 
   /// Exports a whole folder (folder or ZIP depending on [zip]).
   static Future<ExportResult?> exportDir(String dir, {required String name, required bool zip}) async {
-    if (Platform.isAndroid) {
-      if (zip) {
-        final z = p.join(await AppPaths.I.workDir('zip'), '$name.zip');
-        await zipDirectory(dir: dir, zipPath: z);
-        final bytes = await File(z).readAsBytes();
-        final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaZip, fileName: '$name.zip', bytes: bytes);
-        if (saved == null) return null;
-        return ExportResult(S.zipSalvato, location: saved);
-      }
-      final tree = await PlatformService.pickTree();
-      if (tree == null) return null;
-      final n = await PlatformService.writeDirToTree(tree, dir, subfolder: name);
-      return ExportResult(S.fileSalvatiNellaCartellaScelta(n));
-    }
-    // Windows / desktop: native folder dialog
-    final target = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: S.scegliCartellaDestinazione,
-      initialDirectory: AppState.I.export.destination,
-    );
-    if (target == null) return null;
-    AppState.I.update(() => AppState.I.export.destination = target);
     if (zip) {
-      final z = uniquePath(p.join(target, '$name.zip'));
-      final n = await zipDirectory(dir: dir, zipPath: z);
-      return ExportResult(S.zipCreatoFile(n), location: z);
+      final z = p.join(await AppPaths.I.workDir('zip'), '$name.zip');
+      await zipDirectory(dir: dir, zipPath: z);
+      final bytes = await File(z).readAsBytes();
+      final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaZip, fileName: '$name.zip', bytes: bytes);
+      if (saved == null) return null;
+      return ExportResult(S.zipSalvato, location: saved);
     }
-    final out = uniquePath(p.join(target, name));
-    final n = await _copyDir(Directory(dir), Directory(out));
-    return ExportResult(S.fileEsportati(n), location: out);
-  }
-
-  static Future<int> _copyDir(Directory src, Directory dst) async {
-    await dst.create(recursive: true);
-    var n = 0;
-    await for (final e in src.list(recursive: true)) {
-      if (e is File) {
-        final rel = p.relative(e.path, from: src.path);
-        final dest = uniquePath(p.join(dst.path, rel));
-        await Directory(p.dirname(dest)).create(recursive: true);
-        await e.copy(dest);
-        n++;
-      }
-    }
-    return n;
+    final tree = await PlatformService.pickTree();
+    if (tree == null) return null;
+    final n = await PlatformService.writeDirToTree(tree, dir, subfolder: name);
+    return ExportResult(S.fileSalvatiNellaCartellaScelta(n));
   }
 
   /// Saves a single PNG.
   static Future<ExportResult?> saveSingle(Uint8List png, String fileName) async {
-    if (Platform.isAndroid) {
-      final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaPng, fileName: fileName, bytes: png);
-      return saved == null ? null : ExportResult(S.pngSalvato, location: saved);
-    }
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: S.salvaPng,
-      fileName: fileName,
-      type: FileType.custom,
-      allowedExtensions: ['png'],
-      initialDirectory: AppState.I.export.destination,
-    );
-    if (path == null) return null;
-    var target = path.toLowerCase().endsWith('.png') ? path : '$path.png';
-    // The OS dialog already asked about replacing an existing file; we still
-    // refuse to touch the original sources by writing a new file only.
-    await File(target).writeAsBytes(png);
-    AppState.I.update(() => AppState.I.export.destination = p.dirname(target));
-    return ExportResult(S.pngSalvato, location: target);
+    final saved = await FilePicker.platform.saveFile(dialogTitle: S.salvaPng, fileName: fileName, bytes: png);
+    return saved == null ? null : ExportResult(S.pngSalvato, location: saved);
   }
 
-  /// Windows: save a built APK through the native save dialog.
-  static Future<ExportResult?> saveApk(String apk, String fileName) async {
-    final path = await FilePicker.platform.saveFile(
-      dialogTitle: S.apkSalva,
-      fileName: fileName,
-      type: FileType.custom,
-      allowedExtensions: ['apk'],
-      initialDirectory: AppState.I.export.destination,
-    );
-    if (path == null) return null;
-    final target = path.toLowerCase().endsWith('.apk') ? path : '$path.apk';
-    await File(apk).copy(target);
-    AppState.I.update(() => AppState.I.export.destination = p.dirname(target));
-    return ExportResult(S.apkSalvato, location: target);
-  }
-
-  /// Android Share Sheet (also works on Windows where supported).
+  /// Android Share Sheet.
   static Future<void> share(List<String> files, {String? text}) async {
     await SharePlus.instance.share(ShareParams(files: files.map((f) => XFile(f)).toList(), text: text));
   }

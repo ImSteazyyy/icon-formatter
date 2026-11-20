@@ -88,7 +88,7 @@
         <intent>
             <action android:name="com.nothing.launcher.icon_pack_picker" />
         </intent>
-        <!-- icon packs (to show "Le tue app" with the pack the launcher uses) -->
+        <!-- icon packs (to show "Your apps" with the pack the launcher uses) -->
         <intent><action android:name="org.adw.launcher.THEMES" /></intent>
         <intent><action android:name="com.novalauncher.THEME" /></intent>
         <intent><action android:name="com.gau.go.launcherex.theme" /></intent>

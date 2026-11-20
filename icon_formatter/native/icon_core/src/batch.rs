@@ -31,9 +31,9 @@ pub struct Job {
     pub placement: Option<Placement>,
     /// When set, the glyph is placed without isolation (already a glyph).
     pub skip_isolation: bool,
-    /// Plate overrides for this icon (Lucent only; ignored otherwise).
+    /// Plate overrides for this icon (Lightnt only; ignored otherwise).
     pub shape: Option<PlateShape>,
-    /// Plate colour and alpha, RGBA (Lucent only).
+    /// Plate colour and alpha, RGBA (Lightnt only).
     pub backdrop: Option<[u8; 4]>,
 }
 
@@ -58,7 +58,7 @@ pub struct BatchConfig {
     pub segment: SegmentOptions,
     /// Max worker threads (0 = all cores).
     pub threads: usize,
-    /// Lucent rendering: the plate is built per icon from its silhouette,
+    /// Lightnt rendering: the plate is built per icon from its silhouette,
     /// so `background` is ignored.
     pub lucent: Option<crate::lucent::LucentParams>,
     /// Local AI background removal (cached model + mask options).
@@ -73,6 +73,11 @@ pub struct BatchConfig {
 /// pixels and every isolation input match (see `cutcache::key`). `keep_alpha`
 /// is the skip-isolation path (the glyph is already cut out). Errors come only
 /// from the AI model; nothing is stored for them.
+/// Notes added to an item's result when a cut-out cache is in use: the
+/// Flutter side counts them ("N re-composed from cache, M re-cut") and hides them.
+pub const NOTE_CACHE_HIT: &str = "cut:cache-hit";
+pub const NOTE_CACHE_MISS: &str = "cut:cache-miss";
+
 pub fn isolate_cached(
     img: &RgbaImage,
     cut_cache: Option<&Path>,
@@ -91,20 +96,26 @@ pub fn isolate_cached(
         (dir, k)
     });
     if let Some((dir, k)) = &key {
-        if let Some(r) = cutcache::load(dir, k) {
+        if let Some(mut r) = cutcache::load(dir, k) {
+            r.notes.push(NOTE_CACHE_HIT.to_string());
             return Ok(r);
         }
     }
-    let res = if keep_alpha {
+    let mut res = if keep_alpha {
         isolate(img, &eff)
     } else if let Some((model, opt)) = ai {
         crate::ai::isolate_ai(img, model, opt)?.seg
     } else {
         isolate(img, &eff)
     };
+    let miss = key.is_some();
     if let Some((dir, k)) = &key {
         // a failed store only costs a future isolation
         let _ = cutcache::store(dir, k, &res);
+    }
+    // added after the store, so the saved entry stays clean
+    if miss {
+        res.notes.push(NOTE_CACHE_MISS.to_string());
     }
     Ok(res)
 }
@@ -558,3 +569,78 @@ fn slow_cores() -> Vec<usize> {
 
 #[cfg(not(target_os = "android"))]
 fn lower_thread_priority() {}
+
+#[cfg(test)]
+mod cache_hit_tests {
+    use super::*;
+    use image::Rgba;
+    use std::time::Instant;
+
+    fn icon() -> RgbaImage {
+        let mut img = RgbaImage::from_pixel(96, 96, Rgba([240, 240, 240, 255]));
+        for y in 24..72 {
+            for x in 24..72 {
+                img.put_pixel(x, y, Rgba([200, 40, 30, 255]));
+            }
+        }
+        img
+    }
+
+    fn cfg(backdrop: [u8; 4], cache: Option<PathBuf>) -> BatchConfig {
+        BatchConfig {
+            size: 96,
+            background: Arc::new(RgbaImage::from_pixel(96, 96, Rgba(backdrop))),
+            placement: Placement::default(),
+            segment: SegmentOptions::default(),
+            threads: 1,
+            lucent: None,
+            ai: None,
+            effects: Effects::default(),
+            cut_cache: cache,
+        }
+    }
+
+    fn job() -> Job {
+        Job {
+            id: "a".into(),
+            name: "a".into(),
+            source: Source::Bytes(Arc::new(Vec::new())),
+            output: PathBuf::from("a.png"),
+            segment: None,
+            placement: None,
+            skip_isolation: false,
+            shape: None,
+            backdrop: None,
+        }
+    }
+
+    #[test]
+    fn cache_hit_is_marked_and_writes_the_same_pixels() {
+        let t = tempfile::tempdir().unwrap();
+        let img = icon();
+        let fresh = process_one(&img, &cfg([255, 255, 255, 255], None), &job()).0;
+        let (c1, r1) = process_one(&img, &cfg([255, 255, 255, 255], Some(t.path().into())), &job());
+        let (c2, r2) = process_one(&img, &cfg([255, 255, 255, 255], Some(t.path().into())), &job());
+        assert!(r1.notes.iter().any(|n| n == NOTE_CACHE_MISS));
+        assert!(r2.notes.iter().any(|n| n == NOTE_CACHE_HIT));
+        assert_eq!(c1.as_raw(), fresh.as_raw());
+        assert_eq!(c2.as_raw(), fresh.as_raw());
+    }
+
+    #[test]
+    fn plate_only_change_reuses_the_cut_and_matches_a_fresh_run() {
+        let t = tempfile::tempdir().unwrap();
+        let img = icon();
+        // first processing fills the cache
+        process_one(&img, &cfg([255, 255, 255, 255], Some(t.path().into())), &job());
+        let t0 = Instant::now();
+        let fresh = process_one(&img, &cfg([20, 20, 60, 255], None), &job()).0;
+        let full = t0.elapsed();
+        let t1 = Instant::now();
+        let (hit, r) = process_one(&img, &cfg([20, 20, 60, 255], Some(t.path().into())), &job());
+        let recomposed = t1.elapsed();
+        assert!(r.notes.iter().any(|n| n == NOTE_CACHE_HIT), "plate-only change must hit the cut cache");
+        assert_eq!(hit.as_raw(), fresh.as_raw(), "re-composed output must equal a fresh run");
+        eprintln!("bench: full processing {full:?}, re-compose from cache {recomposed:?}");
+    }
+}

@@ -1,6 +1,6 @@
 // End-to-end flows of the app, run on a device or emulator:
 //   flutter test integration_test/app_flow_test.dart -d emulator-5554
-// Windows desktop works too (-d windows); the Apps tab exists on Android only.
+// Android only: the Apps tab exists on the phone.
 // Language is forced to Italian, onboarding and tour are skipped (e2e_support.dart).
 //
 // The Apps tab opens the Shizuku permission prompt on the emulator, so it is
@@ -32,7 +32,7 @@ void expectTabBar() {
   }
 }
 
-/// Imports the 13 samples through the Studio controller, runs "Elabora tutte"
+/// Imports the 13 samples through the Studio controller, runs "Process all"
 /// and waits until every item has a result. Returns the controller.
 Future<WorkspaceController> importAndProcess(WidgetTester tester) async {
   final dir = p.join(AppPaths.I.cache.path, 'e2e_samples');
@@ -104,15 +104,13 @@ void main() {
     }
   });
 
-  testWidgets('b: Settings > Appearance switches Nothing/Glass and light/dark, then back', (tester) async {
+  testWidgets('b: Settings > Appearance switches light and dark, then back', (tester) async {
     await pumpApp(tester);
     await openTab(tester, [S.impostazioni, S.opzioni]);
     await tapText(tester, S.appearance);
     final a = AppState.I.appearance;
-
-    await tapText(tester, S.stileVetro);
-    expect(a.style, UiStyle.glass, reason: 'Glass style was not applied');
-    expect(tester.takeException(), isNull, reason: 'Glass style threw an exception');
+    // the Nothing style is the only look: no style selector
+    expect(find.text(S.stileVetro), findsNothing);
 
     await tapText(tester, S.comodoTemaScuro);
     expect(a.themeChoice, ThemeChoice.dark, reason: 'Dark theme was not chosen');
@@ -123,8 +121,6 @@ void main() {
     expect(a.light, isTrue, reason: 'Light theme not applied');
     expect(tester.takeException(), isNull, reason: 'Light theme threw an exception');
 
-    await tapText(tester, S.stileNothing);
-    expect(a.style, UiStyle.nothing, reason: 'Nothing style was not restored');
     await tapText(tester, S.comodoTemaSistema);
     expect(tester.takeException(), isNull, reason: 'Switching back threw an exception');
   });
@@ -170,7 +166,7 @@ void main() {
   testWidgets('e: Settings > System shows the cache rows', (tester) async {
     await pumpApp(tester);
     await openTab(tester, [S.impostazioni, S.opzioni]);
-    // "Sistema" is both a group title and the row: the row is the lower one
+    // "System" is both a group title and the row: the row is the lower one
     await tester.tap(find.text(S.system).hitTestable().last);
     await pumpFor(tester, const Duration(milliseconds: 800));
     expect(find.text(S.cache).hitTestable(), findsWidgets, reason: 'The cache rows are not shown in Settings > System');

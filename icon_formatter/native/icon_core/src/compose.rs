@@ -514,7 +514,7 @@ fn tile_check(glyph: &RgbaImage, min_alpha: u8) -> bool {
 
 /// Coloured plate with a neutral glyph (e.g. a dark tag on a yellow disc):
 /// the glyph becomes the plate's colour and the plate itself is dropped, so
-/// on the Lucent plate the symbol keeps the app's colour; holes inside the
+/// on the Lightnt plate the symbol keeps the app's colour; holes inside the
 /// glyph that showed the plate become transparent. Returns the recoloured
 /// glyph cropped to the plate box, the glyph box inside it and the plate box
 /// in `img` coordinates. None when the plate is neutral, not a filled

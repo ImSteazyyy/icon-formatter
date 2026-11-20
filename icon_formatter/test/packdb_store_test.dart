@@ -61,7 +61,7 @@ PackContent _maps({int n = 2}) => PackContent.maps(
       },
   },
   log: [
-    {'date': '2026-11-19T10:00:00', 'text': 'Create 2 icone'},
+    {'date': '2026-11-19T10:00:00', 'text': 'Create 2 icons'},
   ],
   profiles: [
     {'name': 'Profilo', 'date': '2026-11-19', 'corrections': {}},

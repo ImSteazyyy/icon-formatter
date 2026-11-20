@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/state.dart';
+import '../app/theme.dart';
 import '../l10n/strings.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/color_picker.dart';
@@ -8,7 +9,7 @@ import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
 import 'workspace_controller.dart';
 
-/// Per-icon plate shape (Lucent only). Picking one processes the icon again.
+/// Per-icon plate shape (Lightnt only). Picking one processes the icon again.
 Future<void> studio2PlateShapeSheet(
   BuildContext context,
   WorkspaceController c,
@@ -34,7 +35,7 @@ Future<void> studio2PlateShapeSheet(
               trailing: v == it.shapeOverride
                   ? Icon(
                       Icons.check_rounded,
-                      color: Theme.of(ctx).colorScheme.primary,
+                      color: Palette.selection,
                     )
                   : null,
               onTap: () => Navigator.pop(ctx, (shape: v)),
@@ -46,7 +47,7 @@ Future<void> studio2PlateShapeSheet(
   if (r != null) c.setItemShape(it, r.shape);
 }
 
-/// Per-icon plate colour (Lucent only): colour picker and opacity. "Predefinito"
+/// Per-icon plate colour (Lightnt only): colour picker and opacity. "Default"
 /// clears the override. Dismissing the sheet changes nothing.
 Future<void> studio2PlateColorSheet(
   BuildContext context,

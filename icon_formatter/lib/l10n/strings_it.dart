@@ -24,7 +24,6 @@ class Strings {
   String get impostazioni => 'Impostazioni';
   String get opzioni => 'Opzioni';
   String get baseAttivo => 'Icona base attiva';
-  String get referenceTranslucent => 'Traslucido di riferimento';
   String kb(Object? a) => '$a KB';
   String mb(Object? a) => '$a MB';
   String get iconFormatter => 'Icon Formatter';
@@ -38,12 +37,8 @@ class Strings {
   String baseCreatoDalPreset(Object? a) => 'Icona base creata dal preset $a';
   String get ogniBaseHaCalibrazioneIndipendente => "Ogni icona base ha la sua calibrazione. Le icone escono alla stessa risoluzione dell'icona base.";
   String get importaBase => 'Carica base';
-  String creaPreset(Object? a) => 'Crea da preset "$a"';
   String get nessunBaseIcon => 'Nessuna icona base';
   String px(Object? a, Object? b) => '$a×${b}px';
-  String get nonCalibrato => 'Non calibrato';
-  String calibratoEsempiValidiGlyph(Object? a, Object? b, Object? c) => 'Calibrata su $a esempi ($b validi) · simbolo al $c%';
-  String get usa => 'Usa';
   String get calibra => 'Calibra';
   String get ricalibra => 'Ricalibra';
   String get rinomina => 'Rinomina';
@@ -92,7 +87,6 @@ class Strings {
   String get cercaNomeOPackage => "Cerca un'app";
   String get soloNonElaborate => 'Solo da elaborare';
   String get selezionaTutte => 'Seleziona tutte';
-  String get deseleziona => 'Deseleziona';
   String get toccaSelezionareTieniPremutoAnteprima => "Tocca per selezionare, tieni premuto per l'anteprima e le correzioni";
   String appSelezionate(Object? a, Object? b) => '$b di $a selezionate';
   String get originalComposition => 'Composizione originale';
@@ -102,6 +96,18 @@ class Strings {
   String get regolazioni => 'Regolazioni';
   String get stile => 'Personalizza';
   String get altro => 'Altro';
+  String get altroSezVerifica => 'Controlli';
+  String get altroSezEsporta => 'Esporta e condividi';
+  String get altroControlloSub => 'Vuote, piccole, scure o senza contrasto';
+  String get altroRegistroSub => 'Cronologia, copiabile come note di rilascio';
+  String get altroProfiliSub => 'Salva e ricarica le correzioni';
+  String get altroApriSub => 'Installato, APK/ZIP o abbinamenti';
+  String get altroImportaSub => 'Cartella o ZIP di icone generate';
+  String get altroPuliziaSub => 'Ripulisci o unisci un pack';
+  String get altroAnteprimaSub => 'Tutte le icone su uno o più fogli';
+  String get altroCondividiSub => 'Invia il file APK del pack';
+  String get altroCreaApkSub => 'Crea un APK installabile del pack';
+  String get provaSuccessiva => 'Prova successiva';
   String get pbApriPack => 'Apri un pack';
   String get pbCondividiApk => 'Condividi';
   String pbApkPronto(Object? v) => 'APK del pack $v pronto da condividere';
@@ -155,11 +161,6 @@ class Strings {
   String get scontornoRemoveBg => 'remove.bg: online, serve una chiave API e consuma crediti';
   String get stileTitolo => 'Stile delle icone';
   String get stileSpiegazione => "Scegli come trasformare le icone. Ogni modifica si vede subito nell'anteprima: trascina la linea bianca per confrontare prima e dopo.";
-  String get hintVuoto => 'Inizia importando le icone da trasformare.';
-  String get hintDaElaborare => 'Scegli lo stile, poi Elabora.';
-  String get hintInCorso => 'Elaborazione in corso…';
-  String hintParziale(Object? a, Object? b) => '$a di $b pronte.';
-  String get hintFatto => 'Fatto. Apri Altro per esportarle o mandarle al Pack.';
   String elaboraApp(Object? a) => 'Elabora $a app';
   String get iconPackZip => 'Icon pack (ZIP o APK)';
   String impossibileAprirePack(Object? a) => 'Non riesco ad aprire il pack: $a';
@@ -321,11 +322,23 @@ class Strings {
   String get prima => 'Prima';
   String get dopo => 'Dopo';
   String completateRimanentiErrori(
+
+
     Object? a,
+
+
     Object? b,
+
+
     Object? c,
+
+
     Object? d,
+
+
     Object? e,
+
+
   ) => '$a · $b di $c pronte · $d rimaste · $e errori';
   String get annulla => 'Annulla';
   String get applica => 'Applica';
@@ -453,7 +466,6 @@ class Strings {
   String pbIconaRipristinata(Object? a) => 'Icona precedente di $a ripristinata';
   String get pbModificaIcona => 'Modifica icona';
   String get pbRipristinaPrecedente => 'Ripristina icona precedente';
-  String get cercaNomeFile => 'Cerca per nome file';
   String get cancellaRicerca => 'Cancella ricerca';
   String nessunRisultato(String q) => 'Nessuna icona contiene "$q"';
   String get dpRimosso => 'Il pack è stato disinstallato. Puoi rigenerarlo e reinstallarlo da qui.';
@@ -463,7 +475,6 @@ class Strings {
   String get dpResiduiPuliti => 'Dati del pack eliminati.';
   String get dpResiduiRimasti => 'Restano copie del pack che non si possono eliminare da qui (per esempio nello Spazio privato bloccato).';
   String get pbDaStudio => 'Icona dallo Studio (ha la precedenza)';
-  String iconeDelPack(String p) => 'Icone del pack in uso: $p';
   String get mantieniBiancoInterno => 'Mantieni il bianco interno';
   String get togliBiancoInterno => 'Togli il bianco interno';
   String get modoSenzaAlone => 'Bordo pieno senza alone';
@@ -478,10 +489,7 @@ class Strings {
   String get modoPaginaDesc => "L'icona intera (per esempio un calendario) arriva fino al bordo del piatto, senza togliere niente e con i suoi colori.";
   String get vetroQualitaNonDisponibile => "Su questo computer la qualità massima del vetro non è disponibile: si usa Bilanciato, così l'app non si blocca.";
   String get stileSpiegazioneModifica => 'Le stesse regolazioni dello Studio: valgono per questa icona e per le prossime create nel Pack.';
-  String get pbTieniPremuto => "Tieni premuto su un'app per modificarne l'icona";
   String get pbPasso1Catalogo => 'App installate';
-  String get pbCatalogoLettura => 'Leggo le app installate…';
-  String pbCatalogoInfo(Object? n, Object? v) => '$n app installate';
   String pbCatalogo(Object? n, Object? v) => '$n app ($v viste da Android)';
   String get pbAggiornaCatalogo => 'Aggiorna';
   String get pbImmagine => 'Immagine';
@@ -494,6 +502,20 @@ class Strings {
   String get pbSoloPosizione => 'Solo posizione e dimensione, sullo sfondo delle icone';
   String get pbUsaComeE => "Usa l'immagine così com'è";
   String get pbConfermaSostituzione => 'Conferma';
+  String get pbEditComeAppare => "Come deve apparire l'icona";
+  String get pbEditAnteprimeHint => "Le anteprime mostrano questa icona. Tocca per scegliere.";
+  String get pbEditConsigliato => 'Consigliato';
+  String get pbEditAltre => 'Altre opzioni';
+  String get pbStileDelPack => 'Forma e sfondo di tutto il pack';
+  String get pbOptAutoSub => 'Sceglie il modo migliore';
+  String get pbOptSimboloT => 'Solo simbolo';
+  String get pbOptSimboloSub => 'Toglie lo sfondo e tiene il disegno';
+  String get pbOptIconaT => 'Icona intera';
+  String get pbOptIconaSub => "Tiene l'immagine com'è dentro la forma";
+  String get pbOptColoreSub => 'Il simbolo prende il colore dello sfondo';
+  String get pbOptBordoSub => 'Il disegno arriva ai bordi';
+  String get pbOptOriginaleT => 'Originale';
+  String get pbOptOriginaleSub => 'Nessuna modifica';
   String get scorriPerChiudereAvviso => 'Scorri di lato per chiudere';
   String get pbEsclusa => 'Esclusa';
   String get pbPerPackage => 'stesso package';
@@ -503,7 +525,6 @@ class Strings {
   String pbSoloSomiglianza(Object? n) => 'solo somiglianza visiva $n%';
   String get vaiInCima => 'Vai in cima';
   String get vaiInFondo => 'Vai in fondo';
-  String get modalitaChiara => 'Modalità chiara';
   String get sfondoComePack => 'Sfondo come il pack';
   String get sfondoComePackSub => 'Porta la trasparenza dello sfondo a quella delle altre icone';
   String get sfondoNientePack => 'Elabora prima le icone';
@@ -526,12 +547,10 @@ class Strings {
   String get pbEscludi => 'Escludi';
   String get pbIncludi => 'Includi';
   String get pbCercaGenerate => 'Cerca tra le icone nuove';
-  String get asTitolo => 'Aggiornamento automatico del pack';
   String get asSezione => 'Aggiornamento automatico';
   String get asControlloAuto => 'Controllo automatico';
   String get asMai => 'Nessun controllo eseguito';
   String asUltimo(Object? t) => 'Ultimo controllo: $t';
-  String get asInfo => "Il controllo parte allo sblocco del telefono e ogni 6 ore, senza root e senza servizi sempre attivi. Se nessuna app è cambiata non fa niente; se qualcosa è cambiato ricevi una notifica silenziosa.";
   String get asControllaOra => 'Controlla ora';
   String asRielabora(Object? n) => 'Rifai $n';
   String asAltre(Object? n) => '…e altre $n';
@@ -545,7 +564,6 @@ class Strings {
   String apkFallita(Object? e) => "Non sono riuscito a creare l'APK: $e";
   String get asSegnaViste => 'Segna viste';
   String get dpTitolo => 'Applica nel launcher';
-  String get dpInfo => "Il pack è un'app a parte: le icone di sistema non vengono toccate. Con Shizuku Icon Formatter lo installa e lo seleziona nel launcher, senza PC e senza root.";
   String get dpApplica => 'Installa e applica';
   String get dpSoloInstalla => 'Installa (con conferma di sistema)';
   String get dpConcedi => 'Concedi il permesso a Shizuku';
@@ -556,10 +574,13 @@ class Strings {
   String get dpShizukuFermo => "Shizuku è installato ma non è attivo: aprilo e premi Avvia (serve il Debug wireless, non il PC). Dopo ogni riavvio del telefono va avviato di nuovo.";
   String get dpShizukuNegato => 'Icon Formatter non ha ancora il permesso di Shizuku.';
   String get dpShizukuVecchio => 'Shizuku è troppo vecchio: aggiornalo.';
+  String get dpShizukuNonInstallato => 'Shizuku non installato';
+  String get dpShizukuNonAttivo => 'Shizuku non è attivo';
+  String get dpShizukuVecchioBreve => 'Shizuku è troppo vecchio';
+  String get dpShizukuPermesso => 'Permesso Shizuku mancante';
   String get dpShizukuOk => 'Shizuku attivo e autorizzato';
   String get dpNoLauncher => 'Nothing Launcher non trovato: il pack viene installato, poi sceglilo nelle impostazioni del tuo launcher.';
   String dpLauncher(Object v) => 'Nothing Launcher $v';
-  String dpSelettore(Object? v) => 'Pack selezionato: ${v ?? '—'}';
   String get dpCompilazione => 'Creo il pack sul telefono…';
   String get dpInstallazione => 'Installo il pack…';
   String get dpApplicazione => 'Seleziono il pack nel launcher…';
@@ -573,13 +594,7 @@ class Strings {
   String get vetro => 'Vetro';
   String get info => 'Info';
   String get lingua => 'Lingua';
-  String get setupBenvenuto => 'Benvenuto';
-  String get setupSub => 'Due scelte e sei pronto. Puoi cambiarle quando vuoi in Impostazioni.';
-  String get setupAuto => 'Aggiornamento automatico';
-  String get setupAutoSub => "Ti avvisa quando un'app nuova o aggiornata ha bisogno della sua icona. Chiede il permesso per le notifiche.";
   String get setupShizuku => 'Shizuku (facoltativo)';
-  String get setupShizukuSub => 'Con Shizuku il pack si installa e si applica da solo, senza PC. Senza Shizuku lo installi con la conferma di sistema e lo scegli a mano nel launcher.';
-  String get setupInizia => 'Inizia';
   String get elaborataBreve => 'elaborata';
   String get baseSquircle => 'Squircle';
   String get baseCerchio => 'Cerchio';
@@ -601,13 +616,6 @@ class Strings {
   String get interfaccia => 'Interfaccia';
   String get apri => 'Apri';
   String versioneBreve(Object v) => 'Versione $v';
-  String get catAspettoDesc => 'Stile, animazioni e densità';
-  String get catVetroDesc => 'Vetro di barra, pannelli, pulsanti e finestre';
-  String get catElaborazioneDesc => 'Dimensioni e rimozione dello sfondo';
-  String get catBaseDesc => 'Sfondi e calibrazione delle icone';
-  String get catPackDesc => 'Come ripulire gli icon pack';
-  String get catExportDesc => 'Formato, nomi e destinazione';
-  String get catSistemaDesc => 'File temporanei, ripristino e versione';
   String get materiale => 'Materiale';
   String get vetroVeloce => 'Più veloce';
   String get vetroBilanciato => 'Bilanciato';
@@ -622,16 +630,13 @@ class Strings {
   String get vetroPannelli => 'Vetro nelle card';
   String get vetroPulsanti => 'Vetro nei pulsanti';
   String get vetroDialoghi => 'Vetro nelle finestre di dialogo';
-  String get pbSottotitoloBreve => 'Crea il tuo icon pack in pochi passi.';
   String get pbPasso1 => 'App';
   String get pbPasso1Sub => 'Le app a cui dare le nuove icone';
   String pbOriginaliN(int n) => '$n app caricate';
   String get pbDaFile => 'Da file';
   String get pbPasso2 => 'Icone nuove';
-  String get pbPasso2Sub => 'Creale con lo Studio o importale, poi abbinale';
   String get pbEsporta => 'Esporta';
   String get pbEsportaSub => 'Cartella, ZIP o APK';
-  String dpVersioneInstallata(Object v) => 'Pack installato: versione $v';
   String get rigeneraConModalita => 'Rigenera in un altro modo…';
   String modalitaSimbolo(Object n) => 'Come prendere il simbolo · $n';
   String get modalitaSimboloInfo => "Se il riconoscimento automatico sbaglia, scegli tu come prendere il simbolo da questa icona (solo stile Lucent).";
@@ -783,7 +788,7 @@ class Strings {
   String get studioRimuoviSelezioneSub => 'Le icone escono dalla lista. I file originali non vengono toccati.';
   String get studioDeselezionaTutte => 'Deseleziona tutte';
   String get studioIncollaAppunti => 'Incolla dagli appunti';
-  String get studioIncollaAppuntiSub => 'Immagine copiata o file copiato in Esplora';
+  String get studioIncollaAppuntiSub => 'Immagine copiata o percorso di un file immagine copiato';
   String get studioAppuntiVuoti => 'Negli appunti non ci sono immagini o file immagine.';
   String get studioAnnullaModifica => 'Annulla modifica';
   String get studioAnnullaModificaSub => 'Torna alla correzione precedente';
@@ -908,4 +913,118 @@ class Strings {
   String get btnAnnulla => 'Annulla';
   String get btnRipristina => 'Ripeti';
   String get btnDuplicati => 'Via doppi';
+  String get ux1bChooseImage => 'Scegli un\'immagine';
+  String get ux1bPickFirst => 'Scegli prima un\'immagine';
+  String get ux1bSheetSource => 'Origine';
+  String get ux1bSheetPack => 'Nel pack';
+  String get ux1bSheetResult => 'Risultato';
+  String get ux1bSheetOptions => 'Opzioni';
+  String get ux1bSubChoose => 'Usa un\'altra immagine dai tuoi file';
+  String get ux1bSubReuse => 'Usa l\'icona di un\'altra app del pack';
+  String get ux1bSubRename => 'Cambia il nome usato nel pack';
+  String get ux1bSubVerify => 'Segnala come controllata da te';
+  String get ux1bSubExclude => 'Lascia questa icona fuori dal pack';
+  String get ux1bSubInclude => 'Rimettila nel pack';
+  String get ux1bSubRedo => 'Rielabora dall\'immagine originale';
+  String get ux1bSubSuggest => 'Propone un\'icona da provare';
+  String get ux1bSubRestore => 'Torna alla versione precedente';
+  String get ux1bCleanupRole => 'Sistema un pack di icone esistente: togli gli sfondi, uniforma lo stile e controlla le icone incerte';
+  String get ux1bStep1 => '1 · Scegli il pack';
+  String get ux1bStep2 => '2 · Stile';
+  String get ux1bStep3 => '3 · Controlla';
+  String ux1bReviewCount(int n) => '$n icone da controllare';
+  String get ux1bReviewLegend => 'Giallo = da controllare';
+  String get ux1bReviewStart => 'Controlla';
+  String get ux1bPrev => 'Precedente';
+  String get ux1bNext => 'Successiva';
+  String get ux1bNoReview => 'Nessuna icona da controllare';
+  String get ux1bAdvanced => 'Avanzate';
+  String get ux1bNone => 'assente';
+  String ux1bEntries(int n) => '$n voci';
+  String get ux1bGenNotice => 'Generata dall\'app: controllala';
+  String ux1bGenBanner(int n) => '$n icone generate, controllale';
+  String get ux1a2Flusso => 'Flusso di lavoro';
+  String get ux1a2Ritaglio => 'Ritaglio';
+  String get ux1a2RegolaStile => 'Regola in Stile icona';
+  String get ux1a2RegolaStileSub => 'Modalità automatica, sensibilità e sfondo chiuso si regolano lì.';
+  String get ux1a2Avanzate => 'Avanzate e motore';
+  String get ux1a2AvanzateSub => 'Modello locale, soglie e processori. Di solito non serve cambiarli.';
+  String get ux1a2Processori => 'Processori usati';
+  String get ux1a2ProcAuto => 'Auto';
+  String get ux1a2ProcPochi => 'Pochi';
+  String get ux1a2ProcTutti => 'Tutti';
+  String get ux1a2ProcAutoSub => 'Il sistema sceglie quanti usarne.';
+  String get ux1a2ProcPochiSub => 'Consuma meno batteria, ma è più lento.';
+  String get ux1a2ProcTuttiSub => 'Il più veloce, ma usa più batteria.';
+  String ux1a2ProcHint(Object? a, Object? b) => 'In uso: $a su $b processori';
+  String get ux1a2RitagliVuoto => 'Nessun ritaglio salvato';
+  String get ux1a2RitagliSub => 'Riusa i ritagli già fatti, senza rielaborarli.';
+  String get ux1a2ChiaveServe => 'Serve una chiave API: inseriscila qui sotto.';
+  String get ux1a2Step1 => 'Aggiungi icone nello Studio';
+  String ux1a2Step2(Object? a) => 'Scegli uno stile, poi $a';
+  String get ux1a2Step3 => 'Manda al Pack e installa';
+  String get ux1a2PassiSub => 'Tocca un passo per aprire quella sezione.';
+  String get ux1a2CoachStudio => 'Aggiungi immagini o una cartella per iniziare.';
+  String get ux1a2CoachPack => 'Quattro passi: aggiungi, elabora, manda al Pack, installa.';
+  String get ux1a2CoachApps => 'Ogni app installata ha la sua icona: toccane una per vederla o cambiarla.';
+  String get ux1a2CoachOk => 'Ho capito';
+  String get ux1a2RipristinaSugg => 'Reimposta i suggerimenti';
+  String get ux1a2RipristinaSuggSub => 'Mostra di nuovo i suggerimenti delle prime volte.';
+  String get ux1a2SuggRipristinati => 'Suggerimenti reimpostati';
+  String get ux1aGruppoModifica => 'Modifica';
+  String get ux1aGruppoVisualizza => 'Visualizza';
+  String get ux1aGruppoInvia => 'Invia';
+  String get ux1aGruppoRimuovi => 'Rimuovi';
+  String get ux1aEsporta => 'Esporta';
+  String get ux1aEsportaSub => 'Cartella o ZIP';
+  String get ux1aSvuotaTitolo => 'Svuotare la lista?';
+  String ux1aSvuotaCorpo(Object? a) => 'Rimuove $a icone da questa lista. I file originali non vengono toccati e puoi aggiungerli di nuovo.';
+  String get ux1aSimbolo => 'Dimensione simbolo';
+  String get ux1aAvanzate => 'Avanzate';
+  String get ux1aTaglio => 'Ritaglio';
+  String get ux1aLancio => 'Launcher';
+  String get ux1aAspetto => 'Aspetto';
+  String get ux1aColore => 'Colori';
+  String get ux1aInfo => 'Cosa fa questa opzione';
+  String get ux1aOpacitaSfondo => 'Opacità del piatto';
+  String get ux1aAggiornaPreset => 'Aggiorna preset';
+  String get ux1aRipristinaPreset => 'Ripristina preset';
+  String get ux1aRinominaPreset => 'Rinomina preset';
+  String get ux1aModificato => 'Modificato';
+  String get ux1aModificatoNonSalvato => 'Modificato, non salvato';
+  String get ux1aPresetIntegrato => 'Preset integrato';
+  String get ux1aPresetSalvato => 'Preset salvato';
+  String ux1aUsoAreaHint(Object? a, Object? b, Object? c) => 'Area utile: lato $a%, centro ($b, $c)';
+  String get ux1bHintAuto => 'Sceglie il modo migliore';
+  String get ux1bHintSymbol => 'Toglie lo sfondo, tiene il disegno';
+  String get ux1bHintPlate => 'Simbolo nel colore dello sfondo';
+  String get ux1bHintFull => 'Il disegno arriva ai bordi';
+  String get ux1bHintPlace => 'Immagine intera dentro la forma';
+  String get ux1bHintRaw => 'Nessuna modifica';
+  String get ux1bChangeBg => 'Cambia sfondo';
+  String get ux1bPlateOpacity => 'Opacità del fondo';
+  String get ux1bPlateMode => 'Colore';
+  String get ux1bPlateAuto => 'Auto';
+  String get ux1bPlateDark => 'Scuro';
+  String get ux1bPlateLight => 'Chiaro';
+  String get ux1bApplyAll => 'Applica a tutte le icone';
+  String get ux1bPlateHint => 'Ricompone ogni icona dal suo ritaglio salvato: nessuna nuova segmentazione.';
+  String get ux1bPlatePreview => 'Anteprime: icone attuali, il nuovo fondo si vede dopo Applica';
+  String get ux2bNoticeRemoveBgNoKey => 'Nessuna chiave remove.bg: ritaglio classico al suo posto.';
+  String get ux2bNoticeAiNoModel => 'Modello AI non scaricato: ritaglio classico al suo posto.';
+  String get ux2bChangeBgTitle => 'Cambia sfondo delle icone elaborate';
+  String get ux2bChangeBgSub => 'Riapplica il fondo senza ritagliare di nuovo le icone';
+  String get ux2bApplyProcessed => 'Applica alle icone elaborate';
+  String get ux2bNothingToRecompose => 'Nessuna icona elaborata da ricomporre';
+  String ux2bCacheSummary(Object? a, Object? b) => '$a ricomposte dalla cache, $b ritagliate di nuovo';
+  String get ux2cPresetSqColour => 'Squircle · Colore';
+  String get ux2cPresetSqMono => 'Squircle · Mono';
+  String get ux2cPresetCiColour => 'Cerchio · Colore';
+  String get ux2cPresetCiMono => 'Cerchio · Mono';
+  String get ux2cChooseStyle => 'Scegli uno stile';
+  String get ux2cChooseStyleSub => 'Forma, colore e fondo applicati alle icone importate';
+  String get ux2cProcessAll => 'Elabora tutte';
+  String get ux2cSortBy => 'Ordina per';
+  String get ux2cShowOnly => 'Mostra';
+  String get ux2cMonoGlyph => 'Glifo monocromatico';
 }

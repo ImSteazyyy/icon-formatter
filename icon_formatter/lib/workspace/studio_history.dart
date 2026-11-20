@@ -8,7 +8,7 @@ class ItemCorrection {
   final PlacementSettings? placement;
   final LucentStrategy? strategy;
 
-  /// Per-icon plate shape and colour (ARGB), Lucent only; null = global.
+  /// Per-icon plate shape and colour (ARGB), Lightnt only; null = global.
   final LucentShape? shape;
   final int? backdrop;
   final bool matchPlate;

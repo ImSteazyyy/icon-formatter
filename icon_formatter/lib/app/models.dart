@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
@@ -149,39 +148,55 @@ class StylePreset {
   TranslucentSettings params;
   final bool builtIn;
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'builtIn': builtIn, 'params': translucentToJson(params)};
+  /// Lucent look (plate shape, mono, backdrop). When set, the preset renders
+  /// through the Lucent pipeline and [params] is unused. Null: procedural preset.
+  LucentConfig? lucent;
+
+  /// Params at the last "save" of a user preset (its baseline). Null: the
+  /// preset was never edited since it was created. Built-ins use their defaults.
+  Map<String, dynamic>? savedJson;
+
+  /// The values that "Modified" compares: the Lucent look, else the procedural params.
+  Map<String, dynamic> get values => lucent?.toJson() ?? translucentToJson(params);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'builtIn': builtIn,
+        'params': translucentToJson(params),
+        if (lucent != null) 'lucent': lucent!.toJson(),
+        if (savedJson != null) 'saved': savedJson,
+      };
 
   static StylePreset fromJson(Map<String, dynamic> j, TranslucentSettings d) => StylePreset(
         id: j['id'] as String,
         name: j['name'] as String,
         builtIn: j['builtIn'] as bool? ?? false,
         params: translucentFromJson((j['params'] as Map).cast<String, dynamic>(), d),
-      );
+      )
+        ..lucent = j['lucent'] is Map ? (LucentConfig()..load((j['lucent'] as Map).cast<String, dynamic>())) : null
+        ..savedJson = (j['saved'] as Map?)?.cast<String, dynamic>();
 }
 
-/// Built-in presets. Values tuned on the reference pack.
+/// The four built-in looks: squircle or circle plate, colour or monochrome glyph.
+const kDefaultPresetId = 'sqColour';
+
+/// Old built-in ids (nothing, liquid, minimal, darkflat, custom) and unknown ids
+/// fall back to the default look; user presets keep their own id.
+String migratePresetId(String? id, Iterable<String> knownIds) =>
+    id != null && knownIds.contains(id) ? id : kDefaultPresetId;
+
+/// Built-in presets: transparent plate (the Nothing widget value), one glyph
+/// colour mode per shape.
 List<StylePreset> builtInPresets(TranslucentSettings d) => [
-      StylePreset(id: 'nothing', name: S.traslucido, builtIn: true, params: d),
-      StylePreset(
-        id: 'liquid',
-        name: S.liquidGlass,
-        builtIn: true,
-        params: copyTranslucent(d, brightness: 0.62, frost: 0.35, reflection: 0.85, border: 0.85, depth: 0.35, contrast: 0.7),
-      ),
-      StylePreset(
-        id: 'minimal',
-        name: S.minimal,
-        builtIn: true,
-        params: copyTranslucent(d, brightness: 0.55, frost: 0.0, reflection: 0.0, border: 0.25, depth: 0.0, contrast: 0.15),
-      ),
-      StylePreset(
-        id: 'darkflat',
-        name: S.darkFlat,
-        builtIn: true,
-        params: copyTranslucent(d, brightness: 0.25, frost: 0.0, reflection: 0.0, border: 0.0, depth: 0.0, contrast: 0.0),
-      ),
-      StylePreset(id: 'custom', name: S.custom, builtIn: true, params: d),
+      _lucentLook(d, 'sqColour', S.ux2cPresetSqColour, LucentShape.squircle, mono: false),
+      _lucentLook(d, 'sqMono', S.ux2cPresetSqMono, LucentShape.squircle, mono: true),
+      _lucentLook(d, 'ciColour', S.ux2cPresetCiColour, LucentShape.circle, mono: false),
+      _lucentLook(d, 'ciMono', S.ux2cPresetCiMono, LucentShape.circle, mono: true),
     ];
+
+StylePreset _lucentLook(TranslucentSettings d, String id, String name, LucentShape shape, {required bool mono}) =>
+    StylePreset(id: id, name: name, builtIn: true, params: d)..lucent = (LucentConfig()..shape = shape..monochrome = mono);
 
 /// User base icon (stored as PNG in the app data folder).
 class BaseIcon {
@@ -237,8 +252,9 @@ class BaseIcon {
 }
 
 /// UI appearance settings.
-/// Look of the whole app: "Stile Nothing" (default) or "Vetro".
-enum UiStyle { nothing, glass }
+/// Look of the whole app: the Nothing style, the only one (kept as an enum so
+/// older saved settings and the native payload still resolve).
+enum UiStyle { nothing }
 
 /// Theme: follow the phone, or fixed light / dark.
 enum ThemeChoice { system, light, dark }
@@ -277,10 +293,8 @@ class Appearance {
   ThemeChoice themeChoice = ThemeChoice.system;
   bool light = false;
 
-  /// Power saving: glass fast and no animations. The values replaced are kept
-  /// here and put back when it goes off.
+  /// Power saving: no animations. The value replaced is kept here and put back when it goes off.
   bool powerSaving = false;
-  String? savedGlassQuality;
   bool savedAnimations = true;
 
   /// App language code ('' = the phone's language, English when not available).
@@ -293,7 +307,7 @@ class Appearance {
     return appLanguages.containsKey(sys) ? sys : 'en';
   }
 
-  /// Red of the Nothing style (fixed: the accent picker belongs to "Vetro").
+  /// Red of the Nothing style (fixed).
   static const nothingRed = 0xFFEC232B;
   /// Default accent: pink sampled from the user's Windows Start icon.
   static const defaultAccent = 0xFFBA4CD4;
@@ -302,7 +316,7 @@ class Appearance {
   bool animations = true;
   bool compact = false;
 
-  Color get accentColor => Color(style == UiStyle.nothing ? nothingRed : accent);
+  Color get accentColor => const Color(nothingRed);
 
   Map<String, dynamic> toJson() => {
         'radius': radius,
@@ -314,7 +328,6 @@ class Appearance {
         'light': light,
         'language': language,
         'powerSaving': powerSaving,
-        'savedGlassQuality': savedGlassQuality,
         'savedAnimations': savedAnimations,
       };
 
@@ -327,7 +340,6 @@ class Appearance {
     language = j['language'] as String? ?? language;
     themeChoice = themeChoiceFrom(j);
     powerSaving = j['powerSaving'] as bool? ?? powerSaving;
-    savedGlassQuality = j['savedGlassQuality'] as String? ?? savedGlassQuality;
     savedAnimations = j['savedAnimations'] as bool? ?? savedAnimations;
     syncLight();
   }
@@ -411,10 +423,10 @@ class GlassConfig {
   GlassQualityLevel quality = GlassQualityLevel.balanced;
 
   /// Native dark material (the glass package preset, premium renderer):
-  /// replaces the sliders of Materiale, Bordo e Luce where supported.
+  /// replaces the sliders of Material, Edges and Light where supported.
   bool native = true;
 
-  // "Vetro nativo" controls (Materiale, Colore, Bordi)
+  // "Native glass" controls (Material, Colour, Edges)
   bool nFrostOn = true;
   double nFrost = 2;
   double nColour = 0.6;
@@ -529,7 +541,7 @@ class GlassConfig {
 }
 
 
-/// Lucent plate settings (see native/icon_core/src/lucent.rs).
+/// Lightnt plate settings (see native/icon_core/src/lucent.rs).
 /// The glyph keeps its own colours unless [monochrome] is on.
 class LucentConfig {
   bool dark = true;
@@ -541,8 +553,20 @@ class LucentConfig {
   bool launcherShadow = false;
   bool launcherEncode = false;
 
-  /// Backdrop alpha (0x66 = 0.4).
-  double backdropAlpha = 0x66 / 255;
+  /// Backdrop alpha per mode: dark plate 0x66 (40%, matches the Nothing
+  /// widgets measured on the phone), light plate 0x99 (60%).
+  double backdropAlphaDark = 0x66 / 255;
+  double backdropAlphaLight = 0x99 / 255;
+
+  /// Alpha of the mode currently selected (the Look slider edits this).
+  double get backdropAlpha => dark ? backdropAlphaDark : backdropAlphaLight;
+  set backdropAlpha(double v) {
+    if (dark) {
+      backdropAlphaDark = v;
+    } else {
+      backdropAlphaLight = v;
+    }
+  }
 
   LucentSettings toSettings() {
     final d = defaultLucentSettings(dark: dark);
@@ -570,7 +594,10 @@ class LucentConfig {
     rim = (j['rim'] as num?)?.toDouble() ?? rim;
     launcherShadow = j['launcherShadow'] as bool? ?? launcherShadow;
     launcherEncode = j['launcherEncode'] as bool? ?? launcherEncode;
+    // older saves hold one 'backdropAlpha' (the mode saved at the time)
     backdropAlpha = (j['backdropAlpha'] as num?)?.toDouble() ?? backdropAlpha;
+    backdropAlphaDark = (j['backdropAlphaDark'] as num?)?.toDouble() ?? backdropAlphaDark;
+    backdropAlphaLight = (j['backdropAlphaLight'] as num?)?.toDouble() ?? backdropAlphaLight;
   }
 
   Map<String, dynamic> toJson() => {
@@ -583,6 +610,8 @@ class LucentConfig {
         'launcherShadow': launcherShadow,
         'launcherEncode': launcherEncode,
         'backdropAlpha': backdropAlpha,
+        'backdropAlphaDark': backdropAlphaDark,
+        'backdropAlphaLight': backdropAlphaLight,
       };
 
   void reset() => load(LucentConfig().toJson());
@@ -643,11 +672,10 @@ class LookConfig {
 
 /// Local AI background removal model catalogue (optional downloads).
 class AiModelInfo {
-  const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note, {this.phone = true, this.desktop = true});
+  const AiModelInfo(this.id, this.kind, this.label, this.bytes, this.ramMb, this.note, {this.phone = true});
 
   /// Runs smoothly on a phone (mid-range class) / on Windows.
   final bool phone;
-  final bool desktop;
   final String id;
   final AiModelKind kind;
   final String label;
@@ -663,12 +691,12 @@ class AiModelInfo {
 /// so it is not listed.
 final aiModels = [
   AiModelInfo('u2netp', AiModelKind.u2Netp, 'U²-Net-p', 4574861, 350, S.aiModelU2netpNote),
-  // 1024 px input: ~7,5 s/icona su un PC (misurato), decine di secondi su telefono
+  // 1024 px input: ~7.5 s per icon on a PC (measured), tens of seconds on a phone
   AiModelInfo('isnet-general-use', AiModelKind.isnetGeneral, 'ISNet General', 178648008, 1400, S.aiModelIsnetNote, phone: false),
 ];
 
 /// Models offered on this device (phone-friendly ones only on Android).
-List<AiModelInfo> get aiModelsHere => [for (final m in aiModels) if (Platform.isAndroid ? m.phone : m.desktop) m];
+List<AiModelInfo> get aiModelsHere => [for (final m in aiModels) if (m.phone) m];
 
 class LocalAiConfig {
   String modelId = 'u2netp';

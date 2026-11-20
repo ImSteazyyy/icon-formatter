@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../app/models.dart';
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../l10n/strings.dart';
@@ -15,8 +14,6 @@ import '../services/extra2_auto_backup.dart';
 import '../services/platform_service.dart';
 import '../services/update_check.dart';
 import '../widgets/common.dart';
-import '../widgets/liquid_glass.dart';
-import '../widgets/theme_reveal.dart';
 import 'settings_whats_new.dart';
 
 /// Automatic backup: the switch asks for a folder; the folder stays until the switch goes off.
@@ -217,7 +214,6 @@ class SettingsDiagnosticsTile extends StatelessWidget {
       redact: [for (final k in ['USERNAME', 'USER', 'COMPUTERNAME']) if (env[k] != null) env[k]!],
     ));
     await Clipboard.setData(ClipboardData(text: text));
-    if (context.mounted) showMsg(context, S.extra2DiagCopiata);
   }
 
   @override
@@ -233,77 +229,7 @@ class SettingsDiagnosticsTile extends StatelessWidget {
   }
 }
 
-/// Desktop shortcuts list in Settings › Sistema.
-class SettingsShortcutsTile extends StatelessWidget {
-  const SettingsShortcutsTile({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      key: const ValueKey('settings-shortcuts'),
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(Icons.keyboard_outlined),
-      title: Text(S.extra2ScorTitolo),
-      subtitle: Text(S.extra2ScorTileSub),
-      onTap: () => showShortcutsSheet(context),
-    );
-  }
-}
-
-/// Light / dark switch used by the Ctrl+Shift+T shortcut (same call as the theme choice).
-void toggleLightDark() {
-  final st = AppState.I;
-  final a = st.appearance;
-  ThemeReveal.run(() => st.update(() {
-        a.themeChoice = a.light ? ThemeChoice.dark : ThemeChoice.light;
-        a.syncLight();
-      }));
-}
-
-Future<void> showShortcutsSheet(BuildContext context) {
-  return showAppSheet<void>(
-    context: context,
-    builder: (ctx) => Padding(
-      padding: const EdgeInsets.fromLTRB(22, 4, 22, 26),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(S.extra2ScorTitolo, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: Palette.text)),
-          const SizedBox(height: 6),
-          Text(S.extra2ScorSub, style: TextStyle(fontSize: 13, color: Palette.text2)),
-          const SizedBox(height: 14),
-          _ShortcutRow(keys: 'Ctrl + 1 … 4', text: S.extra2ScorTab),
-          _ShortcutRow(keys: 'Ctrl + ,', text: S.extra2ScorImp),
-          _ShortcutRow(keys: 'Ctrl + Shift + T', text: S.extra2ScorTema),
-        ],
-      ),
-    ),
-  );
-}
-
-class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({required this.keys, required this.text});
-
-  final String keys;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-          width: 150,
-          child: Text(keys, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Palette.text)),
-        ),
-        Expanded(child: Text(text, style: TextStyle(fontSize: 13.5, color: Palette.text2))),
-      ]),
-    );
-  }
-}
-
-/// "Novità" in Settings › Info: reopens the notes of this version.
+/// "What is new" in Settings › Info: reopens the notes of this version.
 class SettingsWhatsNewTile extends StatelessWidget {
   const SettingsWhatsNewTile({super.key});
 
@@ -337,7 +263,7 @@ class SettingsWhatsNewTile extends StatelessWidget {
   }
 }
 
-/// "Rivedi il tour": opens the first-run tour again.
+/// "Replay the tour": opens the first-run tour again.
 class SettingsTourTile extends StatelessWidget {
   const SettingsTourTile({super.key});
 
@@ -358,6 +284,40 @@ class SettingsTourTile extends StatelessWidget {
             const SizedBox(width: 16),
             Expanded(child: Text(S.tourRivedi, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text))),
             Icon(Icons.chevron_right_rounded, size: 20, color: Palette.text3),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+/// "Reset hints": the first-time hints of the sections show again.
+class SettingsResetHintsTile extends StatelessWidget {
+  const SettingsResetHintsTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final st = AppState.I;
+    return Glass(
+      key: const ValueKey('settings-reset-hints'),
+      radius: st.appearance.radius + 8,
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(st.appearance.radius + 8),
+        onTap: () {
+          st.update(() => st.seenGuides.removeWhere((k) => k.startsWith('coach-')));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Icon(Icons.lightbulb_outline_rounded, size: 26, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(S.ux1a2RipristinaSugg, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Palette.text)),
+                const SizedBox(height: 2),
+                Text(S.ux1a2RipristinaSuggSub, style: TextStyle(fontSize: 13, color: Palette.text2)),
+              ]),
+            ),
           ]),
         ),
       ),

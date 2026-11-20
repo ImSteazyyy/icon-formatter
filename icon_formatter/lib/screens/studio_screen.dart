@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
@@ -45,7 +44,6 @@ class StudioScreen extends StatefulWidget {
 
 class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final c = WorkspaceController(tag: 'studio', mode: StudioMode.translucent);
-  bool dragging = false;
   FolderWatch? _watch;
   String? _watchedDir;
   bool _tabShown = true;
@@ -61,6 +59,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     _tabShown = widget.tabShown?.value ?? true;
     widget.tabShown?.addListener(_onTabShown);
     AppState.I.addListener(_syncWatch);
+    c.addListener(_hintDone);
     _syncWatch();
     // after the first frame: images shared to the app before it was opened
     WidgetsBinding.instance.addPostFrameCallback((_) => _takeShared());
@@ -109,6 +108,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     WidgetsBinding.instance.removeObserver(this);
     widget.tabShown?.removeListener(_onTabShown);
     AppState.I.removeListener(_syncWatch);
+    c.removeListener(_hintDone);
     _watch?.stop();
     c.dispose();
     super.dispose();
@@ -133,6 +133,29 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
       }
     } catch (e) {
       if (mounted) showMsg(context, S.importazioneNonRiuscita(e), error: true);
+    }
+  }
+
+  /// "Export": one entry, then Folder, ZIP or (Android) share.
+  Future<void> _chooseExport() async {
+    final size = MediaQuery.sizeOf(context);
+    final choice = await showGlassMenu<int>(
+      context,
+      anchor: Rect.fromCenter(center: Offset(size.width / 2, size.height - 90), width: 2, height: 2),
+      title: S.ux1aEsporta,
+      items: [
+        GlassMenuItem(value: 0, label: S.esportaCartella, icon: Icons.drive_folder_upload_outlined),
+        GlassMenuItem(value: 1, label: S.esportaZip, icon: Icons.archive_outlined),
+        if (Platform.isAndroid) GlassMenuItem(value: 2, label: S.condividi, icon: Icons.share_outlined),
+      ],
+    );
+    switch (choice) {
+      case 0:
+        await _export(zip: false);
+      case 1:
+        await _export(zip: true);
+      case 2:
+        await _export(zip: true, share: true);
     }
   }
 
@@ -200,18 +223,25 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     await _import(() => ImportService.expand(paths));
   }
 
-  /// Undo, redo and duplicates, as toolbar buttons (desktop; enabled state
+  /// Undo, redo and duplicates, as toolbar buttons (enabled state
   /// read on each rebuild). The phone has them in "Altro".
   List<Widget> _studioTools() => [
         ToolButton(key: const ValueKey('studio-undo'), icon: Icons.undo_rounded, label: S.btnAnnulla, onTap: c.canUndo ? () => c.undo() : null),
         ToolButton(key: const ValueKey('studio-redo'), icon: Icons.redo_rounded, label: S.btnRipristina, onTap: c.canRedo ? () => c.redo() : null),
         if (c.duplicateCount > 0)
           ToolButton(key: const ValueKey('studio-dup'), icon: Icons.content_copy_outlined, label: S.btnDuplicati, onTap: () => _excludeDuplicates()),
+        // the plate of the processed icons, from their saved cut-outs
+        ToolButton(
+          key: const ValueKey('studio-recompose'),
+          icon: Icons.format_paint_outlined,
+          label: S.ux2bChangeBgTitle,
+          onTap: c.canRecompose ? () => c.recomposeProcessed() : null,
+        ),
       ];
 
   void _excludeDuplicates() {
     final n = c.excludeDuplicates();
-    if (mounted) showMsg(context, S.studioDuplicatiEsclusi(n));
+    if (mounted) showMsg(context, S.studioDuplicatiEsclusi(n), warning: true);
   }
 
   /// The one import menu (centre button and "+"): files, folder, ZIP/APK
@@ -264,6 +294,16 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
     }
   }
 
+  /// Once icons are in, the "add images" hint has done its job: never show it again.
+  void _hintDone() {
+    if (c.items.isEmpty || AppState.I.seenGuides.contains('coach-studio')) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!AppState.I.seenGuides.contains('coach-studio')) {
+        AppState.I.update(() => AppState.I.seenGuides.add('coach-studio'));
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -292,10 +332,13 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         icon: const Icon(Icons.dashboard_customize_outlined),
         label: Text(S.mandaAlPack),
       ),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: false), icon: const Icon(Icons.drive_folder_upload_outlined), label: Text(S.esportaCartella)),
-      OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true), icon: const Icon(Icons.archive_outlined), label: Text(S.esportaZip)),
-      if (Platform.isAndroid)
-        OutlinedButton.icon(onPressed: c.items.isEmpty ? null : () => _export(zip: true, share: true), icon: const Icon(Icons.share_outlined), label: Text(S.condividi)),
+      // one Export entry (folder, ZIP or share), like the phone's menu
+      OutlinedButton.icon(
+        key: const ValueKey('studio-export'),
+        onPressed: c.items.isEmpty ? null : _chooseExport,
+        icon: const Icon(Icons.file_download_outlined),
+        label: Text(S.ux1aEsporta),
+      ),
     ];
     // empty Studio: one obvious primary action, the steps underneath
     Widget step(int n, String title) => Padding(
@@ -306,7 +349,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
               height: 24,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: nothingStyle ? NothingColors.tertiary : Theme.of(context).colorScheme.primary.withValues(alpha: 0.16), shape: BoxShape.circle),
-              child: Text('$n', style: TextStyle(fontSize: 12, color: nothingStyle ? Palette.fg : Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
+              child: Text('$n', style: TextStyle(fontSize: 12, color: nothingStyle ? Palette.fg : accentTextOf(context), fontWeight: FontWeight.w700)),
             ),
             const SizedBox(width: 10),
             Expanded(child: Text(title, style: TextStyle(fontSize: 13.5, color: Palette.text2))),
@@ -320,11 +363,11 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
         radius: AppState.I.appearance.radius + 8,
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Icon(Icons.auto_awesome_mosaic_outlined, size: 44, color: Theme.of(context).colorScheme.primary),
+          Icon(Icons.auto_awesome_mosaic_outlined, size: 44, color: Palette.text2),
           const SizedBox(height: 12),
           Text(S.studioVuotoTitolo, textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Palette.text)),
           const SizedBox(height: 6),
-          Text(Platform.isWindows ? S.studioVuotoSubWin : S.studioVuotoSub, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.text2)),
+          Text(S.studioVuotoSub, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, color: Palette.text2)),
           const SizedBox(height: 18),
           // the only button: every source opens from here
           Builder(
@@ -343,7 +386,7 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
         ]),
       ),
     );
-    Widget view = ListenableBuilder(
+    final Widget view = ListenableBuilder(
       listenable: c,
       builder: (context, _) => WorkspaceView(
         c: c,
@@ -378,56 +421,32 @@ class _StudioScreenState extends State<StudioScreen> with AutomaticKeepAliveClie
                   ),
                 ),
               ),
+        // grouped by purpose; "Clear" is last, apart and in the danger colour
         moreActions: [
-          MoreAction(Icons.undo_rounded, S.studioAnnullaModifica, S.studioAnnullaModificaSub, c.canUndo ? () => c.undo() : null),
-          MoreAction(Icons.redo_rounded, S.studioRipristinaModifica, S.studioRipristinaModificaSub, c.canRedo ? () => c.redo() : null),
-          MoreAction(Icons.crop_square_outlined, S.studioGuidaArea, S.studioGuidaAreaSub, c.toggleSafeGuide),
+          MoreAction.section(S.ux1aGruppoModifica),
+          MoreAction(Icons.undo_rounded, S.studioAnnullaModifica, '', c.canUndo ? () => c.undo() : null),
+          MoreAction(Icons.redo_rounded, S.studioRipristinaModifica, '', c.canRedo ? () => c.redo() : null),
           if (c.duplicateCount > 0) MoreAction(Icons.content_copy_outlined, S.studioEscludiDuplicati, S.studioEscludiDuplicatiSub(c.duplicateCount), _excludeDuplicates),
           if (c.items.any((i) => i.calendarDay != null))
-            MoreAction(Icons.opacity_rounded, S.sfondoComePack, S.sfondoComePackSub, () async {
+            MoreAction(Icons.opacity_rounded, S.sfondoComePack, '', () async {
               final r = await c.matchPlateAll();
               if (mounted) showMsg(this.context, plateMatchMessage(r), error: r == null);
             }),
-          MoreAction(Icons.dashboard_customize_outlined, S.mandaAlPack, S.mandaAlPackSub, _sendToPack),
-          MoreAction(Icons.drive_folder_upload_outlined, S.esportaCartella, S.esportaCartellaSub, () => _export(zip: false)),
-          MoreAction(Icons.archive_outlined, S.esportaZip, S.esportaZipSub, () => _export(zip: true)),
-          if (Platform.isAndroid) MoreAction(Icons.share_outlined, S.condividi, S.condividiSub, () => _export(zip: true, share: true)),
-          MoreAction(Icons.clear_all, S.svuota, S.svuotaSub, () async {
-            if (c.items.isNotEmpty && await confirm(context, S.svuotareLista, S.fileOriginaliNonVengonoToccati, ok: S.svuota)) c.clear();
-          }),
+          MoreAction.section(S.ux1aGruppoVisualizza),
+          MoreAction(Icons.crop_square_outlined, S.studioGuidaArea, '', c.toggleSafeGuide),
+          MoreAction.section(S.ux1aGruppoInvia),
+          MoreAction(Icons.dashboard_customize_outlined, S.mandaAlPack, '', _sendToPack),
+          MoreAction(Icons.file_download_outlined, S.ux1aEsporta, S.ux1aEsportaSub, _chooseExport),
+          if (Platform.isAndroid) MoreAction(Icons.share_outlined, S.condividi, '', () => _export(zip: true, share: true)),
+          MoreAction.section(S.ux1aGruppoRimuovi),
+          MoreAction(Icons.clear_all, S.svuota, '', () async {
+            if (c.items.isNotEmpty && await confirm(context, S.ux1aSvuotaTitolo, S.ux1aSvuotaCorpo(c.items.length), ok: S.svuota)) c.clear();
+          }, destructive: true),
         ],
         emptyHint: empty,
         onOpenBases: widget.onOpenBases,
       ),
     );
-    if (Platform.isWindows) {
-      view = DropTarget(
-        onDragEntered: (_) => setState(() => dragging = true),
-        onDragExited: (_) => setState(() => dragging = false),
-        onDragDone: (d) async {
-          setState(() => dragging = false);
-          final paths = d.files.map((f) => f.path).toList();
-          await _import(() => ImportService.expand(paths));
-        },
-        child: Stack(children: [
-          view,
-          if (dragging)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  margin: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                    border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
-                  ),
-                  child: Center(child: Text(S.rilasciaImportare, style: TextStyle(fontSize: 18))),
-                ),
-              ),
-            ),
-        ]),
-      );
-    }
     return view;
   }
 }

@@ -52,7 +52,6 @@ class S {
   static String get impostazioni => current.impostazioni;
   static String get opzioni => current.opzioni;
   static String get baseAttivo => current.baseAttivo;
-  static String get referenceTranslucent => current.referenceTranslucent;
   static String kb(Object? a) => current.kb(a);
   static String mb(Object? a) => current.mb(a);
   static String get iconFormatter => current.iconFormatter;
@@ -66,12 +65,8 @@ class S {
   static String baseCreatoDalPreset(Object? a) => current.baseCreatoDalPreset(a);
   static String get ogniBaseHaCalibrazioneIndipendente => current.ogniBaseHaCalibrazioneIndipendente;
   static String get importaBase => current.importaBase;
-  static String creaPreset(Object? a) => current.creaPreset(a);
   static String get nessunBaseIcon => current.nessunBaseIcon;
   static String px(Object? a, Object? b) => current.px(a, b);
-  static String get nonCalibrato => current.nonCalibrato;
-  static String calibratoEsempiValidiGlyph(Object? a, Object? b, Object? c) => current.calibratoEsempiValidiGlyph(a, b, c);
-  static String get usa => current.usa;
   static String get calibra => current.calibra;
   static String get ricalibra => current.ricalibra;
   static String get rinomina => current.rinomina;
@@ -120,7 +115,6 @@ class S {
   static String get cercaNomeOPackage => current.cercaNomeOPackage;
   static String get soloNonElaborate => current.soloNonElaborate;
   static String get selezionaTutte => current.selezionaTutte;
-  static String get deseleziona => current.deseleziona;
   static String get toccaSelezionareTieniPremutoAnteprima => current.toccaSelezionareTieniPremutoAnteprima;
   static String appSelezionate(Object? a, Object? b) => current.appSelezionate(a, b);
   static String get originalComposition => current.originalComposition;
@@ -130,6 +124,18 @@ class S {
   static String get regolazioni => current.regolazioni;
   static String get stile => current.stile;
   static String get altro => current.altro;
+  static String get altroSezVerifica => current.altroSezVerifica;
+  static String get altroSezEsporta => current.altroSezEsporta;
+  static String get altroControlloSub => current.altroControlloSub;
+  static String get altroRegistroSub => current.altroRegistroSub;
+  static String get altroProfiliSub => current.altroProfiliSub;
+  static String get altroApriSub => current.altroApriSub;
+  static String get altroImportaSub => current.altroImportaSub;
+  static String get altroPuliziaSub => current.altroPuliziaSub;
+  static String get altroAnteprimaSub => current.altroAnteprimaSub;
+  static String get altroCondividiSub => current.altroCondividiSub;
+  static String get altroCreaApkSub => current.altroCreaApkSub;
+  static String get provaSuccessiva => current.provaSuccessiva;
   static String get pbApriPack => current.pbApriPack;
   static String get pbCondividiApk => current.pbCondividiApk;
   static String pbApkPronto(Object? v) => current.pbApkPronto(v);
@@ -183,11 +189,6 @@ class S {
   static String get scontornoRemoveBg => current.scontornoRemoveBg;
   static String get stileTitolo => current.stileTitolo;
   static String get stileSpiegazione => current.stileSpiegazione;
-  static String get hintVuoto => current.hintVuoto;
-  static String get hintDaElaborare => current.hintDaElaborare;
-  static String get hintInCorso => current.hintInCorso;
-  static String hintParziale(Object? a, Object? b) => current.hintParziale(a, b);
-  static String get hintFatto => current.hintFatto;
   static String elaboraApp(Object? a) => current.elaboraApp(a);
   static String get iconPackZip => current.iconPackZip;
   static String impossibileAprirePack(Object? a) => current.impossibileAprirePack(a);
@@ -349,11 +350,23 @@ class S {
   static String get prima => current.prima;
   static String get dopo => current.dopo;
   static String completateRimanentiErrori(
+
+
     Object? a,
+
+
     Object? b,
+
+
     Object? c,
+
+
     Object? d,
+
+
     Object? e,
+
+
   ) => current.completateRimanentiErrori(a, b, c, d, e);
   static String get annulla => current.annulla;
   static String get applica => current.applica;
@@ -481,7 +494,6 @@ class S {
   static String pbIconaRipristinata(Object? a) => current.pbIconaRipristinata(a);
   static String get pbModificaIcona => current.pbModificaIcona;
   static String get pbRipristinaPrecedente => current.pbRipristinaPrecedente;
-  static String get cercaNomeFile => current.cercaNomeFile;
   static String get cancellaRicerca => current.cancellaRicerca;
   static String nessunRisultato(String q) => current.nessunRisultato(q);
   static String get dpRimosso => current.dpRimosso;
@@ -491,7 +503,6 @@ class S {
   static String get dpResiduiPuliti => current.dpResiduiPuliti;
   static String get dpResiduiRimasti => current.dpResiduiRimasti;
   static String get pbDaStudio => current.pbDaStudio;
-  static String iconeDelPack(String p) => current.iconeDelPack(p);
   static String get mantieniBiancoInterno => current.mantieniBiancoInterno;
   static String get togliBiancoInterno => current.togliBiancoInterno;
   static String get modoSenzaAlone => current.modoSenzaAlone;
@@ -506,10 +517,7 @@ class S {
   static String get modoPaginaDesc => current.modoPaginaDesc;
   static String get vetroQualitaNonDisponibile => current.vetroQualitaNonDisponibile;
   static String get stileSpiegazioneModifica => current.stileSpiegazioneModifica;
-  static String get pbTieniPremuto => current.pbTieniPremuto;
   static String get pbPasso1Catalogo => current.pbPasso1Catalogo;
-  static String get pbCatalogoLettura => current.pbCatalogoLettura;
-  static String pbCatalogoInfo(Object? n, Object? v) => current.pbCatalogoInfo(n, v);
   static String pbCatalogo(Object? n, Object? v) => current.pbCatalogo(n, v);
   static String get pbAggiornaCatalogo => current.pbAggiornaCatalogo;
   static String get pbImmagine => current.pbImmagine;
@@ -522,6 +530,20 @@ class S {
   static String get pbSoloPosizione => current.pbSoloPosizione;
   static String get pbUsaComeE => current.pbUsaComeE;
   static String get pbConfermaSostituzione => current.pbConfermaSostituzione;
+  static String get pbEditComeAppare => current.pbEditComeAppare;
+  static String get pbEditAnteprimeHint => current.pbEditAnteprimeHint;
+  static String get pbEditConsigliato => current.pbEditConsigliato;
+  static String get pbEditAltre => current.pbEditAltre;
+  static String get pbStileDelPack => current.pbStileDelPack;
+  static String get pbOptAutoSub => current.pbOptAutoSub;
+  static String get pbOptSimboloT => current.pbOptSimboloT;
+  static String get pbOptSimboloSub => current.pbOptSimboloSub;
+  static String get pbOptIconaT => current.pbOptIconaT;
+  static String get pbOptIconaSub => current.pbOptIconaSub;
+  static String get pbOptColoreSub => current.pbOptColoreSub;
+  static String get pbOptBordoSub => current.pbOptBordoSub;
+  static String get pbOptOriginaleT => current.pbOptOriginaleT;
+  static String get pbOptOriginaleSub => current.pbOptOriginaleSub;
   static String get scorriPerChiudereAvviso => current.scorriPerChiudereAvviso;
   static String get pbEsclusa => current.pbEsclusa;
   static String get pbPerPackage => current.pbPerPackage;
@@ -531,7 +553,6 @@ class S {
   static String pbSoloSomiglianza(Object? n) => current.pbSoloSomiglianza(n);
   static String get vaiInCima => current.vaiInCima;
   static String get vaiInFondo => current.vaiInFondo;
-  static String get modalitaChiara => current.modalitaChiara;
   static String get sfondoComePack => current.sfondoComePack;
   static String get sfondoComePackSub => current.sfondoComePackSub;
   static String get sfondoNientePack => current.sfondoNientePack;
@@ -554,12 +575,10 @@ class S {
   static String get pbEscludi => current.pbEscludi;
   static String get pbIncludi => current.pbIncludi;
   static String get pbCercaGenerate => current.pbCercaGenerate;
-  static String get asTitolo => current.asTitolo;
   static String get asSezione => current.asSezione;
   static String get asControlloAuto => current.asControlloAuto;
   static String get asMai => current.asMai;
   static String asUltimo(Object? t) => current.asUltimo(t);
-  static String get asInfo => current.asInfo;
   static String get asControllaOra => current.asControllaOra;
   static String asRielabora(Object? n) => current.asRielabora(n);
   static String asAltre(Object? n) => current.asAltre(n);
@@ -573,7 +592,6 @@ class S {
   static String apkFallita(Object? e) => current.apkFallita(e);
   static String get asSegnaViste => current.asSegnaViste;
   static String get dpTitolo => current.dpTitolo;
-  static String get dpInfo => current.dpInfo;
   static String get dpApplica => current.dpApplica;
   static String get dpSoloInstalla => current.dpSoloInstalla;
   static String get dpConcedi => current.dpConcedi;
@@ -584,10 +602,13 @@ class S {
   static String get dpShizukuFermo => current.dpShizukuFermo;
   static String get dpShizukuNegato => current.dpShizukuNegato;
   static String get dpShizukuVecchio => current.dpShizukuVecchio;
+  static String get dpShizukuNonInstallato => current.dpShizukuNonInstallato;
+  static String get dpShizukuNonAttivo => current.dpShizukuNonAttivo;
+  static String get dpShizukuVecchioBreve => current.dpShizukuVecchioBreve;
+  static String get dpShizukuPermesso => current.dpShizukuPermesso;
   static String get dpShizukuOk => current.dpShizukuOk;
   static String get dpNoLauncher => current.dpNoLauncher;
   static String dpLauncher(Object v) => current.dpLauncher(v);
-  static String dpSelettore(Object? v) => current.dpSelettore(v);
   static String get dpCompilazione => current.dpCompilazione;
   static String get dpInstallazione => current.dpInstallazione;
   static String get dpApplicazione => current.dpApplicazione;
@@ -601,13 +622,7 @@ class S {
   static String get vetro => current.vetro;
   static String get info => current.info;
   static String get lingua => current.lingua;
-  static String get setupBenvenuto => current.setupBenvenuto;
-  static String get setupSub => current.setupSub;
-  static String get setupAuto => current.setupAuto;
-  static String get setupAutoSub => current.setupAutoSub;
   static String get setupShizuku => current.setupShizuku;
-  static String get setupShizukuSub => current.setupShizukuSub;
-  static String get setupInizia => current.setupInizia;
   static String get elaborataBreve => current.elaborataBreve;
   static String get baseSquircle => current.baseSquircle;
   static String get baseCerchio => current.baseCerchio;
@@ -629,13 +644,6 @@ class S {
   static String get interfaccia => current.interfaccia;
   static String get apri => current.apri;
   static String versioneBreve(Object v) => current.versioneBreve(v);
-  static String get catAspettoDesc => current.catAspettoDesc;
-  static String get catVetroDesc => current.catVetroDesc;
-  static String get catElaborazioneDesc => current.catElaborazioneDesc;
-  static String get catBaseDesc => current.catBaseDesc;
-  static String get catPackDesc => current.catPackDesc;
-  static String get catExportDesc => current.catExportDesc;
-  static String get catSistemaDesc => current.catSistemaDesc;
   static String get materiale => current.materiale;
   static String get vetroVeloce => current.vetroVeloce;
   static String get vetroBilanciato => current.vetroBilanciato;
@@ -650,16 +658,13 @@ class S {
   static String get vetroPannelli => current.vetroPannelli;
   static String get vetroPulsanti => current.vetroPulsanti;
   static String get vetroDialoghi => current.vetroDialoghi;
-  static String get pbSottotitoloBreve => current.pbSottotitoloBreve;
   static String get pbPasso1 => current.pbPasso1;
   static String get pbPasso1Sub => current.pbPasso1Sub;
   static String pbOriginaliN(int n) => current.pbOriginaliN(n);
   static String get pbDaFile => current.pbDaFile;
   static String get pbPasso2 => current.pbPasso2;
-  static String get pbPasso2Sub => current.pbPasso2Sub;
   static String get pbEsporta => current.pbEsporta;
   static String get pbEsportaSub => current.pbEsportaSub;
-  static String dpVersioneInstallata(Object v) => current.dpVersioneInstallata(v);
   static String get rigeneraConModalita => current.rigeneraConModalita;
   static String modalitaSimbolo(Object n) => current.modalitaSimbolo(n);
   static String get modalitaSimboloInfo => current.modalitaSimboloInfo;
@@ -936,4 +941,118 @@ class S {
   static String get btnAnnulla => current.btnAnnulla;
   static String get btnRipristina => current.btnRipristina;
   static String get btnDuplicati => current.btnDuplicati;
+  static String get ux1bChooseImage => current.ux1bChooseImage;
+  static String get ux1bPickFirst => current.ux1bPickFirst;
+  static String get ux1bSheetSource => current.ux1bSheetSource;
+  static String get ux1bSheetPack => current.ux1bSheetPack;
+  static String get ux1bSheetResult => current.ux1bSheetResult;
+  static String get ux1bSheetOptions => current.ux1bSheetOptions;
+  static String get ux1bSubChoose => current.ux1bSubChoose;
+  static String get ux1bSubReuse => current.ux1bSubReuse;
+  static String get ux1bSubRename => current.ux1bSubRename;
+  static String get ux1bSubVerify => current.ux1bSubVerify;
+  static String get ux1bSubExclude => current.ux1bSubExclude;
+  static String get ux1bSubInclude => current.ux1bSubInclude;
+  static String get ux1bSubRedo => current.ux1bSubRedo;
+  static String get ux1bSubSuggest => current.ux1bSubSuggest;
+  static String get ux1bSubRestore => current.ux1bSubRestore;
+  static String get ux1bCleanupRole => current.ux1bCleanupRole;
+  static String get ux1bStep1 => current.ux1bStep1;
+  static String get ux1bStep2 => current.ux1bStep2;
+  static String get ux1bStep3 => current.ux1bStep3;
+  static String ux1bReviewCount(int n) => current.ux1bReviewCount(n);
+  static String get ux1bReviewLegend => current.ux1bReviewLegend;
+  static String get ux1bReviewStart => current.ux1bReviewStart;
+  static String get ux1bPrev => current.ux1bPrev;
+  static String get ux1bNext => current.ux1bNext;
+  static String get ux1bNoReview => current.ux1bNoReview;
+  static String get ux1bAdvanced => current.ux1bAdvanced;
+  static String get ux1bNone => current.ux1bNone;
+  static String ux1bEntries(int n) => current.ux1bEntries(n);
+  static String get ux1bGenNotice => current.ux1bGenNotice;
+  static String ux1bGenBanner(int n) => current.ux1bGenBanner(n);
+  static String get ux1a2Flusso => current.ux1a2Flusso;
+  static String get ux1a2Ritaglio => current.ux1a2Ritaglio;
+  static String get ux1a2RegolaStile => current.ux1a2RegolaStile;
+  static String get ux1a2RegolaStileSub => current.ux1a2RegolaStileSub;
+  static String get ux1a2Avanzate => current.ux1a2Avanzate;
+  static String get ux1a2AvanzateSub => current.ux1a2AvanzateSub;
+  static String get ux1a2Processori => current.ux1a2Processori;
+  static String get ux1a2ProcAuto => current.ux1a2ProcAuto;
+  static String get ux1a2ProcPochi => current.ux1a2ProcPochi;
+  static String get ux1a2ProcTutti => current.ux1a2ProcTutti;
+  static String get ux1a2ProcAutoSub => current.ux1a2ProcAutoSub;
+  static String get ux1a2ProcPochiSub => current.ux1a2ProcPochiSub;
+  static String get ux1a2ProcTuttiSub => current.ux1a2ProcTuttiSub;
+  static String ux1a2ProcHint(Object? a, Object? b) => current.ux1a2ProcHint(a, b);
+  static String get ux1a2RitagliVuoto => current.ux1a2RitagliVuoto;
+  static String get ux1a2RitagliSub => current.ux1a2RitagliSub;
+  static String get ux1a2ChiaveServe => current.ux1a2ChiaveServe;
+  static String get ux1a2Step1 => current.ux1a2Step1;
+  static String ux1a2Step2(Object? a) => current.ux1a2Step2(a);
+  static String get ux1a2Step3 => current.ux1a2Step3;
+  static String get ux1a2PassiSub => current.ux1a2PassiSub;
+  static String get ux1a2CoachStudio => current.ux1a2CoachStudio;
+  static String get ux1a2CoachPack => current.ux1a2CoachPack;
+  static String get ux1a2CoachApps => current.ux1a2CoachApps;
+  static String get ux1a2CoachOk => current.ux1a2CoachOk;
+  static String get ux1a2RipristinaSugg => current.ux1a2RipristinaSugg;
+  static String get ux1a2RipristinaSuggSub => current.ux1a2RipristinaSuggSub;
+  static String get ux1a2SuggRipristinati => current.ux1a2SuggRipristinati;
+  static String get ux1aGruppoModifica => current.ux1aGruppoModifica;
+  static String get ux1aGruppoVisualizza => current.ux1aGruppoVisualizza;
+  static String get ux1aGruppoInvia => current.ux1aGruppoInvia;
+  static String get ux1aGruppoRimuovi => current.ux1aGruppoRimuovi;
+  static String get ux1aEsporta => current.ux1aEsporta;
+  static String get ux1aEsportaSub => current.ux1aEsportaSub;
+  static String get ux1aSvuotaTitolo => current.ux1aSvuotaTitolo;
+  static String ux1aSvuotaCorpo(Object? a) => current.ux1aSvuotaCorpo(a);
+  static String get ux1aSimbolo => current.ux1aSimbolo;
+  static String get ux1aAvanzate => current.ux1aAvanzate;
+  static String get ux1aTaglio => current.ux1aTaglio;
+  static String get ux1aLancio => current.ux1aLancio;
+  static String get ux1aAspetto => current.ux1aAspetto;
+  static String get ux1aColore => current.ux1aColore;
+  static String get ux1aInfo => current.ux1aInfo;
+  static String get ux1aOpacitaSfondo => current.ux1aOpacitaSfondo;
+  static String get ux1aAggiornaPreset => current.ux1aAggiornaPreset;
+  static String get ux1aRipristinaPreset => current.ux1aRipristinaPreset;
+  static String get ux1aRinominaPreset => current.ux1aRinominaPreset;
+  static String get ux1aModificato => current.ux1aModificato;
+  static String get ux1aModificatoNonSalvato => current.ux1aModificatoNonSalvato;
+  static String get ux1aPresetIntegrato => current.ux1aPresetIntegrato;
+  static String get ux1aPresetSalvato => current.ux1aPresetSalvato;
+  static String ux1aUsoAreaHint(Object? a, Object? b, Object? c) => current.ux1aUsoAreaHint(a, b, c);
+  static String get ux1bHintAuto => current.ux1bHintAuto;
+  static String get ux1bHintSymbol => current.ux1bHintSymbol;
+  static String get ux1bHintPlate => current.ux1bHintPlate;
+  static String get ux1bHintFull => current.ux1bHintFull;
+  static String get ux1bHintPlace => current.ux1bHintPlace;
+  static String get ux1bHintRaw => current.ux1bHintRaw;
+  static String get ux1bChangeBg => current.ux1bChangeBg;
+  static String get ux1bPlateOpacity => current.ux1bPlateOpacity;
+  static String get ux1bPlateMode => current.ux1bPlateMode;
+  static String get ux1bPlateAuto => current.ux1bPlateAuto;
+  static String get ux1bPlateDark => current.ux1bPlateDark;
+  static String get ux1bPlateLight => current.ux1bPlateLight;
+  static String get ux1bApplyAll => current.ux1bApplyAll;
+  static String get ux1bPlateHint => current.ux1bPlateHint;
+  static String get ux1bPlatePreview => current.ux1bPlatePreview;
+  static String get ux2bNoticeRemoveBgNoKey => current.ux2bNoticeRemoveBgNoKey;
+  static String get ux2bNoticeAiNoModel => current.ux2bNoticeAiNoModel;
+  static String get ux2bChangeBgTitle => current.ux2bChangeBgTitle;
+  static String get ux2bChangeBgSub => current.ux2bChangeBgSub;
+  static String get ux2bApplyProcessed => current.ux2bApplyProcessed;
+  static String get ux2bNothingToRecompose => current.ux2bNothingToRecompose;
+  static String ux2bCacheSummary(Object? a, Object? b) => current.ux2bCacheSummary(a, b);
+  static String get ux2cPresetSqColour => current.ux2cPresetSqColour;
+  static String get ux2cPresetSqMono => current.ux2cPresetSqMono;
+  static String get ux2cPresetCiColour => current.ux2cPresetCiColour;
+  static String get ux2cPresetCiMono => current.ux2cPresetCiMono;
+  static String get ux2cChooseStyle => current.ux2cChooseStyle;
+  static String get ux2cChooseStyleSub => current.ux2cChooseStyleSub;
+  static String get ux2cProcessAll => current.ux2cProcessAll;
+  static String get ux2cSortBy => current.ux2cSortBy;
+  static String get ux2cShowOnly => current.ux2cShowOnly;
+  static String get ux2cMonoGlyph => current.ux2cMonoGlyph;
 }

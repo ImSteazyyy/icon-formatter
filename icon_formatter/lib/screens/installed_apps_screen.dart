@@ -11,9 +11,11 @@ import '../services/app_lists.dart';
 import '../services/export_service.dart';
 import '../services/platform_service.dart';
 import '../src/rust/api/engine.dart';
+import '../widgets/app_search.dart';
 import '../widgets/common.dart';
 import '../widgets/liquid_glass.dart';
 import '../workspace/adjust_panel.dart';
+import '../workspace/style_sheet.dart';
 import '../workspace/workspace_controller.dart';
 import '../workspace/workspace_view.dart';
 import '../l10n/strings.dart';
@@ -210,14 +212,13 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   title: Text(S.pack3ListaSalvaSelezione),
                   onTap: () async {
                     if (selected.isEmpty) {
-                      showMsg(context, S.pack3ListaSelezioneVuota);
+                      showMsg(context, S.pack3ListaSelezioneVuota, warning: true);
                       return;
                     }
                     final name = await askText(context, S.pack3ListaSalvaCome);
                     if (name == null || name.trim().isEmpty) return;
-                    final list = AppState.I.appLists.addList(name: name, packages: {...selected});
+                    AppState.I.appLists.addList(name: name, packages: {...selected});
                     AppState.I.update();
-                    if (mounted) showMsg(context, S.pack3ListaSalvata(list.name));
                     changed();
                   },
                 ),
@@ -242,7 +243,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                                 ..addAll(l.packages.where(known.contains));
                             });
                             Navigator.pop(ctx);
-                            showMsg(context, S.pack3ListaCaricata(l.name));
                           },
                         ),
                         IconButton(
@@ -279,7 +279,7 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
   Future<void> _process() async {
     final list = apps.where((a) => selected.contains(a.key)).toList();
     if (list.isEmpty) {
-      showMsg(context, S.selezionaAlmenoApp);
+      showMsg(context, S.selezionaAlmenoApp, warning: true);
       return;
     }
     c.mode = switch (pipeline) {
@@ -331,11 +331,8 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
     super.build(context);
     if (!Platform.isAndroid) return const SizedBox.shrink();
     final list = filtered;
-    final accent = Theme.of(context).colorScheme.primary;
     final under = GlassInsets.of(context);
     // the shell's SafeArea already removed it from MediaQuery: read the view
-    final view = View.of(context);
-    final statusBar = view.padding.top / view.devicePixelRatio;
     return SafeArea(
       bottom: false,
       child: Stack(
@@ -360,45 +357,23 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                         tooltip: S.regolazioni,
                         icon: Icons.tune,
                         label: S.stile,
-                        onPressed: () => showAppSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          showDragHandle: true,
-                          // the style (what the apps become) first, then its adjustments
-                          builder: (ctx) => StatefulBuilder(
-                            builder: (ctx, setS) => SizedBox(
-                              height: MediaQuery.of(ctx).size.height * 0.80,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
-                                    child: Text(
-                                      S.stileTitolo,
-                                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: ChoiceRows<AppPipeline>(
-                                      options: [
-                                        (AppPipeline.translucent, S.traslucido),
-                                        (AppPipeline.original, S.originalComposition),
-                                        (AppPipeline.preset, S.customPreset),
-                                        ],
-                                      value: pipeline,
-                                      onChanged: (v) {
-                                        setState(() => pipeline = v);
-                                        setS(() {});
-                                      },
-                                    ),
-                                  ),
-                                  Expanded(
-                                      child: AdjustPanel(c: c, showModes: false, onOpenBases: widget.onOpenBases),
-                                    ),
-                                ],
-                              ),
-                            ),
+                        // the same sheet as Studio; the pipeline choice sits above the panel
+                        onPressed: () => showStyleSheet(
+                          context,
+                          c: c,
+                          showModes: false,
+                          onOpenBases: widget.onOpenBases,
+                          modeChooser: (setSheet) => ChoiceRows<AppPipeline>(
+                            options: [
+                              (AppPipeline.translucent, S.traslucido),
+                              (AppPipeline.original, S.originalComposition),
+                              (AppPipeline.preset, S.customPreset),
+                            ],
+                            value: pipeline,
+                            onChanged: (v) {
+                              setState(() => pipeline = v);
+                              setSheet(() {});
+                            },
                           ),
                         ),
                       ),
@@ -406,11 +381,36 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                   ),
                 ),
               ),
+              // progress / completion sits in the list above the search: it scrolls
+              // away with the header and never covers the icons
+              SliverToBoxAdapter(
+                child: ListenableBuilder(
+                  listenable: c.batch,
+                  builder: (context, _) {
+                    final b = c.batch;
+                    if (b.total == 0) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: ProgressStrip(
+                        done: b.done,
+                        total: b.total,
+                        errors: b.errors,
+                        running: b.running,
+                        onCancel: b.cancel,
+                        label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
+                        note: b.notice,
+                        onDismiss: b.dismissProgress,
+                      ),
+                    );
+                  },
+                ),
+              ),
               // the search stays at the top while the icons scroll under it
               SliverPinnedSearch(
                 // the bars sit close together; the icons get a bit more air below them
+                framed: false,
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                child: TextField(controller: _search, decoration: pillSearchDecoration(context, S.cercaNomeOPackage), onChanged: (v) => setState(() => query = v)),
+                child: AppSearchField(controller: _search, hint: S.cercaNomeOPackage, onChanged: (v) => setState(() => query = v), onClear: () => setState(() => query = '')),
               ),
               SliverToBoxAdapter(
                 child: Column(
@@ -478,9 +478,9 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                                         child: AnimatedContainer(
                                           duration: const Duration(milliseconds: 150),
                                           decoration: BoxDecoration(
-                                            color: sel ? accent.withValues(alpha: 0.16) : (nothingStyle ? NothingColors.raised : Palette.fg.withValues(alpha: 0.04)),
+                                            color: sel ? Palette.selection.withValues(alpha: nothingStyle ? 0.10 : 0.16) : (nothingStyle ? NothingColors.raised : Palette.fg.withValues(alpha: 0.04)),
                                             borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(color: sel ? accent.withValues(alpha: 0.7) : Colors.transparent, width: 1.5),
+                                            border: Border.all(color: sel ? Palette.selection.withValues(alpha: 0.7) : Colors.transparent, width: 1.5),
                                           ),
                                           child: Stack(
                                             children: [
@@ -502,10 +502,10 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                                                 child: Icon(
                                                   sel ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
                                                   size: 20,
-                                                  color: sel ? accent : Palette.text3,
+                                                  color: sel ? Palette.selection : Palette.text3,
                                                 ),
                                               ),
-                                              if (dot != null) Positioned(right: 6, top: 6, child: StatusDot(color: dot)),
+                                              if (dot != null) Positioned(right: 6, top: 6, child: StatusDot(color: dot, label: status)),
                                             ],
                                           ),
                                         ),
@@ -523,55 +523,6 @@ class _InstalledAppsScreenState extends State<InstalledAppsScreen> with Automati
                       },
                     ),
             ],
-          ),
-          // soft dark fade under the status bar: what scrolls up there stays
-          // readable behind the clock and fades out instead of being cut
-          Positioned(
-            left: 0,
-            right: 0,
-            top: -statusBar,
-            height: statusBar + 28,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    // fully opaque from the screen top down to the pinned search
-                    // (translucent glass cells showed through the status bar), then
-                    // a short fade
-                    colors: [Palette.bg, Palette.bg, Palette.bg.withValues(alpha: 0)],
-                    stops: [0.0, statusBar / (statusBar + 28), 1.0],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // progress / completion floats right under the status bar (nothing
-          // moves); a sideways swipe removes it
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: ListenableBuilder(
-                listenable: c.batch,
-                builder: (context, _) {
-                  final b = c.batch;
-                  if (b.total == 0) return const SizedBox.shrink();
-                  return ProgressStrip(
-                    done: b.done,
-                    total: b.total,
-                    errors: b.errors,
-                    running: b.running,
-                    onCancel: b.cancel,
-                    label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
-                    onDismiss: b.dismissProgress,
-                  );
-                },
-              ),
-            ),
           ),
           if (MediaQuery.viewInsetsOf(context).bottom == 0) JumpButtonsSlot(controller: _scroll, openBottom: under + 76, foldedBottom: MediaQuery.viewPaddingOf(context).bottom + 74),
       // floating liquid-glass action bar (content scrolls underneath);

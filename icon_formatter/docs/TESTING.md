@@ -1,54 +1,48 @@
-# Test
+# Testing
 
-Tre livelli: test unitari, test di integrazione (flussi dell'app) e stress test a 5000 icone.
-Comandi da eseguire nella cartella `icon_formatter` del progetto, con Flutter in `/d/dev/flutter/bin/flutter`.
+There are three levels: unit tests, integration tests (app flows), and a stress test with 5,000 icons. Run the commands from the `icon_formatter` folder, with `flutter` on your PATH.
 
-## Test unitari
+## Unit tests
 
 ```
 flutter test test
 ```
 
-Controllano la logica pura (modelli, pack, l10n, calendario, ecc.).
+They check the pure logic: models, packs, l10n, the calendar, and so on.
 
-## Test di integrazione (flussi)
+## Integration tests (flows)
 
-File: `integration_test/app_flow_test.dart` (helper in `integration_test/e2e_support.dart`).
+Files in `integration_test/`. Shared helpers are in `integration_test/e2e_support.dart`.
 
 ```
 export MSYS_NO_PATHCONV=1
 flutter test integration_test/app_flow_test.dart -d emulator-5554
 ```
 
-Su Windows desktop: `-d windows` (la scheda Apps esiste solo su Android).
+Run them on an Android device or emulator (`-d <device>`). The Apps tab exists only on Android.
 
-Cosa copre:
+`app_flow_test.dart` covers:
 
-- a: le schede Studio, Pack e Impostazioni si aprono senza eccezioni e la barra e' visibile.
-- b: Impostazioni > Aspetto: Nothing e Vetro, tema scuro e chiaro, poi ritorno allo stato iniziale.
-- c: Studio: importa 13 icone sintetiche (disegnate dal test, nessuna grafica di terzi), "Elabora tutte",
-  controllo che ogni icona abbia un risultato senza errori e che l'output esista, poi "Manda al Pack".
-- d: "Manda al Pack" arriva davvero al Pack builder (controllo sui dati del builder, non sul testo
-  a schermo, perche' la scheda Pack mostra le app del catalogo); "Abbina" non genera eccezioni.
-- e: Impostazioni > Sistema: si vedono le righe della cache.
+- a: the Studio, Pack and Settings tabs open without exceptions, and the navigation bar is visible.
+- b: Settings › Appearance: Nothing and Glass, dark and light theme, then back to the initial state.
+- c: Studio: imports 13 synthetic icons (drawn by the test, with no third-party artwork), runs **Process all**, checks that every icon has a result without errors and that the output exists, then **Send to Pack**.
+- d: **Send to Pack** really reaches the Pack builder. The check reads the builder's data, not the text on screen, because the Pack tab shows the apps of the catalogue. **Match** runs without exceptions.
+- e: Settings › System: the cache rows are visible.
 
-La lingua e' forzata all'italiano e l'onboarding e il tour sono saltati.
-La scheda Apps apre la richiesta di permesso Shizuku, quindi non viene aperta a meno di
-`--dart-define=E2E_APPS=true`.
+The test forces the language to Italian and skips the onboarding and the tour. The Apps tab opens the Shizuku permission request, so it is not opened unless you pass `--dart-define=E2E_APPS=true`.
 
-Errori Flutter tollerati: `e2e_support.dart`, costante `allowedFlutterErrors`. Oggi contiene un solo
-errore di debug (ListTile senza Material, in `AutoSyncCard`, `lib/screens/pack_builder_screen.dart:3116`).
-Ogni occorrenza viene stampata con `E2E_ALLOWED` e la catena dei creatori del widget. Quando il
-problema viene corretto in `lib/`, togliere la voce dalla lista.
+Tolerated Flutter errors are listed in the constant `allowedFlutterErrors` in `e2e_support.dart`. The list is currently empty. If a known error appears, add it there with a note, and remove the entry once the cause is fixed.
 
-Ogni test riparte dall'app appena avviata; i messaggi di errore indicano il passo che fallisce.
+Each test starts from a freshly launched app. Error messages name the step that failed.
 
-## Stress test: 5000 icone
+Other integration tests in the same folder:
 
-File: `integration_test/stress_5000_test.dart`. Il test genera le immagini da solo, nella cache
-dell'app (`.../cache/IconFormatterCache/stress_in`), con colori e codici a 16 bit distinti per
-ogni icona, cosi' la cache dei ritagli non puo' riutilizzarli. Non serve nessun file sul
-dispositivo. La generazione non entra nei tempi misurati (ma e' riportata nella prima riga).
+- `pack_edit_flow_test.dart` opens the edit page ("Edit icon") on a synthetic icon. It checks the treatment tiles, Cancel, Confirm, Change, and the pack-wide plate opacity against the real engine, then reads the saved correction back from the pack store. Run it with `flutter test integration_test/pack_edit_flow_test.dart -d emulator-5554`.
+- `ffi_test.dart` checks the Rust core through flutter_rust_bridge. Run it with `flutter test integration_test/ffi_test.dart -d <device>` on an Android device or emulator.
+
+## Stress test: 5,000 icons
+
+File: `integration_test/stress_5000_test.dart`. The test generates its own images in the app cache (`.../cache/IconFormatterCache/stress_in`), with a distinct colour and 16-bit code for each icon, so the cutout cache cannot reuse them. No file has to exist on the device. Generation happens outside the measured time, but it is reported on the first line.
 
 ```
 flutter test integration_test/stress_5000_test.dart -d emulator-5554 \
@@ -57,33 +51,23 @@ flutter test integration_test/stress_5000_test.dart -d emulator-5554 \
   --dart-define=STRESS_BUDGET_MB=1536
 ```
 
-Per la prova rapida usare `--dart-define=STRESS_N=500`. Senza `STRESS=true` il test viene saltato,
-cosi' il comando di integrazione normale non lo esegue.
+For a quick run, use `--dart-define=STRESS_N=500`. Without `STRESS=true`, the test is skipped, so the normal integration command does not run it.
 
-Il test importa la cartella dallo Studio, preme "Elabora tutte" e ogni 100 icone registra:
-tempo trascorso, tempo per 100 icone, RSS del processo (MB), frame totali, frame "janky"
-(piu' di 16,7 ms tra costruzione e raster), frame peggiore ed errori.
+The test imports the folder into the Studio, presses **Process all**, and every 100 icons it records: elapsed time, time per 100 icons, the process RSS (MB), total frames, "janky" frames (more than 16.7 ms between build and raster), the worst frame, and errors.
 
-### Cosa significano i budget
+### What the budgets mean
 
-- `STRESS_BUDGET_MB` (default 1536): picco di RSS del processo oltre il quale il test fallisce.
-  E' una soglia scelta, non una misura del telefono. Sull'emulatore x86_64, che ha poca RAM,
-  un superamento va letto come un dato da confrontare con le versioni precedenti.
-- Frame "janky": percentuale di frame oltre 16,7 ms durante l'elaborazione. Non fa fallire il
-  test: e' un indicatore per confrontare le versioni.
-- Il test fallisce anche se un'icona termina con errore, se non si importano tutte le icone o se
-  l'app si chiude (crash).
+- `STRESS_BUDGET_MB` (default 1536): the peak process RSS above which the test fails. It is a chosen threshold, not a measurement of the phone. The x86_64 emulator has little RAM, so a result above the budget there is a number to compare with earlier versions.
+- Janky frames: the percentage of frames longer than 16.7 ms during processing. They do not fail the test. Use them to compare versions.
+- The test also fails if any icon ends with an error, if not all icons are imported, or if the app crashes.
 
-### Dove sono i risultati
+### Where the results are
 
-- File: `<cache dell'app>/IconFormatterCache/stress_results.txt`. Su Android e' in
-  `/data/user/0/com.iconformatter.icon_formatter/cache/IconFormatterCache/`, leggibile con
-  `adb shell run-as com.iconformatter.icon_formatter cat ...` (app debug).
-- Stampati in console con il prefisso `E2E_STRESS`.
+- File: `<app cache>/IconFormatterCache/stress_results.txt`. On Android it is in `/data/user/0/com.iconformatter.icon_formatter/cache/IconFormatterCache/`. Read it with `adb shell run-as com.iconformatter.icon_formatter cat ...` (debug builds only).
+- Printed to the console with the prefix `E2E_STRESS`.
 
-Il file si aggiorna a ogni blocco di 100 icone, quindi resta leggibile anche se l'app si chiude a meta'.
+The file is updated every 100 icons, so it stays readable even if the app closes halfway.
 
-## Immagini di test
+## Test images
 
-Le immagini generate non vanno nel repository e non vengono copiate sul dispositivo: vivono solo
-nella cache dell'app durante il test. Non mettere screenshot dell'emulatore nel repository.
+The generated images are not stored in the repository and are not copied to the device. They exist only in the app cache during the test. Do not put emulator screenshots in the repository.

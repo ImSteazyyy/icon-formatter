@@ -43,8 +43,6 @@ class StringsPt extends Strings {
   @override
   String get baseAttivo => 'Ícone base ativo';
   @override
-  String get referenceTranslucent => 'Translúcido de referência';
-  @override
   String get icone => 'Ícones';
   @override
   String get nessunaIconaSelezionata => 'Nenhum ícone selecionado';
@@ -65,15 +63,7 @@ class StringsPt extends Strings {
   @override
   String get importaBase => 'Nova base';
   @override
-  String creaPreset(Object? a) => 'Criar a partir da predefinição "$a"';
-  @override
   String get nessunBaseIcon => 'Nenhum ícone base';
-  @override
-  String get nonCalibrato => 'Não calibrado';
-  @override
-  String calibratoEsempiValidiGlyph(Object? a, Object? b, Object? c) => 'Calibrado com $a exemplos ($b válidos) · símbolo a $c%';
-  @override
-  String get usa => 'Usar';
   @override
   String get calibra => 'Calibrar';
   @override
@@ -169,8 +159,6 @@ class StringsPt extends Strings {
   @override
   String get selezionaTutte => 'Selecionar tudo';
   @override
-  String get deseleziona => 'Desmarcar';
-  @override
   String get toccaSelezionareTieniPremutoAnteprima => 'Toque para selecionar, mantenha premido para a pré-visualização e as correções';
   @override
   String appSelezionate(Object? a, Object? b) => '$b de $a selecionadas';
@@ -188,6 +176,30 @@ class StringsPt extends Strings {
   String get stile => 'Personalizar';
   @override
   String get altro => 'Mais';
+  @override
+  String get altroSezVerifica => 'Verificações';
+  @override
+  String get altroSezEsporta => 'Exportar e partilhar';
+  @override
+  String get altroControlloSub => 'Vazias, pequenas, escuras ou com pouco contraste';
+  @override
+  String get altroRegistroSub => 'Histórico, copiável como notas de versão';
+  @override
+  String get altroProfiliSub => 'Guardar e recarregar as correções';
+  @override
+  String get altroApriSub => 'Instalado, APK/ZIP ou associações';
+  @override
+  String get altroImportaSub => 'Pasta ou ZIP de ícones gerados';
+  @override
+  String get altroPuliziaSub => 'Limpar ou juntar um pack';
+  @override
+  String get altroAnteprimaSub => 'Todos os ícones em uma ou mais folhas';
+  @override
+  String get altroCondividiSub => 'Enviar o ficheiro APK do pack';
+  @override
+  String get altroCreaApkSub => 'Criar um APK instalável do pack';
+  @override
+  String get provaSuccessiva => 'Próximo teste';
   @override
   String get pbApriPack => 'Abrir pack';
   @override
@@ -294,16 +306,6 @@ class StringsPt extends Strings {
   String get stileTitolo => 'Estilo dos ícones';
   @override
   String get stileSpiegazione => 'Escolha como transformar os ícones. Cada alteração aparece logo na pré-visualização: arraste a linha branca para comparar antes e depois.';
-  @override
-  String get hintVuoto => 'Comece por importar os ícones a transformar.';
-  @override
-  String get hintDaElaborare => 'Escolha o estilo e depois Processar.';
-  @override
-  String get hintInCorso => 'A processar…';
-  @override
-  String hintParziale(Object? a, Object? b) => '$a de $b prontos.';
-  @override
-  String get hintFatto => 'Concluído. Abra Mais para os exportar ou enviar para o Pack.';
   @override
   String elaboraApp(Object? a) => 'Processar $a apps';
   @override
@@ -624,11 +626,23 @@ class StringsPt extends Strings {
   String get dopo => 'Depois';
   @override
   String completateRimanentiErrori(
+
+
     Object? a,
+
+
     Object? b,
+
+
     Object? c,
+
+
     Object? d,
+
+
     Object? e,
+
+
   ) => '$a · $b de $c prontos · $d em falta · $e erros';
   @override
   String get annulla => 'Cancelar';
@@ -881,8 +895,6 @@ class StringsPt extends Strings {
   @override
   String get pbRipristinaPrecedente => 'Restaurar ícone anterior';
   @override
-  String get cercaNomeFile => 'Procurar por nome de ficheiro';
-  @override
   String get cancellaRicerca => 'Limpar pesquisa';
   @override
   String nessunRisultato(String q) => 'Nenhum ícone contém "$q"';
@@ -900,8 +912,6 @@ class StringsPt extends Strings {
   String get dpResiduiRimasti => 'Restam cópias do pack que não podem ser eliminadas daqui (por exemplo num Espaço privado bloqueado).';
   @override
   String get pbDaStudio => 'Ícone do Estúdio (tem prioridade)';
-  @override
-  String iconeDelPack(String p) => 'Ícones do pack em uso: $p';
   @override
   String get mantieniBiancoInterno => 'Manter o branco interior';
   @override
@@ -931,13 +941,7 @@ class StringsPt extends Strings {
   @override
   String get stileSpiegazioneModifica => 'Os mesmos ajustes do Estúdio: aplicam-se a este ícone e aos próximos criados no Pack.';
   @override
-  String get pbTieniPremuto => 'Mantenha premida uma app para editar o seu ícone';
-  @override
   String get pbPasso1Catalogo => 'Apps instaladas';
-  @override
-  String get pbCatalogoLettura => 'A ler as apps instaladas…';
-  @override
-  String pbCatalogoInfo(Object? n, Object? v) => '$n apps instaladas';
   @override
   String pbCatalogo(Object? n, Object? v) => '$n apps ($v vistas pelo Android)';
   @override
@@ -963,6 +967,34 @@ class StringsPt extends Strings {
   @override
   String get pbConfermaSostituzione => 'Confirmar';
   @override
+  String get pbEditComeAppare => 'Como o ícone aparece';
+  @override
+  String get pbEditAnteprimeHint => 'As pré-visualizações mostram este ícone. Toque para escolher.';
+  @override
+  String get pbEditConsigliato => 'Recomendado';
+  @override
+  String get pbEditAltre => 'Mais opções';
+  @override
+  String get pbStileDelPack => 'Forma e fundo de todo o pack';
+  @override
+  String get pbOptAutoSub => 'Escolhe o melhor modo';
+  @override
+  String get pbOptSimboloT => 'Só símbolo';
+  @override
+  String get pbOptSimboloSub => 'Remove o fundo e mantém o desenho';
+  @override
+  String get pbOptIconaT => 'Ícone inteiro';
+  @override
+  String get pbOptIconaSub => 'Mantém a imagem como está, dentro da forma';
+  @override
+  String get pbOptColoreSub => 'O símbolo assume a cor do fundo';
+  @override
+  String get pbOptBordoSub => 'O desenho chega às bordas';
+  @override
+  String get pbOptOriginaleT => 'Original';
+  @override
+  String get pbOptOriginaleSub => 'Sem alterações';
+  @override
   String get scorriPerChiudereAvviso => 'Deslize para o lado para fechar';
   @override
   String get pbEsclusa => 'Excluída';
@@ -980,8 +1012,6 @@ class StringsPt extends Strings {
   String get vaiInCima => 'Ir para o topo';
   @override
   String get vaiInFondo => 'Ir para o fim';
-  @override
-  String get modalitaChiara => 'Modo claro';
   @override
   String get sfondoComePack => 'Fundo como o pack';
   @override
@@ -1027,8 +1057,6 @@ class StringsPt extends Strings {
   @override
   String get pbCercaGenerate => 'Procurar nos ícones novos';
   @override
-  String get asTitolo => 'Atualização automática do pack';
-  @override
   String get asSezione => 'Atualização automática';
   @override
   String get asControlloAuto => 'Verificação automática';
@@ -1036,8 +1064,6 @@ class StringsPt extends Strings {
   String get asMai => 'Ainda nenhuma verificação';
   @override
   String asUltimo(Object? t) => 'Última verificação: $t';
-  @override
-  String get asInfo => 'A verificação corre ao desbloquear o telemóvel e a cada 6 horas, sem root e sem serviços sempre ativos. Se nenhuma app mudou não faz nada; se algo mudou recebe uma notificação silenciosa.';
   @override
   String get asControllaOra => 'Verificar';
   @override
@@ -1065,8 +1091,6 @@ class StringsPt extends Strings {
   @override
   String get dpTitolo => 'Aplicar no launcher';
   @override
-  String get dpInfo => 'O pack é uma app à parte: os ícones do sistema não são tocados. Com o Shizuku, o Icon Formatter instala-o e seleciona-o no launcher, sem PC e sem root.';
-  @override
   String get dpApplica => 'Instalar e aplicar';
   @override
   String get dpSoloInstalla => 'Instalar (com confirmação do sistema)';
@@ -1087,11 +1111,17 @@ class StringsPt extends Strings {
   @override
   String get dpShizukuVecchio => 'O Shizuku é demasiado antigo: atualize-o.';
   @override
+  String get dpShizukuNonInstallato => 'Shizuku não instalado';
+  @override
+  String get dpShizukuNonAttivo => 'Shizuku não está ativo';
+  @override
+  String get dpShizukuVecchioBreve => 'Shizuku é demasiado antigo';
+  @override
+  String get dpShizukuPermesso => 'Falta a permissão do Shizuku';
+  @override
   String get dpShizukuOk => 'Shizuku ativo e autorizado';
   @override
   String get dpNoLauncher => 'Nothing Launcher não encontrado: o pack é instalado, depois escolha-o nas configurações do seu launcher.';
-  @override
-  String dpSelettore(Object? v) => "Pack selecionado: ${v ?? '—'}";
   @override
   String get dpCompilazione => 'A criar o pack no telemóvel…';
   @override
@@ -1119,19 +1149,7 @@ class StringsPt extends Strings {
   @override
   String get lingua => 'Idioma';
   @override
-  String get setupBenvenuto => 'Bem-vindo';
-  @override
-  String get setupSub => 'Duas escolhas e está pronto. Pode alterá-las quando quiser nas Configurações.';
-  @override
-  String get setupAuto => 'Atualização automática';
-  @override
-  String get setupAutoSub => 'Avisa quando uma app nova ou atualizada precisa do seu ícone. Pede permissão para enviar notificações.';
-  @override
   String get setupShizuku => 'Shizuku (opcional)';
-  @override
-  String get setupShizukuSub => 'Com o Shizuku o pack instala-se e aplica-se sozinho, sem PC. Sem o Shizuku instala-o com a confirmação do sistema e escolhe-o à mão no launcher.';
-  @override
-  String get setupInizia => 'Começar';
   @override
   String get elaborataBreve => 'processada';
   @override
@@ -1175,20 +1193,6 @@ class StringsPt extends Strings {
   @override
   String versioneBreve(Object v) => 'Versão $v';
   @override
-  String get catAspettoDesc => 'Estilo, animações e disposição';
-  @override
-  String get catVetroDesc => 'Vidro da barra, cartões, botões e janelas';
-  @override
-  String get catElaborazioneDesc => 'Tamanhos e remoção do fundo';
-  @override
-  String get catBaseDesc => 'Fundos e calibração dos ícones';
-  @override
-  String get catPackDesc => 'Como limpar os icon packs';
-  @override
-  String get catExportDesc => 'Formato, nomes e destino';
-  @override
-  String get catSistemaDesc => 'Ficheiros temporários, repor e versão';
-  @override
   String get materiale => 'Material';
   @override
   String get vetroVeloce => 'Mais rápido';
@@ -1217,8 +1221,6 @@ class StringsPt extends Strings {
   @override
   String get vetroDialoghi => 'Vidro nas janelas';
   @override
-  String get pbSottotitoloBreve => 'Crie o seu icon pack em poucos passos.';
-  @override
   String get pbPasso1 => 'Apps';
   @override
   String get pbPasso1Sub => 'As apps que recebem os ícones novos';
@@ -1229,13 +1231,9 @@ class StringsPt extends Strings {
   @override
   String get pbPasso2 => 'Ícones novos';
   @override
-  String get pbPasso2Sub => 'Crie-os com o Estúdio ou importe-os e depois associe-os';
-  @override
   String get pbEsporta => 'Exportar';
   @override
   String get pbEsportaSub => 'Pasta, ZIP ou APK';
-  @override
-  String dpVersioneInstallata(Object v) => 'Pack instalado: versão $v';
   @override
   String get rigeneraConModalita => 'Criar de novo de outra forma…';
   @override
@@ -1539,7 +1537,7 @@ class StringsPt extends Strings {
   @override
   String get studioIncollaAppunti => 'Colar da área de transferência';
   @override
-  String get studioIncollaAppuntiSub => 'Uma imagem copiada ou um arquivo copiado no Explorador';
+  String get studioIncollaAppuntiSub => 'Uma imagem copiada ou o caminho de um arquivo de imagem copiado';
   @override
   String get studioAppuntiVuoti => 'A área de transferência não tem imagem nem arquivo de imagem.';
   @override
@@ -1788,4 +1786,232 @@ class StringsPt extends Strings {
   String get btnRipristina => 'Refazer';
   @override
   String get btnDuplicati => 'Sem cópias';
+  @override
+  String get ux1bChooseImage => 'Escolher imagem';
+  @override
+  String get ux1bPickFirst => 'Escolhe primeiro uma imagem';
+  @override
+  String get ux1bSheetSource => 'Origem';
+  @override
+  String get ux1bSheetPack => 'Pack';
+  @override
+  String get ux1bSheetResult => 'Resultado';
+  @override
+  String get ux1bSheetOptions => 'Opções';
+  @override
+  String get ux1bSubChoose => 'Usar outra imagem dos teus ficheiros';
+  @override
+  String get ux1bSubReuse => 'Usar o ícone de outra app do pack';
+  @override
+  String get ux1bSubRename => 'Mudar o nome usado no pack';
+  @override
+  String get ux1bSubVerify => 'Marcar como verificada por ti';
+  @override
+  String get ux1bSubExclude => 'Deixar este ícone fora do pack';
+  @override
+  String get ux1bSubInclude => 'Voltar a pô-lo no pack';
+  @override
+  String get ux1bSubRedo => 'Processar de novo a partir da imagem original';
+  @override
+  String get ux1bSubSuggest => 'Sugerir um ícone para experimentar';
+  @override
+  String get ux1bSubRestore => 'Voltar à versão anterior';
+  @override
+  String get ux1bCleanupRole => 'Corrige um pack de ícones existente: remove os fundos, uniformiza o estilo e revê os ícones incertos';
+  @override
+  String get ux1bStep1 => '1 · Escolher o pack';
+  @override
+  String get ux1bStep2 => '2 · Estilo';
+  @override
+  String get ux1bStep3 => '3 · Rever';
+  @override
+  String ux1bReviewCount(int n) => '$n ícones para rever';
+  @override
+  String get ux1bReviewLegend => 'Amarelo = rever';
+  @override
+  String get ux1bReviewStart => 'Rever';
+  @override
+  String get ux1bPrev => 'Anterior';
+  @override
+  String get ux1bNext => 'Seguinte';
+  @override
+  String get ux1bNoReview => 'Nenhum ícone para rever';
+  @override
+  String get ux1bAdvanced => 'Avançado';
+  @override
+  String get ux1bNone => 'ausente';
+  @override
+  String ux1bEntries(int n) => '$n entradas';
+  @override
+  String get ux1bGenNotice => 'Gerado pela app: verifica';
+  @override
+  String ux1bGenBanner(int n) => '$n ícones gerados, verifica-os';
+  @override
+  String get ux1a2Flusso => 'Fluxo de trabalho';
+  @override
+  String get ux1a2Ritaglio => 'Recorte';
+  @override
+  String get ux1a2RegolaStile => 'Ajustar em Estilo do ícone';
+  @override
+  String get ux1a2RegolaStileSub => 'O modo automático, a sensibilidade e o fundo fechado ajustam-se ali.';
+  @override
+  String get ux1a2Avanzate => 'Avançado e motor';
+  @override
+  String get ux1a2AvanzateSub => 'Modelo local, limiares e processadores. Normalmente não é preciso mudar.';
+  @override
+  String get ux1a2Processori => 'Processadores usados';
+  @override
+  String get ux1a2ProcAuto => 'Auto';
+  @override
+  String get ux1a2ProcPochi => 'Menos';
+  @override
+  String get ux1a2ProcTutti => 'Todos';
+  @override
+  String get ux1a2ProcAutoSub => 'O sistema escolhe quantos usar.';
+  @override
+  String get ux1a2ProcPochiSub => 'Gasta menos bateria, mas é mais lento.';
+  @override
+  String get ux1a2ProcTuttiSub => 'O mais rápido, mas gasta mais bateria.';
+  @override
+  String ux1a2ProcHint(Object? a, Object? b) => 'Em uso: $a de $b processadores';
+  @override
+  String get ux1a2RitagliVuoto => 'Nenhum recorte guardado';
+  @override
+  String get ux1a2RitagliSub => 'Reutiliza os recortes já feitos, sem os processar de novo.';
+  @override
+  String get ux1a2ChiaveServe => 'Precisa de uma chave API: introduza-a abaixo.';
+  @override
+  String get ux1a2Step1 => 'Adicione ícones no Studio';
+  @override
+  String ux1a2Step2(Object? a) => 'Escolha um estilo e depois $a';
+  @override
+  String get ux1a2Step3 => 'Envie para o Pack e instale';
+  @override
+  String get ux1a2PassiSub => 'Toque em um passo para abrir essa seção.';
+  @override
+  String get ux1a2CoachStudio => 'Adicione imagens ou uma pasta para começar.';
+  @override
+  String get ux1a2CoachPack => 'Quatro passos: adicionar, processar, enviar ao Pack, instalar.';
+  @override
+  String get ux1a2CoachApps => 'Cada app instalada tem o seu ícone: toque numa para o ver ou alterar.';
+  @override
+  String get ux1a2CoachOk => 'Entendi';
+  @override
+  String get ux1a2RipristinaSugg => 'Repor dicas';
+  @override
+  String get ux1a2RipristinaSuggSub => 'Volta a mostrar as dicas das primeiras vezes.';
+  @override
+  String get ux1a2SuggRipristinati => 'Dicas repostas';
+  @override
+  String get ux1aGruppoModifica => 'Editar';
+  @override
+  String get ux1aGruppoVisualizza => 'Ver';
+  @override
+  String get ux1aGruppoInvia => 'Enviar';
+  @override
+  String get ux1aGruppoRimuovi => 'Remover';
+  @override
+  String get ux1aEsporta => 'Exportar';
+  @override
+  String get ux1aEsportaSub => 'Pasta ou ZIP';
+  @override
+  String get ux1aSvuotaTitolo => 'Esvaziar a lista?';
+  @override
+  String ux1aSvuotaCorpo(Object? a) => 'Remove $a ícones desta lista. Os ficheiros originais não são alterados e podes adicioná-los de novo.';
+  @override
+  String get ux1aSimbolo => 'Tamanho do símbolo';
+  @override
+  String get ux1aAvanzate => 'Avançado';
+  @override
+  String get ux1aTaglio => 'Recorte';
+  @override
+  String get ux1aLancio => 'Launcher';
+  @override
+  String get ux1aAspetto => 'Aspeto';
+  @override
+  String get ux1aColore => 'Cores';
+  @override
+  String get ux1aInfo => 'O que esta opção faz';
+  @override
+  String get ux1aOpacitaSfondo => 'Opacidade da placa';
+  @override
+  String get ux1aAggiornaPreset => 'Atualizar predefinição';
+  @override
+  String get ux1aRipristinaPreset => 'Repor predefinição';
+  @override
+  String get ux1aRinominaPreset => 'Renomear predefinição';
+  @override
+  String get ux1aModificato => 'Modificado';
+  @override
+  String get ux1aModificatoNonSalvato => 'Editado, não guardado';
+  @override
+  String get ux1aPresetIntegrato => 'Predefinição integrada';
+  @override
+  String get ux1aPresetSalvato => 'Predefinição guardada';
+  @override
+  String ux1aUsoAreaHint(Object? a, Object? b, Object? c) => 'Área útil: lado $a %, centro ($b, $c)';
+  @override
+  String get ux1bHintAuto => 'Escolhe a melhor opção';
+  @override
+  String get ux1bHintSymbol => 'Remove o fundo, mantém o desenho';
+  @override
+  String get ux1bHintPlate => 'Símbolo na cor do fundo';
+  @override
+  String get ux1bHintFull => 'O desenho chega às margens';
+  @override
+  String get ux1bHintPlace => 'Imagem inteira dentro da forma';
+  @override
+  String get ux1bHintRaw => 'Sem alterações';
+  @override
+  String get ux1bChangeBg => 'Mudar o fundo';
+  @override
+  String get ux1bPlateOpacity => 'Opacidade do fundo';
+  @override
+  String get ux1bPlateMode => 'Cor';
+  @override
+  String get ux1bPlateAuto => 'Auto';
+  @override
+  String get ux1bPlateDark => 'Escuro';
+  @override
+  String get ux1bPlateLight => 'Claro';
+  @override
+  String get ux1bApplyAll => 'Aplicar a todos os ícones';
+  @override
+  String get ux1bPlateHint => 'Recompõe cada ícone a partir do recorte guardado: sem nova segmentação.';
+  @override
+  String get ux1bPlatePreview => 'Pré-visualização: ícones atuais, o novo fundo aparece após Aplicar';
+  @override
+  String get ux2bNoticeRemoveBgNoKey => 'Sem chave remove.bg: usa-se o recorte clássico.';
+  @override
+  String get ux2bNoticeAiNoModel => 'Modelo de IA não descarregado: usa-se o recorte clássico.';
+  @override
+  String get ux2bChangeBgTitle => 'Mudar o fundo dos ícones processados';
+  @override
+  String get ux2bChangeBgSub => 'Reaplica o fundo sem recortar os ícones de novo';
+  @override
+  String get ux2bApplyProcessed => 'Aplicar aos ícones processados';
+  @override
+  String get ux2bNothingToRecompose => 'Nenhum ícone processado para recompor';
+  @override
+  String ux2bCacheSummary(Object? a, Object? b) => '$a recompostas da cache, $b recortadas de novo';
+  @override
+  String get ux2cPresetSqColour => 'Squircle · Cor';
+  @override
+  String get ux2cPresetSqMono => 'Squircle · Mono';
+  @override
+  String get ux2cPresetCiColour => 'Círculo · Cor';
+  @override
+  String get ux2cPresetCiMono => 'Círculo · Mono';
+  @override
+  String get ux2cChooseStyle => 'Escolher um estilo';
+  @override
+  String get ux2cChooseStyleSub => 'Forma, cor e fundo aplicados aos ícones importados';
+  @override
+  String get ux2cProcessAll => 'Processar todas';
+  @override
+  String get ux2cSortBy => 'Ordenar por';
+  @override
+  String get ux2cShowOnly => 'Mostrar';
+  @override
+  String get ux2cMonoGlyph => 'Glifo monocromático';
 }

@@ -16,6 +16,7 @@ class PackRecord {
     this.file = '',
     this.calendarDay = 0,
     this.isSystem = false,
+    this.isFresh = false,
   });
 
   /// 'original', 'generated' or 'calendar'.
@@ -29,6 +30,9 @@ class PackRecord {
   final int calendarDay;
   final bool isSystem;
 
+  /// Flag bit 2: an app added this session, rendered from its own launcher icon.
+  final bool isFresh;
+
   /// Ids are unique per kind only.
   String get rowKey => '$kind\u0001$id';
 
@@ -38,7 +42,7 @@ class PackRecord {
 
   /// Every field the builder keeps: a different signature means the row changed.
   String get signature =>
-      '$path\u0001$label\u0001$package\u0001$activity\u0001$file\u0001$calendarDay\u0001${isSystem ? 1 : 0}';
+      '$path\u0001$label\u0001$package\u0001$activity\u0001$file\u0001$calendarDay\u0001${isSystem ? 1 : 0}${isFresh ? 'fresh' : ''}';
 
   /// Same keys as the entries of pack_builder.json.
   Map<String, Object?> toJson() => {
@@ -49,6 +53,7 @@ class PackRecord {
     'file': file,
     'path': path,
     if (calendarDay > 0) 'calendarDay': calendarDay,
+    if (isFresh) 'fresh': true,
   };
 
   /// Null when the JSON entry has no path (such entries were never saved).
@@ -64,6 +69,7 @@ class PackRecord {
       activity: m['activity'] as String? ?? '',
       file: m['file'] as String? ?? '',
       calendarDay: (m['calendarDay'] as num?)?.toInt() ?? 0,
+      isFresh: m['fresh'] == true,
     );
   }
 
@@ -77,6 +83,7 @@ class PackRecord {
     file: r['file'] as String,
     calendarDay: r['calendar_day'] as int,
     isSystem: ((r['flags'] as int) & 1) != 0,
+    isFresh: ((r['flags'] as int) & 2) != 0,
   );
 }
 
@@ -283,7 +290,7 @@ class PackDb {
         r.file,
         r.path,
         r.calendarDay,
-        r.isSystem ? 1 : 0,
+        (r.isSystem ? 1 : 0) | (r.isFresh ? 2 : 0),
         nowMs,
       ]);
     }
@@ -298,11 +305,6 @@ class PackDb {
       b.delete('rows', where: 'kind = ? AND id = ?', whereArgs: [r.kind, r.id]);
     }
     await b.commit(noResult: true);
-  }
-
-  Future<Map<String, String>> readKv(DatabaseExecutor e, String table) async {
-    final r = await e.query(table);
-    return {for (final x in r) x['key'] as String: x['json'] as String};
   }
 
   Future<void> upsertKv(

@@ -72,7 +72,7 @@ class _Frame {
   final int spanUs;
 }
 
-/// Frame monitor (Impostazioni > Sistema > Mostra gli FPS). It exists only while shown:
+/// Frame monitor (Settings > System > Show FPS). It exists only while shown:
 /// the timings callback is registered in initState and removed in dispose.
 class FpsOverlay extends StatefulWidget {
   const FpsOverlay({super.key});

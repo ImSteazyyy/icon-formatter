@@ -14,7 +14,7 @@ import '../src/rust/api/engine.dart';
 import 'common.dart';
 import 'liquid_glass.dart';
 
-/// Settings › Elaborazione: local AI model manager (download, size, RAM,
+/// Settings › Processing: local AI model manager (download, size, RAM,
 /// delete, mask thresholds, test on an image).
 class LocalAiBox extends StatefulWidget {
   const LocalAiBox({super.key});
@@ -83,7 +83,6 @@ class _LocalAiBoxState extends State<LocalAiBox> {
                     const SizedBox(height: 4),
                     Wrap(spacing: 6, children: [
                       if (m.phone) _Tag(S.aiTagTelefono),
-                      if (m.desktop) _Tag(m.phone ? S.aiTagWindows : S.aiTagSoloWindows),
                     ]),
                   ]),
                 ),

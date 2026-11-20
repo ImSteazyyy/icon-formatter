@@ -6,8 +6,11 @@ import 'liquid_glass.dart';
 
 /// One row of a [showGlassMenu] pop-up.
 class GlassMenuItem<T> {
-  const GlassMenuItem({required this.value, required this.label, this.icon, this.subtitle, this.destructive = false, this.enabled = true, this.selected = false});
+  const GlassMenuItem({required this.value, required this.label, this.icon, this.subtitle, this.destructive = false, this.enabled = true, this.selected = false, this.section = false});
   final T value;
+
+  /// Group title (not tappable): splits the menu into purpose groups.
+  final bool section;
   final String label;
   final IconData? icon;
   final String? subtitle;
@@ -87,7 +90,6 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
     final above = over > below;
     final room = (above ? over : below).clamp(120.0, size.height * 0.6);
     final left = (a.center.dx - width / 2).clamp(margin, size.width - margin - width);
-    final accent = Theme.of(context).colorScheme.primary;
     final origin = Alignment(((a.center.dx - left) / width) * 2 - 1, above ? 1 : -1);
     final curve = CurvedAnimation(parent: widget.animation, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
 
@@ -100,7 +102,15 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
     }
     for (var i = 0; i < widget.items.length; i++) {
       final it = widget.items[i];
-      if (i > 0 || widget.title != null) rows.add(Divider(height: 1, thickness: 0.6, indent: 18, endIndent: 18, color: Palette.fg.withValues(alpha: 0.08)));
+      if (it.section) {
+        rows.add(Padding(
+          padding: EdgeInsets.fromLTRB(18, i == 0 ? 10 : 14, 18, 4),
+          child: Text(it.label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Palette.text3)),
+        ));
+        continue;
+      }
+      final afterSection = i > 0 && widget.items[i - 1].section;
+      if ((i > 0 || widget.title != null) && !afterSection) rows.add(Divider(height: 1, thickness: 0.6, indent: 18, endIndent: 18, color: Palette.fg.withValues(alpha: 0.08)));
       final color = !it.enabled ? Palette.text3 : (it.destructive ? Palette.danger : Palette.text);
       rows.add(InkWell(
         key: ValueKey('menu-${it.label}'),
@@ -108,7 +118,7 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Row(children: [
-            if (it.selected) Padding(padding: const EdgeInsets.only(right: 10), child: Icon(Icons.check_rounded, size: 18, color: accent)),
+            if (it.selected) Padding(padding: const EdgeInsets.only(right: 10), child: Icon(Icons.check_rounded, size: 18, color: Palette.selection)),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text(it.label, style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w500, color: color)),
@@ -126,7 +136,6 @@ class _GlassMenuViewState<T> extends State<_GlassMenuView<T>> {
       type: MaterialType.transparency,
       child: LiquidGlass(
         radius: 26,
-        role: GlassRole.panel,
         live: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: ConstrainedBox(

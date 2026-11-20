@@ -14,12 +14,16 @@ import '../services/preset_share.dart';
 import '../src/rust/api/engine.dart';
 import '../widgets/ai_mask.dart';
 import '../widgets/common.dart';
+import 'preset_chooser.dart';
 import 'workspace_controller.dart';
 import 'extra_compare_styles.dart';
 import 'studio2_color_section.dart';
 import '../l10n/strings.dart';
 
-/// Controls shared by all pipelines.
+/// The one "Icon style" panel, shared by Studio and Your apps (and the
+/// pack's style editor). Order: the mode, the essentials of the style, the
+/// symbol size and the resolution. Everything technical sits in "Advanced",
+/// collapsed, with one-line descriptions.
 class AdjustPanel extends StatelessWidget {
   const AdjustPanel({super.key, required this.c, this.showModes = true, this.onOpenBases});
 
@@ -37,7 +41,6 @@ class AdjustPanel extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             if (showModes) ...[
-              SectionTitle(S.modalita),
               SegmentedButton<StudioMode>(
                 showSelectedIcon: false,
                 segments: [
@@ -52,20 +55,18 @@ class AdjustPanel extends StatelessWidget {
             ],
             ..._styleSection(context, st),
             const SizedBox(height: 18),
-            Studio2ColorSection(c: c),
+            ..._symbolSizeSection(),
             const SizedBox(height: 18),
-            _overrideSwitch(context),
-            ..._placementSection(context),
+            ..._resolutionSection(st),
             const SizedBox(height: 18),
-            ..._segmentSection(context),
-            const SizedBox(height: 18),
-            ..._sizeSection(context, st),
+            _advancedSection(context, st),
           ],
         );
       },
     );
   }
 
+  /// Essentials of the chosen pipeline.
   List<Widget> _styleSection(BuildContext context, AppState st) {
     switch (c.mode) {
       case StudioMode.original:
@@ -95,74 +96,102 @@ class AdjustPanel extends StatelessWidget {
                 ),
                 if (onOpenBases != null) TextButton(onPressed: onOpenBases, child: Text(S.calibra)),
               ]),
-            )
-          else if (b?.calibration != null)
-            Text(
-              S.calibratoGlyphCentro((b!.calibration!.glyphRatio * 100).toStringAsFixed(1), b.calibration!.centerX.toStringAsFixed(3), b.calibration!.centerY.toStringAsFixed(3)),
-              style: TextStyle(fontSize: 12, color: Palette.text2),
             ),
         ];
       case StudioMode.translucent:
-        return lucentControls(st);
+        return _lucentEssentialsFor(st, context);
       case StudioMode.preset:
         final id = c.presetId ?? (c.packSettings ? st.packPresetId : st.activePresetId);
-        final pr = st.presetById(id);
-        return [
-          SectionTitle(S.preset),
-          Row(children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('preset${pr.id}${st.presets.length}'),
-                initialValue: pr.id,
-                isExpanded: true,
-                items: [for (final x in st.presets) DropdownMenuItem(value: x.id, child: Text(x.name))],
-                onChanged: (v) {
-                  c.setPreset(v);
-                  if (!c.packSettings) st.update(() => st.activePresetId = v!);
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: S.salvaComeNuovoPreset,
-              icon: const Icon(Icons.save_as_outlined),
-              onPressed: () async {
-                final name = await askText(context, S.nomeDelPreset, initial: '${pr.name} copia');
-                if (name != null && name.isNotEmpty) {
-                  final n = st.savePresetAs(name, pr.params);
-                  c.setPreset(n.id);
-                }
-              },
-            ),
-            if (pr.builtIn)
-              IconButton(tooltip: S.ripristinaValori, icon: const Icon(Icons.restart_alt), onPressed: () => st.resetPreset(pr.id))
-            else
-              IconButton(
-                tooltip: S.eliminaPreset,
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () async {
-                  if (await confirm(context, S.eliminarePreset, pr.name, ok: S.elimina)) {
-                    st.deletePreset(pr.id);
-                    c.setPreset(null);
-                  }
-                },
-              ),
-            IconButton(tooltip: S.presetCondividiCondividi, icon: const Icon(Icons.ios_share), onPressed: () => _sharePreset(context, pr)),
-            IconButton(tooltip: S.presetCondividiImporta, icon: const Icon(Icons.file_download_outlined), onPressed: () => _importPresets(context, st)),
-          ]),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => showCompareStyles(context, c, pr.id),
-              icon: const Icon(Icons.compare_outlined, size: 18),
-              label: Text(S.extraConfrontaStili),
-            ),
-          ),
-          const SizedBox(height: 6),
-          ...translucentSliders(pr.params, (t) => st.setPresetParams(pr.id, t)),
-        ];
+        return _presetBar(context, st, st.presetById(id));
     }
+  }
+
+  /// Preset chooser with its state: name, "Modified" pill and the actions that
+  /// belong to that state (update, reset, save as new, rename, delete).
+  List<Widget> _presetBar(BuildContext context, AppState st, StylePreset pr) {
+    final modified = st.presetModified(pr);
+    return [
+      SectionTitle(S.preset),
+      // every preset with its live thumbnail (rendered lazily, cached)
+      SizedBox(
+        height: 116,
+        child: ListView.separated(
+          key: const ValueKey('preset-strip'),
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          itemCount: st.presets.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final x = st.presets[i];
+            return PresetTile(preset: x, selected: x.id == pr.id, onTap: () => applyPresetChoice(c, x));
+          },
+        ),
+      ),
+      if (modified) ...[
+        const SizedBox(height: 6),
+        Align(alignment: Alignment.centerLeft, child: _ModifiedPill(label: S.ux1aModificato)),
+      ],
+      const SizedBox(height: 4),
+      Text(
+        modified ? S.ux1aModificatoNonSalvato : (pr.builtIn ? S.ux1aPresetIntegrato : S.ux1aPresetSalvato),
+        style: TextStyle(fontSize: 12, color: modified ? Palette.text : Palette.text3),
+      ),
+      const SizedBox(height: 6),
+      Wrap(spacing: 4, runSpacing: 4, children: [
+        if (modified && !pr.builtIn)
+          TextButton(key: const ValueKey('preset-update'), onPressed: () => st.updatePreset(pr.id), child: Text(S.ux1aAggiornaPreset)),
+        if (modified)
+          TextButton(key: const ValueKey('preset-reset'), onPressed: () => st.resetPreset(pr.id), child: Text(S.ux1aRipristinaPreset)),
+        TextButton.icon(
+          key: const ValueKey('preset-save-new'),
+          icon: const Icon(Icons.save_as_outlined, size: 18),
+          label: Text(S.salvaComeNuovoPreset),
+          onPressed: () async {
+            final name = await askText(context, S.nomeDelPreset, initial: modified || pr.builtIn ? '${pr.name} copia' : pr.name);
+            if (name != null && name.isNotEmpty) {
+              // the edited values become the new preset; the old one keeps its saved state
+              final lk = pr.lucent;
+              final n = lk != null ? st.savePresetLucent(name, lk) : st.savePresetAs(name, pr.params);
+              c.setPreset(n.id);
+            }
+          },
+        ),
+        if (!pr.builtIn)
+          TextButton.icon(
+            key: const ValueKey('preset-rename'),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text(S.ux1aRinominaPreset),
+            onPressed: () async {
+              final name = await askText(context, S.ux1aRinominaPreset, initial: pr.name);
+              if (name != null) st.renamePreset(pr.id, name);
+            },
+          ),
+        if (!pr.builtIn)
+          TextButton.icon(
+            key: const ValueKey('preset-delete'),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: Text(S.eliminaPreset),
+            onPressed: () async {
+              if (await confirm(context, S.eliminarePreset, pr.name, ok: S.elimina)) {
+                st.deletePreset(pr.id);
+                c.setPreset(null);
+              }
+            },
+          ),
+      ]),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(spacing: 4, children: [
+          TextButton.icon(
+            onPressed: () => showCompareStyles(context, c, pr.id),
+            icon: const Icon(Icons.compare_outlined, size: 18),
+            label: Text(S.extraConfrontaStili),
+          ),
+          IconButton(tooltip: S.presetCondividiCondividi, icon: const Icon(Icons.ios_share), onPressed: () => _sharePreset(context, pr)),
+          IconButton(tooltip: S.presetCondividiImporta, icon: const Icon(Icons.file_download_outlined), onPressed: () => _importPresets(context, st)),
+        ]),
+      ),
+    ];
   }
 
   /// Mobile: share sheet. Desktop: save dialog, like the settings backup.
@@ -205,13 +234,96 @@ class AdjustPanel extends StatelessWidget {
     }
   }
 
-  Widget _overrideSwitch(BuildContext context) {
+  /// One size control for the symbol. It is the placement scale, which applies
+  /// to every pipeline (the Lucent symbol scale is no longer shown twice).
+  List<Widget> _symbolSizeSection() {
+    final pl = c.editPlacement;
+    return [
+      SliderRow(
+        label: S.ux1aSimbolo,
+        value: pl.scaleMul,
+        min: 0.5,
+        max: 1.6,
+        format: (v) => '${(v * 100).round()}%',
+        onChanged: (v) => c.setPlacement(copyPlacement(pl, scaleMul: v)),
+      ),
+    ];
+  }
+
+  /// Resolution: the default is the same for Studio and Your apps (the size
+  /// of the pipeline), and it is written next to the switch.
+  List<Widget> _resolutionSection(AppState st) {
+    final ex = st.export;
+    final auto = '${st.sizeFor(c.mode)}px';
+    return [
+      SectionTitle(S.risoluzione),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(S.risoluzionePersonalizzata, style: TextStyle(fontSize: 13)),
+        subtitle: Text(ex.customSize ? '${ex.size}px' : S.predefinita(auto), style: const TextStyle(fontSize: 11)),
+        value: ex.customSize,
+        onChanged: (v) => st.update(() => ex.customSize = v),
+      ),
+      if (ex.customSize)
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final s in [128, 192, 256, 432, 512, 1024])
+            ChoiceChip(label: Text('$s'), selected: ex.size == s, onSelected: (_) => st.update(() => ex.size = s)),
+          SizedBox(
+            width: 110,
+            child: TextFormField(
+              key: ValueKey('size${ex.size}'),
+              initialValue: '${ex.size}',
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(suffixText: 'px'),
+              onFieldSubmitted: (v) {
+                final n = int.tryParse(v);
+                if (n != null && n >= 16 && n <= 4096) st.update(() => ex.size = n);
+              },
+            ),
+          ),
+        ]),
+    ];
+  }
+
+  /// Collapsed by default. Each group opens on its own.
+  Widget _advancedSection(BuildContext context, AppState st) {
+    final lucent = c.mode == StudioMode.translucent;
+    final pr = st.presetById(c.presetId ?? (c.packSettings ? st.packPresetId : st.activePresetId));
+    return Glass(
+      padding: EdgeInsets.zero,
+      child: ExpansionTile(
+        key: const ValueKey('style-advanced'),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(S.ux1aAvanzate, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Palette.text)),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        children: [
+          _group(S.ux1aTaglio, _segmentSection(context)),
+          _group(S.composizione, _compositionSection()),
+          if (c.mode == StudioMode.preset && pr.lucent != null) _group(S.ux1aAspetto, _lucentPresetControls(st, pr)),
+          if (c.mode == StudioMode.preset && pr.lucent == null) _group(S.ux1aAspetto, translucentSliders(pr.params, (t) => st.setPresetParams(pr.id, t))),
+          // one heading: the colour section draws its own (it used to be wrapped twice)
+          if (lucent || pr.lucent != null) Studio2ColorSection(c: c),
+          if (lucent) _group(S.ux1aLancio, _launcherSection(st)),
+        ],
+      ),
+    );
+  }
+
+  Widget _group(String title, List<Widget> children) => ExpansionTile(
+        title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.text2)),
+        childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        children: children,
+      );
+
+  /// Position, size of the usable area and the per-icon switch.
+  List<Widget> _compositionSection() {
     final it = c.selected;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionTitle(S.composizione,
-          trailing: it != null && it.hasOverride
-              ? TextButton(onPressed: () => c.clearOverrides(it), child: Text(S.rimuoviCorrezioni))
-              : null),
+    final pl = c.editPlacement;
+    return [
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
@@ -229,20 +341,6 @@ class AdjustPanel extends StatelessWidget {
                 c.notify();
               },
       ),
-    ]);
-  }
-
-  List<Widget> _placementSection(BuildContext context) {
-    final pl = c.editPlacement;
-    return [
-      SliderRow(
-        label: S.scala,
-        value: pl.scaleMul,
-        min: 0.5,
-        max: 1.6,
-        format: (v) => '${(v * 100).round()}%',
-        onChanged: (v) => c.setPlacement(copyPlacement(pl, scaleMul: v)),
-      ),
       SliderRow(
         label: S.posizioneX,
         value: pl.offsetX,
@@ -259,15 +357,6 @@ class AdjustPanel extends StatelessWidget {
         format: (v) => (v * 100).toStringAsFixed(1),
         onChanged: (v) => c.setPlacement(copyPlacement(pl, offsetY: v)),
       ),
-      if (c.editSelectedOnly)
-        SliderRow(
-          label: S.latoGlyph,
-          value: pl.glyphRatio,
-          min: 0.3,
-          max: 0.9,
-          format: (v) => '${(v * 100).round()}%',
-          onChanged: (v) => c.setPlacement(copyPlacement(pl, glyphRatio: v)),
-        ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
@@ -284,7 +373,7 @@ class AdjustPanel extends StatelessWidget {
         onChanged: (v) => AppState.I.update(() => AppState.I.look.opticalCentre = v),
       ),
       Text(
-        S.areaUtileLatoGlyphCentro((pl.glyphRatio * pl.scaleMul * 100).toStringAsFixed(1), (pl.centerX + pl.offsetX).toStringAsFixed(3), (pl.centerY + pl.offsetY).toStringAsFixed(3)),
+        S.ux1aUsoAreaHint((pl.glyphRatio * pl.scaleMul * 100).toStringAsFixed(1), (pl.centerX + pl.offsetX).toStringAsFixed(3), (pl.centerY + pl.offsetY).toStringAsFixed(3)),
         style: TextStyle(fontSize: 11, color: Palette.text3),
       ),
     ];
@@ -293,7 +382,6 @@ class AdjustPanel extends StatelessWidget {
   List<Widget> _segmentSection(BuildContext context) {
     final s = c.editSegment;
     return [
-      SectionTitle(S.isolamentoGlyph),
       DropdownButtonFormField<SegMode>(
         key: ValueKey('seg${s.mode}${c.editSelectedOnly}'),
         initialValue: s.mode,
@@ -333,40 +421,74 @@ class AdjustPanel extends StatelessWidget {
     ];
   }
 
-  List<Widget> _sizeSection(BuildContext context, AppState st) {
-    final ex = st.export;
-    final auto = c.mode == StudioMode.original && st.selectedBase != null
-        ? S.dimensioneDelBasePx(st.selectedBase!.size)
-        : '${st.translucentSize}px';
+  /// Controls of a Lucent preset: they edit the preset itself (shape, glyph
+  /// colour, plate alpha), so "Modified" and the reset follow them.
+  List<Widget> _lucentPresetControls(AppState st, StylePreset pr) {
+    final l = pr.lucent!;
+    void set(VoidCallback f) => st.update(f);
     return [
-      SectionTitle(S.risoluzione),
+      DropdownButtonFormField<LucentShape>(
+        key: ValueKey('plshape${pr.id}${l.shape}'),
+        initialValue: l.shape,
+        isExpanded: true,
+        decoration: InputDecoration(labelText: S.lucentForma, isDense: true),
+        items: [
+          DropdownMenuItem(value: LucentShape.squircle, child: Text(S.lucentFormaSquircle)),
+          DropdownMenuItem(value: LucentShape.circle, child: Text(S.lucentFormaCerchio)),
+        ],
+        onChanged: (v) => set(() => l.shape = v ?? l.shape),
+      ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         dense: true,
-        title: Text(S.risoluzionePersonalizzata, style: TextStyle(fontSize: 13)),
-        subtitle: Text(ex.customSize ? '${ex.size}px' : S.predefinita(auto), style: const TextStyle(fontSize: 11)),
-        value: ex.customSize,
-        onChanged: (v) => st.update(() => ex.customSize = v),
+        title: Text(S.ux2cMonoGlyph, style: TextStyle(fontSize: 13)),
+        value: l.monochrome,
+        onChanged: (v) => set(() => l.monochrome = v),
       ),
-      if (ex.customSize)
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final s in [128, 192, 256, 432, 512, 1024])
-            ChoiceChip(label: Text('$s'), selected: ex.size == s, onSelected: (_) => st.update(() => ex.size = s)),
-          SizedBox(
-            width: 110,
-            child: TextFormField(
-              key: ValueKey('size${ex.size}'),
-              initialValue: '${ex.size}',
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(suffixText: 'px'),
-              onFieldSubmitted: (v) {
-                final n = int.tryParse(v);
-                if (n != null && n >= 16 && n <= 4096) st.update(() => ex.size = n);
-              },
-            ),
-          ),
-        ]),
+      SliderRow(label: S.ux1aOpacitaSfondo, value: l.backdropAlpha, onChanged: (v) => set(() => l.backdropAlpha = v)),
     ];
+  }
+
+  List<Widget> _launcherSection(AppState st) {
+    final l = st.lucent;
+    void set(VoidCallback f) => st.update(f);
+    return [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(S.lucentOmbraLauncher, style: TextStyle(fontSize: 13)),
+        value: l.launcherShadow && !l.launcherEncode,
+        onChanged: l.launcherEncode ? null : (v) => set(() => l.launcherShadow = v),
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(S.lucentCodificaLauncher, style: TextStyle(fontSize: 13)),
+        subtitle: Text(S.lucentCodificaLauncherSub, style: TextStyle(fontSize: 11)),
+        value: l.launcherEncode,
+        onChanged: (v) => set(() => l.launcherEncode = v),
+      ),
+    ];
+  }
+}
+
+/// One preset of the strip: its live thumbnail and name. The selected one has
+/// the selection colour (never the error colour).
+/// Small "Modified" pill next to the preset chooser.
+class _ModifiedPill extends StatelessWidget {
+  const _ModifiedPill({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Palette.selection.withValues(alpha: 0.6)),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Palette.text)),
+    );
   }
 }
 
@@ -405,16 +527,21 @@ List<Widget> translucentSliders(TranslucentSettings t, ValueChanged<TranslucentS
       ),
     ];
 
-
-/// Lucent controls. Changes go through AppState, so the
-/// preview re-renders with the same Rust function used by the export.
-List<Widget> lucentControls(AppState st) {
+/// Lucent essentials: the mode, the plate shape and its opacity. The rest of
+/// the Lucent options sit in "Advanced" (see [AdjustPanel._launcherSection]).
+/// Changes go through AppState, so the preview re-renders with the same Rust
+/// function used by the export.
+List<Widget> _lucentEssentialsFor(AppState st, BuildContext context) {
   final l = st.lucent;
   void set(VoidCallback f) => st.update(f);
   return [
-    SectionTitle(S.lucentTitle, trailing: TextButton(onPressed: () => set(l.reset), child: Text(S.ripristina))),
-    Text(S.lucentInfo, style: TextStyle(fontSize: 12, color: Palette.text2)),
-    const SizedBox(height: 10),
+    SectionTitle(
+      S.lucentTitle,
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        IconButton(tooltip: S.ux1aInfo, icon: const Icon(Icons.info_outline, size: 20), onPressed: () => showMsg(context, S.lucentInfo)),
+        TextButton(onPressed: () => set(l.reset), child: Text(S.ripristina)),
+      ]),
+    ),
     SegmentedButton<bool>(
       showSelectedIcon: false,
       segments: [
@@ -428,6 +555,7 @@ List<Widget> lucentControls(AppState st) {
     DropdownButtonFormField<LucentShape>(
       key: ValueKey('lshape${l.shape}'),
       initialValue: l.shape,
+      isExpanded: true,
       decoration: InputDecoration(labelText: S.lucentForma, isDense: true),
       items: [
         DropdownMenuItem(value: LucentShape.squircle, child: Text(S.lucentFormaSquircle)),
@@ -437,39 +565,6 @@ List<Widget> lucentControls(AppState st) {
       onChanged: (v) => set(() => l.shape = v ?? l.shape),
     ),
     const SizedBox(height: 6),
-    SliderRow(label: S.lucentOpacitaPiatto, value: l.backdropAlpha, onChanged: (v) => set(() => l.backdropAlpha = v)),
-    SliderRow(label: S.lucentScalaGlifo, value: l.glyphScale, min: 0.5, max: 1.6, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => l.glyphScale = v)),
-    SliderRow(label: S.lucentBordoLuce, value: l.rim, onChanged: (v) => set(() => l.rim = v)),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(S.lucentMantieniComposizione, style: TextStyle(fontSize: 13)),
-      subtitle: Text(S.lucentMantieniComposizioneSub, style: TextStyle(fontSize: 11)),
-      value: l.keepComposition,
-      onChanged: (v) => set(() => l.keepComposition = v),
-    ),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(S.lucentMonocromatico, style: TextStyle(fontSize: 13)),
-      subtitle: Text(S.lucentMonocromaticoSub, style: TextStyle(fontSize: 11)),
-      value: l.monochrome,
-      onChanged: (v) => set(() => l.monochrome = v),
-    ),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(S.lucentOmbraLauncher, style: TextStyle(fontSize: 13)),
-      value: l.launcherShadow && !l.launcherEncode,
-      onChanged: l.launcherEncode ? null : (v) => set(() => l.launcherShadow = v),
-    ),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(S.lucentCodificaLauncher, style: TextStyle(fontSize: 13)),
-      subtitle: Text(S.lucentCodificaLauncherSub, style: TextStyle(fontSize: 11)),
-      value: l.launcherEncode,
-      onChanged: (v) => set(() => l.launcherEncode = v),
-    ),
+    SliderRow(label: S.ux1aOpacitaSfondo, value: l.backdropAlpha, onChanged: (v) => set(() => l.backdropAlpha = v)),
   ];
 }

@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
 import '../l10n/strings.dart';
-import 'common.dart';
-import 'liquid_glass.dart';
 
 /// Wallpaper chosen in this app session. Not persisted.
 ImageProvider? _sessionWallpaper;
@@ -87,8 +85,6 @@ class _HomePreviewState extends State<HomePreview> {
               ),
       ),
     );
-    // glass rim around the phone screen, as on the other glass panels
-    if (glassCards) screen = LiquidGlass(radius: 28, child: screen);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 12),

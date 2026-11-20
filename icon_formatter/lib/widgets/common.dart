@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../app/state.dart';
@@ -11,7 +13,6 @@ import 'barfold_geometry.dart';
 import 'toasts.dart';
 import 'liquid_glass.dart';
 
-/// Glass panel (Impostazioni › Vetro).
 /// Height of every button in the app (pills, tool buttons, bars).
 const double kButtonHeight = 48;
 
@@ -26,7 +27,7 @@ class Glass extends StatelessWidget {
   final bool live;
 
   @override
-  Widget build(BuildContext context) => LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, chromatic: 0.3, role: GlassRole.panel, live: live, child: child);
+  Widget build(BuildContext context) => LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, live: live, child: child);
 }
 
 /// Solid anthracite card for cells of long scrolling grids. A glass panel
@@ -41,25 +42,20 @@ class Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-    child: glassCards
-        ? LiquidGlass(radius: radius ?? AppState.I.appearance.radius, padding: padding, child: child)
-        : DecoratedBox(
+    child: DecoratedBox(
       decoration: BoxDecoration(
-        color: nothingStyle ? NothingColors.card : Palette.card,
+        color: NothingColors.card,
         borderRadius: BorderRadius.circular(radius ?? AppState.I.appearance.radius),
-        border: nothingStyle ? null : Border.all(color: Palette.fg.withValues(alpha: 0.07)),
       ),
       child: Padding(padding: padding, child: child),
     ),
   );
 }
 
-/// Glass style with "glass on cards" on: cells, pills and search fields
-/// are glass like the cards (Impostazioni › Vetro › Dove usarlo).
-bool get glassCards => !nothingStyle && glassEnabled(GlassRole.panel);
-
-/// [child] on a glass pill when [glassCards], as it is otherwise.
-Widget glassPill(Widget child, {double radius = kButtonHeight / 2}) => glassCards ? LiquidGlass(radius: radius, child: child) : child;
+// Temporary: lib/screens/pack/pb_screen_details.dart (another agent's files)
+// still calls these. Nothing has no glass cards; remove with those call sites.
+const bool glassCards = false;
+Widget glassPill(Widget child, {double radius = kButtonHeight / 2}) => child;
 
 /// Soft ambient background so the glass panels have something to frost.
 class Backdrop extends StatelessWidget {
@@ -69,8 +65,8 @@ class Backdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // flat near-black page: the glass and the content carry the colour
-    return DecoratedBox(decoration: BoxDecoration(color: nothingStyle ? NothingColors.bg : Palette.bg), child: child);
+    // flat near-black page: the frosted bars and the content carry the colour
+    return DecoratedBox(decoration: BoxDecoration(color: NothingColors.bg), child: child);
   }
 }
 
@@ -423,20 +419,28 @@ class _SliderRowState extends State<SliderRow> {
 }
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.trailing});
+  const SectionTitle(this.text, {super.key, this.trailing, this.top = 4, this.bottom});
 
   final String text;
   final Widget? trailing;
 
+  /// Space above and below the title (the Pack tab uses 20 and 8).
+  final double top;
+  final double? bottom;
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: EdgeInsets.only(bottom: nothingStyle ? 12 : 10, top: 4),
+    padding: EdgeInsets.only(bottom: bottom ?? (nothingStyle ? 12 : 10), top: top),
     child: Row(
       children: [
         Expanded(
-          child: nothingStyle
-              ? Text(text, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: Palette.text))
-              : Text(text.toUpperCase(), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 11, letterSpacing: 1.1)),
+          // a heading for screen readers: they can jump from section to section
+          child: Semantics(
+            header: true,
+            child: nothingStyle
+                ? Text(text, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: Palette.text))
+                : Text(text.toUpperCase(), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 11, letterSpacing: 1.1)),
+          ),
         ),
         ?trailing,
       ],
@@ -445,24 +449,36 @@ class SectionTitle extends StatelessWidget {
 }
 
 class StatusDot extends StatelessWidget {
-  const StatusDot({super.key, required this.color, this.size = 8});
+  const StatusDot({super.key, required this.color, this.size = 8, this.label});
 
   final Color color;
   final double size;
 
+  /// What the colour means, read by screen readers (the status text of the item).
+  final String? label;
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: size,
-    height: size,
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget build(BuildContext context) => Semantics(
+    label: label,
+    child: Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    ),
   );
 }
 
-/// Batch progress strip: done / remaining / errors + cancel.
-class ProgressStrip extends StatelessWidget {
-  const ProgressStrip({super.key, required this.done, required this.total, required this.errors, required this.running, this.onCancel, this.label, this.onDismiss});
+/// Batch progress strip: done / remaining / errors, the cache note, and cancel
+/// (running) or close (finished). It sits in the layout, never over content,
+/// with the same frosted surface as the toasts and the bottom bar.
+class ProgressStrip extends StatefulWidget {
+  const ProgressStrip({super.key, required this.done, required this.total, required this.errors, required this.running, this.onCancel, this.label, this.note, this.onDismiss});
 
-  /// When finished, swiping the strip down (or tapping ×) calls this.
+  /// Strips on screen. The coach hint waits while one shows.
+  static final ValueNotifier<int> live = ValueNotifier<int>(0);
+
+  /// When finished, a tap on × or a swipe calls this. Without errors the strip
+  /// calls it by itself six seconds after the batch ends.
   final VoidCallback? onDismiss;
 
   final int done;
@@ -472,19 +488,61 @@ class ProgressStrip extends StatelessWidget {
   final VoidCallback? onCancel;
   final String? label;
 
+  /// Second line: the cache note of the batch.
+  final String? note;
+
+  @override
+  State<ProgressStrip> createState() => _ProgressStripState();
+}
+
+class _ProgressStripState extends State<ProgressStrip> {
+  Timer? _autoHide;
+
+  @override
+  void initState() {
+    super.initState();
+    _count(1);
+    _armAutoHide();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProgressStrip old) {
+    super.didUpdateWidget(old);
+    if (old.running != widget.running || old.errors != widget.errors || old.total != widget.total) _armAutoHide();
+  }
+
+  @override
+  void dispose() {
+    _autoHide?.cancel();
+    _count(-1);
+    super.dispose();
+  }
+
+  // counted after the frame: the strip is mounted inside a build pass
+  void _count(int d) => SchedulerBinding.instance.addPostFrameCallback((_) => ProgressStrip.live.value += d);
+
+  void _armAutoHide() {
+    _autoHide?.cancel();
+    _autoHide = null;
+    final w = widget;
+    if (!w.running && w.total > 0 && w.errors == 0 && w.onDismiss != null) {
+      _autoHide = Timer(const Duration(seconds: 6), () {
+        if (mounted) w.onDismiss!();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final v = total == 0 ? 0.0 : done / total;
-    final closable = !running && onDismiss != null;
-    // the same dark surface as the notices: it floats over moving content,
-    // and live glass there costs a full-screen blur on every frame of a batch
+    final w = widget;
+    final v = w.total == 0 ? 0.0 : w.done / w.total;
+    final closable = !w.running && w.onDismiss != null;
     final stripBox = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
       decoration: BoxDecoration(
-        // lifted from the content under it, like the notices; Nothing style: the frosted bar colour
         color: nothingStyle ? NothingColors.navPill : Color.alphaBlend(Palette.fg.withValues(alpha: 0.16), Palette.bg),
         borderRadius: BorderRadius.circular(AppState.I.appearance.radius),
-        // a hairline like the toasts (the old red outline and the heavy shadow made it shout)
+        // a hairline like the toasts; the bar stays neutral unless something failed
         border: Border.all(color: Palette.fg.withValues(alpha: 0.14)),
         boxShadow: nothingStyle ? null : const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 6))],
       ),
@@ -495,25 +553,35 @@ class ProgressStrip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(S.completateRimanentiErrori(label ?? (running ? S.batchElaborazione : S.batchCompletato), done, total, total - done, errors), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: Palette.text)),
-                const SizedBox(height: 8),
+                Text(
+                  S.completateRimanentiErrori(w.label ?? (w.running ? S.batchElaborazione : S.batchCompletato), w.done, w.total, w.total - w.done, w.errors),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: Palette.text),
+                ),
+                if (w.note != null)
+                  Text(w.note!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Palette.text2)),
+                const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(value: v, minHeight: 3, backgroundColor: Palette.fg.withValues(alpha: 0.10)),
+                  child: LinearProgressIndicator(
+                    value: v,
+                    minHeight: 3,
+                    color: w.errors > 0 ? Palette.danger : Palette.text,
+                    backgroundColor: Palette.fg.withValues(alpha: 0.10),
+                  ),
                 ),
               ],
             ),
           ),
-          if (running && onCancel != null) ...[const SizedBox(width: 12), OutlinedButton.icon(onPressed: onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: Text(S.annulla))],
-          if (closable) ...[
-            const SizedBox(width: 8),
+          if (w.running && w.onCancel != null) ...[const SizedBox(width: 12), OutlinedButton.icon(onPressed: w.onCancel, icon: const Icon(Icons.stop_rounded, size: 18), label: Text(S.annulla))],
+          if (closable)
             IconButton(
               key: const ValueKey('progress-close'),
               tooltip: S.scorriGiuPerChiudere,
               icon: Icon(Icons.close_rounded, size: 18, color: Palette.text2),
-              onPressed: onDismiss,
+              onPressed: w.onDismiss,
             ),
-          ],
         ],
       ),
     );
@@ -523,13 +591,13 @@ class ProgressStrip extends StatelessWidget {
         : stripBox;
     if (!closable) return strip;
     // finished: swipe left or right to remove it (like the notices)
-    return Dismissible(key: const ValueKey('progress-strip'), direction: DismissDirection.horizontal, onDismissed: (_) => onDismiss!(), child: strip);
+    return Dismissible(key: const ValueKey('progress-strip'), direction: DismissDirection.horizontal, onDismissed: (_) => w.onDismiss!(), child: strip);
   }
 }
 
 /// Notice at the top of the app (swipe sideways to remove it).
-void showMsg(BuildContext context, String msg, {bool error = false, String? actionLabel, VoidCallback? onAction}) {
-  Toasts.show(msg, error: error, actionLabel: actionLabel, onAction: onAction);
+void showMsg(BuildContext context, String msg, {bool error = false, bool warning = false, String? actionLabel, VoidCallback? onAction}) {
+  Toasts.show(msg, kind: error ? ToastKind.error : (warning ? ToastKind.warning : ToastKind.info), actionLabel: actionLabel, onAction: onAction);
 }
 
 Future<String?> askText(BuildContext context, String title, {String initial = '', String hint = ''}) async {
@@ -583,7 +651,7 @@ Future<void> showZoom(BuildContext context, {Uint8List? bytes, String? path, Str
                 Expanded(
                   child: Text(title ?? S.anteprima, style: Theme.of(ctx).textTheme.titleMedium, overflow: TextOverflow.ellipsis),
                 ),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close), tooltip: S.chiudi),
               ],
             ),
           ),
@@ -639,7 +707,7 @@ class ToolButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  /// Accent pill like Studio's "Importa icone". Inside a card: half its
+  /// Accent pill like Studio's "Import icons". Inside a card: half its
   /// width, two per row (the card's Wrap spaces them 8 apart); in a
   /// scrolling toolbar (unbounded width): its own width.
   @override
@@ -689,8 +757,6 @@ class GlassIconButton extends StatelessWidget {
         height: size,
         child: LiquidGlass(
           radius: size / 2,
-          chromatic: 0.5,
-          role: GlassRole.button,
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
@@ -721,8 +787,6 @@ class GlassIconButton extends StatelessWidget {
       height: size,
       child: LiquidGlass(
         radius: size / 2,
-        chromatic: 0.5,
-        role: GlassRole.button,
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
@@ -740,6 +804,9 @@ class GlassIconButton extends StatelessWidget {
 // ---------------------------------------------------------------- design kit
 // Shared building blocks of the dark minimal UI: every screen, menu and
 // settings page uses these instead of ad-hoc containers.
+
+/// [accentForText] for the accent of the current theme.
+Color accentTextOf(BuildContext context) => accentForText(Theme.of(context).colorScheme.primary, dark: Theme.of(context).brightness == Brightness.dark);
 
 /// Accent icon in a soft rounded tile (settings rows, cards, headers).
 class IconChip extends StatelessWidget {
@@ -962,7 +1029,9 @@ class SettingSwitch extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onChanged == null ? null : () => onChanged!(!value),
-      child: Padding(
+      // one node for screen readers: "Title, on" instead of a bare switch
+      child: MergeSemantics(
+        child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
@@ -980,6 +1049,7 @@ class SettingSwitch extends StatelessWidget {
             Switch(value: value, onChanged: onChanged),
           ],
         ),
+        ),
       ),
     );
   }
@@ -995,12 +1065,14 @@ class ChoiceRows<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final accent = Palette.selection;
     return Column(
       children: [
         for (var i = 0; i < options.length; i++) ...[
           if (i > 0) Divider(height: 1, color: Palette.fg.withValues(alpha: 0.06)),
-          InkWell(
+          Semantics(
+            selected: options[i].$1 == value,
+            child: InkWell(
             onTap: () => onChanged(options[i].$1),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 13),
@@ -1014,13 +1086,14 @@ class ChoiceRows<T> extends StatelessWidget {
               ),
             ),
           ),
+          ),
         ],
       ],
     );
   }
 }
 
-/// Numbered step of a guided flow (Pack: sorgenti -> icone nuove -> applica).
+/// Numbered step of a guided flow (Pack: sources -> new icons -> apply).
 class StepCard extends StatelessWidget {
   const StepCard({super.key, required this.step, required this.title, this.subtitle, this.children = const [], this.done = false, this.icon});
 
@@ -1068,7 +1141,7 @@ class StepCard extends StatelessWidget {
                       ? Icon(Icons.memory_rounded, size: 18, color: nothingStyle ? Palette.fg : accent)
                       : Text(
                           '$step',
-                          style: TextStyle(color: nothingStyle ? Palette.fg : accent, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: nothingStyle ? Palette.fg : accentTextOf(context), fontWeight: FontWeight.w700),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -1098,7 +1171,7 @@ class StepCard extends StatelessWidget {
   }
 }
 
-/// Stadium on/off choice, [kButtonHeight] high: filters ("App di sistema")
+/// Stadium on/off choice, [kButtonHeight] high: filters ("System apps")
 /// and tabs ("Tema AI online" / "AI locale"). Selected: accent tint and a
 /// check, or the [icon] when it has one.
 class ChoicePill extends StatelessWidget {
@@ -1115,13 +1188,13 @@ class ChoicePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final accent = Palette.selection;
     final Widget lead = icon != null
         ? Icon(icon, key: ValueKey(on), size: iconSize, color: iconColor ?? (on ? accent : Palette.text2))
         : (on ? Icon(Icons.check_rounded, key: const ValueKey(1), size: 18, color: accent) : const SizedBox(key: ValueKey(0), width: 0));
-    return glassPill(Material(
-      color: on ? accent.withValues(alpha: 0.18) : Colors.transparent,
-      shape: StadiumBorder(side: glassCards && !on ? BorderSide.none : BorderSide(color: on ? accent.withValues(alpha: 0.55) : Palette.fg.withValues(alpha: 0.14))),
+    return Material(
+      color: on ? accent.withValues(alpha: nothingStyle ? 0.14 : 0.18) : Colors.transparent,
+      shape: StadiumBorder(side: BorderSide(color: on ? accent.withValues(alpha: 0.55) : Palette.fg.withValues(alpha: 0.14))),
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: onTap,
@@ -1154,7 +1227,7 @@ class ChoicePill extends StatelessWidget {
           ),
         ),
       ),
-    ));
+    );
   }
 }
 
@@ -1181,11 +1254,11 @@ class IconFilterPill extends StatelessWidget {
         selected: on,
         label: tooltip,
         excludeSemantics: true,
-        child: glassPill(Material(
+        child: Material(
           // Nothing style: monochrome, the active filter is a white pill
           color: nothingStyle ? (on ? NothingColors.on : NothingColors.raised) : (on ? color.withValues(alpha: 0.20) : Colors.transparent),
           shape: StadiumBorder(
-            side: nothingStyle || (glassCards && !on) ? BorderSide.none : BorderSide(color: on ? color.withValues(alpha: 0.75) : Palette.fg.withValues(alpha: 0.14), width: on ? 1.5 : 1),
+            side: BorderSide.none,
           ),
           child: InkWell(
             customBorder: const StadiumBorder(),
@@ -1213,7 +1286,7 @@ class IconFilterPill extends StatelessWidget {
               }),
             ),
           ),
-        )),
+        ),
       ),
     );
   }
@@ -1222,19 +1295,23 @@ class IconFilterPill extends StatelessWidget {
 /// A search field that stays at the top of a [CustomScrollView] while the
 /// content scrolls under it. A dark backing keeps it readable over the icons.
 class SliverPinnedSearch extends StatelessWidget {
-  const SliverPinnedSearch({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(0, 6, 0, 6)});
+  /// [framed] false: the child draws its own frosted pill (AppSearchField), so
+  /// it is only pinned and padded here.
+  const SliverPinnedSearch({super.key, required this.child, this.padding = const EdgeInsets.fromLTRB(0, 6, 0, 6), this.framed = true});
 
   final Widget child;
   final EdgeInsets padding;
+  final bool framed;
 
   @override
-  Widget build(BuildContext context) => SliverPersistentHeader(pinned: true, delegate: _PinnedSearchDelegate(child, padding));
+  Widget build(BuildContext context) => SliverPersistentHeader(pinned: true, delegate: _PinnedSearchDelegate(child, padding, framed));
 }
 
 class _PinnedSearchDelegate extends SliverPersistentHeaderDelegate {
-  _PinnedSearchDelegate(this.child, this.padding);
+  _PinnedSearchDelegate(this.child, this.padding, this.framed);
   final Widget child;
   final EdgeInsets padding;
+  final bool framed;
 
   /// below the field: the fade of the backing
   static const double _tail = 6;
@@ -1246,32 +1323,23 @@ class _PinnedSearchDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    // only the pill floats over the content: no backing band behind it. In the
-    // Nothing style it is frosted like the bottom bar (blur + translucent grey);
-    // in Glass the liquid glass pill does the same job.
-    if (glassCards) {
-      return Padding(
-        padding: padding.copyWith(bottom: padding.bottom + _tail),
-        child: glassPill(Material(type: MaterialType.transparency, child: child)),
-      );
-    }
-    // also Glass with the glass effects off (power saving): a frosted pill, never a bare one
-    {
-      return Padding(
-        padding: padding.copyWith(bottom: padding.bottom + _tail),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(kButtonHeight / 2),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-            child: ColoredBox(color: nothingStyle ? NothingColors.navPill : Palette.bg.withValues(alpha: 0.6), child: Material(type: MaterialType.transparency, child: child)),
-          ),
+    if (!framed) return Padding(padding: padding.copyWith(bottom: padding.bottom + _tail), child: child);
+    // only the pill floats over the content: no backing band behind it. It is
+    // frosted like the bottom bar (blur + translucent grey), never a bare one
+    return Padding(
+      padding: padding.copyWith(bottom: padding.bottom + _tail),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(kButtonHeight / 2),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: ColoredBox(color: NothingColors.navPill, child: Material(type: MaterialType.transparency, child: child)),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
-  bool shouldRebuild(covariant _PinnedSearchDelegate old) => old.child != child || old.padding != padding;
+  bool shouldRebuild(covariant _PinnedSearchDelegate old) => old.child != child || old.padding != padding || old.framed != framed;
 }
 
 /// Two small round glass buttons: jump to the top / to the bottom of a list.
@@ -1331,11 +1399,11 @@ class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
             message: tip,
             // floats over the list: live glass like the bars
             child: LiquidGlass(
-              radius: 22,
+              radius: 24,
               live: true,
               child: Material(
                 type: MaterialType.transparency,
-                child: InkWell(customBorder: const CircleBorder(), onTap: f, child: SizedBox(width: 44, height: 44, child: Icon(icon, size: 22, color: Palette.text))),
+                child: InkWell(customBorder: const CircleBorder(), onTap: f, child: SizedBox(width: 48, height: 48, child: Icon(icon, size: 22, color: Palette.text))),
               ),
             ),
           ),
@@ -1349,9 +1417,9 @@ class _ScrollJumpButtonsState extends State<ScrollJumpButtons> {
     Widget slot(bool on, Widget child) => AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          width: 44,
-          height: on ? 44 : 0,
-          child: ClipRect(child: OverflowBox(maxHeight: 44, alignment: Alignment.bottomCenter, child: child)),
+          width: 48,
+          height: on ? 48 : 0,
+          child: ClipRect(child: OverflowBox(maxHeight: 48, alignment: Alignment.bottomCenter, child: child)),
         );
     return Column(mainAxisSize: MainAxisSize.min, children: [
       slot(canUp, _btn(Icons.keyboard_double_arrow_up_rounded, S.vaiInCima, canUp, () => _go(true))),
@@ -1454,10 +1522,10 @@ InputDecoration pillSearchDecoration(BuildContext context, String hint) {
     isDense: false,
     constraints: const BoxConstraints(minHeight: kButtonHeight, maxHeight: kButtonHeight),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-    fillColor: glassCards ? Colors.transparent : Palette.fg.withValues(alpha: 0.05),
-    border: b(glassCards ? Colors.transparent : Palette.fg.withValues(alpha: 0.14)),
-    enabledBorder: b(glassCards ? Colors.transparent : Palette.fg.withValues(alpha: 0.14)),
-    focusedBorder: b(Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+    fillColor: Palette.fg.withValues(alpha: 0.05),
+    border: b(Palette.fg.withValues(alpha: 0.14)),
+    enabledBorder: b(Palette.fg.withValues(alpha: 0.14)),
+    focusedBorder: b(Palette.selection.withValues(alpha: 0.7)),
   );
 }
 

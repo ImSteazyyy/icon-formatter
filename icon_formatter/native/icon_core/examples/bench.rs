@@ -31,6 +31,8 @@ fn main() {
                 segment: None,
                 placement: None,
                 skip_isolation: false,
+                shape: None,
+                backdrop: None,
             });
         }
     }

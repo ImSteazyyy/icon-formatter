@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
+import 'liquid_glass.dart';
 import 'common.dart';
 
 /// Row of a settings card in the Pack tab: icon chip, one-line title, optional
@@ -24,7 +25,8 @@ class PackRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          IconChip(icon: icon, color: iconColor),
+          // Nothing style: a neutral chip, red stays for real accents and errors
+          IconChip(icon: icon, color: iconColor ?? (nothingStyle ? Palette.text2 : null)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -42,7 +44,8 @@ class PackRow extends StatelessWidget {
       ),
     );
     // the ink paints on this transparent Material, above the card's fill
-    return Material(type: MaterialType.transparency, child: InkWell(borderRadius: BorderRadius.circular(12), onTap: onTap, child: body));
+    // one node for screen readers: the title labels the switch or value inside
+    return Material(type: MaterialType.transparency, child: InkWell(borderRadius: BorderRadius.circular(12), onTap: onTap, child: MergeSemantics(child: body)));
   }
 }
 

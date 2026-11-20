@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -6,12 +5,17 @@ import 'package:path/path.dart' as p;
 import '../app/state.dart';
 import '../app/theme.dart';
 import '../services/export_service.dart';
+import '../widgets/app_search.dart';
 import '../widgets/common.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/glass_menu.dart';
 import 'studio2_plate_sheets.dart';
 import '../widgets/liquid_glass.dart';
+import '../widgets/pack_rows.dart';
 import '../widgets/studio_guide.dart';
 import 'adjust_panel.dart';
+import 'preset_chooser.dart';
+import 'style_sheet.dart';
 import 'studio_list.dart';
 import 'workspace_controller.dart';
 import '../l10n/strings.dart';
@@ -46,7 +50,7 @@ class WorkTile extends StatelessWidget {
         tip = S.ok(r.method);
       }
     }
-    final accent = Theme.of(context).colorScheme.primary;
+    final accent = Palette.selection;
     final picked = c.isSelected(it);
     return Tooltip(
       message: '${it.label ?? it.rel}\n$tip',
@@ -77,7 +81,7 @@ class WorkTile extends StatelessWidget {
                         child: out != null ? IconImage(key: ValueKey('$out${r.hashCode}'), path: out) : IconImage(path: it.path, bytes: it.bytes),
                       ),
                     ),
-                    if (dot != null) Positioned(right: 0, top: 0, child: StatusDot(color: dot)),
+                    if (dot != null) Positioned(right: 0, top: 0, child: StatusDot(color: dot, label: tip)),
                     if (it.hasOverride) Positioned(left: 0, top: 0, child: Icon(Icons.edit, size: 12, color: Palette.text2)),
                     if (it.isDuplicate) Positioned(right: 0, bottom: 0, child: Tooltip(message: S.studioDuplicato, child: Icon(Icons.content_copy_rounded, size: 14, color: Palette.warn))),
                     if (picked) Positioned(left: 0, bottom: 0, child: Icon(Icons.check_circle, size: 18, color: accent)),
@@ -189,7 +193,7 @@ class WorkTile extends StatelessWidget {
                       key: ValueKey('mode-${v.name}'),
                       title: Text(t),
                       subtitle: Text(d),
-                      trailing: v == cur ? Icon(Icons.check_rounded, color: Theme.of(ctx).colorScheme.primary) : null,
+                      trailing: v == cur ? Icon(Icons.check_rounded, color: Palette.selection) : null,
                       onTap: () => Navigator.pop(ctx, v),
                     ),
                 ],
@@ -213,7 +217,7 @@ class WorkTile extends StatelessWidget {
   }
 }
 
-/// What "Sfondo come il pack" did, for a notice.
+/// What "Background like the pack" did, for a notice.
 String plateMatchMessage(PlateMatch? r) {
   if (r == null) return S.sfondoNientePack;
   if (r.changed == 0) return S.sfondoGiaUguale;
@@ -234,9 +238,7 @@ class PreviewPane extends StatelessWidget {
       builder: (context, _) {
         final it = c.selected;
         if (it == null) {
-          return Center(
-            child: Text(S.selezionaOImportaIcona, style: TextStyle(color: Palette.text3)),
-          );
+          return EmptyState(icon: Icons.image_outlined, title: S.nessunaIconaSelezionata, hint: S.selezionaOImportaIcona);
         }
         final info = c.previewInfo;
         final compare = ClipRRect(
@@ -287,7 +289,7 @@ class PreviewPane extends StatelessWidget {
           tooltip: S.studioGuidaArea,
           isSelected: c.safeGuide,
           icon: const Icon(Icons.crop_square_outlined),
-          selectedIcon: Icon(Icons.crop_square_rounded, color: Theme.of(context).colorScheme.primary),
+          selectedIcon: Icon(Icons.crop_square_rounded, color: Palette.selection),
           onPressed: c.toggleSafeGuide,
         );
         final more = IconButton(
@@ -414,7 +416,7 @@ class WorkspaceView extends StatelessWidget {
   /// (before that the centre button does the same). Gets the button rect.
   final void Function(Rect anchor)? onAdd;
 
-  /// Phones: the one big action of the bottom bar ("Elabora tutte").
+  /// Phones: the one big action of the bottom bar ("Process all").
   final Widget? primaryAction;
 
   /// Icon-only start button for the compact bar (tab bar folded).
@@ -433,34 +435,8 @@ class WorkspaceView extends StatelessWidget {
   final VoidCallback? onOpenBases;
   final Widget Function(WorkItem it)? tileBuilder;
 
-  /// "Stile": every adjustment of the icons, with a title that explains it.
-  Future<void> openStyleSheet(BuildContext context) => showAppSheet(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (ctx) => SizedBox(
-      height: MediaQuery.of(ctx).size.height * 0.80,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 4),
-            child: Text(
-              S.stileTitolo,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(S.stileSpiegazione, style: TextStyle(fontSize: 13, color: Palette.text2)),
-          ),
-          Expanded(
-            child: AdjustPanel(c: c, showModes: showModes, onOpenBases: onOpenBases),
-          ),
-        ],
-      ),
-    ),
-  );
+  /// "Stile": every adjustment of the icons, in the shared style sheet.
+  Future<void> openStyleSheet(BuildContext context) => showStyleSheet(context, c: c, showModes: showModes, onOpenBases: onOpenBases);
 
   @override
   Widget build(BuildContext context) {
@@ -474,20 +450,25 @@ class WorkspaceView extends StatelessWidget {
           listenable: c.batch,
           builder: (context, _) {
             final b = c.batch;
-            if (b.total == 0 && b.fatal == null) return const SizedBox.shrink();
+            if (b.total == 0 && b.fatal == null && b.notice == null) return const SizedBox.shrink();
             return Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Column(
                 children: [
-                  ProgressStrip(
-                    done: b.done,
-                    total: b.total,
-                    errors: b.errors,
-                    running: b.running,
-                    onCancel: b.cancel,
-                    label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
-                    onDismiss: b.dismissProgress,
-                  ),
+                  // the cache note lives inside the strip; without a batch it is a plain line
+                  if (b.total > 0)
+                    ProgressStrip(
+                      done: b.done,
+                      total: b.total,
+                      errors: b.errors,
+                      running: b.running,
+                      onCancel: b.cancel,
+                      label: b.cancelled ? S.annullato : (b.running && b.phase != null ? b.phase : null),
+                      note: b.notice,
+                      onDismiss: b.dismissProgress,
+                    )
+                  else if (b.notice != null)
+                    Text(b.notice!, style: TextStyle(fontSize: 12, color: Palette.text2)),
                   if (b.fatal != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
@@ -663,10 +644,10 @@ class WorkspaceView extends StatelessWidget {
                                 child: PreviewPane(c: c, compact: true),
                               ),
                             if (c.items.isNotEmpty) const SizedBox(height: 8),
+                            progress,
                             Expanded(child: _grid(context, 92, bottomPad: under + 136, search: true)),
                           ],
                         ),
-                        Positioned(left: 0, right: 0, top: -10, child: progress),
                       ],
                     ),
                   ),
@@ -746,7 +727,9 @@ class WorkspaceView extends StatelessWidget {
           controller: c.gridScroll,
           slivers: [
             // the search stays at the top while the icons scroll under it
-            if (search || c.query.isNotEmpty) SliverPinnedSearch(padding: const EdgeInsets.fromLTRB(4, 4, 4, 6), child: StudioSearch(c: c)),
+            if (search || c.query.isNotEmpty) SliverPinnedSearch(framed: false, padding: const EdgeInsets.fromLTRB(4, 4, 4, 6), child: StudioSearch(c: c)),
+            // right after an import: pick the look here (until the icons are processed)
+            if (c.processed.isEmpty) SliverToBoxAdapter(child: ImportStyleCard(c: c)),
             if (c.selecting) SliverToBoxAdapter(child: _selectionBar(context)),
             if (list.isEmpty)
               SliverToBoxAdapter(
@@ -801,43 +784,20 @@ class _StudioSearchState extends State<StudioSearch> {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      key: const ValueKey('studio-search'),
-      controller: t,
-      decoration: pillSearchDecoration(context, S.cercaLista).copyWith(
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ValueListenableBuilder(
-              valueListenable: t,
-              builder: (_, v, _) => v.text.isEmpty
-                  ? const SizedBox.shrink()
-                  : IconButton(
-                      tooltip: S.cancellaRicerca,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: () {
-                        t.clear();
-                        widget.c.setQuery('');
-                      },
-                    ),
-            ),
-            // sort and filter of the list: display only
-            ListenableBuilder(
-              listenable: widget.c,
-              builder: (context, _) {
-                final on = widget.c.sort != StudioSort.added || widget.c.filter != StudioFilter.all;
-                return IconButton(
-                  key: const ValueKey('studio-arrange'),
-                  tooltip: S.studioOrdinaFiltra,
-                  icon: Icon(Icons.tune_rounded, color: on ? Theme.of(context).colorScheme.primary : null),
-                  onPressed: () => showArrangeSheet(context, widget.c),
-                );
-              },
-            ),
-          ],
-        ),
+    // the shared search field; the sort/filter sheet is its own pill beside it
+    return ListenableBuilder(
+      listenable: widget.c,
+      builder: (context, _) => AppSearchField(
+        fieldKey: const ValueKey('studio-search'),
+        filterKey: const ValueKey('studio-arrange'),
+        controller: t,
+        hint: S.cercaLista,
+        filterTooltip: S.studioOrdinaFiltra,
+        filterOn: widget.c.sort != StudioSort.added || widget.c.filter != StudioFilter.all,
+        onFilter: () => showArrangeSheet(context, widget.c),
+        onChanged: widget.c.setQuery,
+        onClear: () => widget.c.setQuery(''),
       ),
-      onChanged: widget.c.setQuery,
     );
   }
 }
@@ -846,51 +806,62 @@ class _StudioSearchState extends State<StudioSearch> {
 Future<void> showArrangeSheet(BuildContext context, WorkspaceController c) {
   return showAppSheet(
     context: context,
+    isScrollControlled: true,
     builder: (ctx) => ListenableBuilder(
       listenable: c,
-      builder: (ctx, _) {
-        final accent = Theme.of(ctx).colorScheme.primary;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 12),
+      builder: (ctx, _) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 2),
-                child: Text(S.studioOrdinaFiltra, style: Theme.of(ctx).textTheme.titleMedium),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 6),
-                child: Text(S.studioFiltroSub, style: TextStyle(fontSize: 12, color: Palette.text2)),
-              ),
-              for (final (v, t) in [(StudioSort.added, S.studioOrdineAggiunta), (StudioSort.name, S.studioOrdinaNome), (StudioSort.state, S.studioOrdinaStato)])
-                ListTile(
-                  key: ValueKey('sort-${v.name}'),
-                  title: Text(t),
-                  trailing: c.sort == v ? Icon(Icons.check_rounded, color: accent) : null,
-                  onTap: () => c.setSort(v),
-                ),
-              const Divider(height: 16),
-              for (final (f, t) in [
-                (StudioFilter.all, S.studioFiltroTutte),
-                (StudioFilter.modified, S.studioFiltroModificate),
-                (StudioFilter.errors, S.studioFiltroErrori),
-                (StudioFilter.excluded, S.studioFiltroEscluse),
+              Text(S.studioOrdinaFiltra, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Palette.text)),
+              const SizedBox(height: 2),
+              Text(S.studioFiltroSub, style: TextStyle(fontSize: 12, color: Palette.text2)),
+              const SizedBox(height: 10),
+              SectionTitle(S.ux2cSortBy),
+              for (final (v, t, icon) in [
+                (StudioSort.added, S.studioOrdineAggiunta, Icons.schedule_rounded),
+                (StudioSort.name, S.studioOrdinaNome, Icons.sort_by_alpha_rounded),
+                (StudioSort.state, S.studioOrdinaStato, Icons.flag_outlined),
               ])
-                ListTile(
-                  key: ValueKey('filter-${f.name}'),
-                  title: Text(t),
-                  trailing: c.filter == f ? Icon(Icons.check_rounded, color: accent) : null,
-                  onTap: () => c.setFilter(f),
+                PackRow(key: ValueKey('sort-${v.name}'), icon: icon, title: t, trailing: _arrangeCheck(c.sort == v), onTap: () => c.setSort(v)),
+              const SizedBox(height: 8),
+              SectionTitle(S.ux2cShowOnly),
+              for (final (f, t, icon) in [
+                (StudioFilter.all, S.studioFiltroTutte, Icons.apps_rounded),
+                (StudioFilter.modified, S.studioFiltroModificate, Icons.edit_outlined),
+                (StudioFilter.errors, S.studioFiltroErrori, Icons.error_outline_rounded),
+                (StudioFilter.excluded, S.studioFiltroEscluse, Icons.block_rounded),
+              ])
+                PackRow(key: ValueKey('filter-${f.name}'), icon: icon, title: t, trailing: _arrangeCheck(c.filter == f), onTap: () => c.setFilter(f)),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const ValueKey('arrange-reset'),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 20),
+                  label: Text(S.ripristina),
+                  onPressed: c.sort == StudioSort.added && c.filter == StudioFilter.all
+                      ? null
+                      : () {
+                          c.setSort(StudioSort.added);
+                          c.setFilter(StudioFilter.all);
+                        },
                 ),
+              ),
             ],
           ),
-        );
-      },
+        ),
+      ),
     ),
   );
 }
+
+/// The check that marks the chosen row of the sort and filter sheet.
+Widget? _arrangeCheck(bool on) => on ? Icon(Icons.check_rounded, color: Palette.selection) : null;
 
 /// Result summary dialog after an export.
 Future<void> showExportDone(BuildContext context, ExportResult r) async {
@@ -898,15 +869,19 @@ Future<void> showExportDone(BuildContext context, ExportResult r) async {
   showMsg(context, '${r.message}${r.location != null ? ' · ${r.location}' : ''}');
 }
 
-bool get isMobile => Platform.isAndroid || Platform.isIOS;
-
 /// One entry of the "Altro" sheet.
 class MoreAction {
-  const MoreAction(this.icon, this.label, this.subtitle, this.onTap);
-  final IconData icon;
+  const MoreAction(this.icon, this.label, this.subtitle, this.onTap, {this.destructive = false}) : isSection = false;
+
+  /// Group title of the menu (no action): entries after it belong to it.
+  const MoreAction.section(this.label) : icon = null, subtitle = '', onTap = null, destructive = false, isSection = true;
+
+  final IconData? icon;
   final String label;
   final String subtitle;
   final VoidCallback? onTap;
+  final bool destructive;
+  final bool isSection;
 }
 
 /// Bottom bar on phones: one big start button and "Altro" (the other
@@ -924,7 +899,7 @@ class ActionBar extends StatelessWidget {
   final Widget? compactPrimary;
   final Widget? compactLeading;
 
-  /// Small line above the buttons (e.g. selection count + "Seleziona tutte").
+  /// Small line above the buttons (e.g. selection count + "Select all").
   final Widget? header;
 
   Future<void> _open(BuildContext context, [Rect? anchor]) async {
@@ -932,7 +907,18 @@ class ActionBar extends StatelessWidget {
       context,
       anchor: anchor ?? anchorOf(context),
       title: S.altreAzioni,
-      items: [for (var k = 0; k < more.length; k++) GlassMenuItem(value: k, label: more[k].label, subtitle: more[k].subtitle, icon: more[k].icon, enabled: more[k].onTap != null)],
+      items: [
+        for (var k = 0; k < more.length; k++)
+          GlassMenuItem(
+            value: k,
+            label: more[k].label,
+            subtitle: more[k].isSection || more[k].subtitle.isEmpty ? null : more[k].subtitle,
+            icon: more[k].icon,
+            enabled: more[k].onTap != null,
+            destructive: more[k].destructive,
+            section: more[k].isSection,
+          ),
+      ],
     );
     if (i != null) more[i].onTap?.call();
   }
@@ -1145,8 +1131,8 @@ Future<List<PackImage>?> pickImagesDialog(BuildContext context, List<PackImage> 
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: on ? Theme.of(ctx).colorScheme.primary : Colors.transparent, width: 2),
-                          color: on ? Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.14) : null,
+                          border: Border.all(color: on ? Palette.selection : Colors.transparent, width: 2),
+                          color: on ? Palette.selection.withValues(alpha: 0.14) : null,
                         ),
                         child: Column(children: [
                           SizedBox(width: 60, height: 60, child: IconImage(path: im.abs)),

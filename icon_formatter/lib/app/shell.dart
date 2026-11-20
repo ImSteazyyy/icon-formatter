@@ -4,23 +4,20 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:flutter/services.dart';
 
-import '../screens/bases_screen.dart';
-import '../screens/settings_extras.dart';
 import '../screens/settings_whats_new.dart';
 import '../screens/installed_apps_screen.dart';
 import '../screens/pack_builder_screen.dart';
 import '../services/platform_service.dart';
 import '../services/update_check.dart';
-import '../screens/pack_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/studio_screen.dart';
 import '../widgets/common.dart';
 import '../widgets/barfold_geometry.dart';
 import '../widgets/liquid_glass.dart';
-import '../widgets/title_bar.dart';
 import '../widgets/tour2_visibility.dart';
+import '../widgets/toasts.dart';
+import '../widgets/coach_hint.dart';
 import 'state.dart';
 import 'theme.dart';
 import '../l10n/strings.dart';
@@ -37,15 +34,11 @@ class _Dest {
   String get short => shortLabel ?? label;
 }
 
-/// Destinations. "apps" exists only on Android.
+/// Destinations (Android only).
 List<_Dest> get _dests => [
   _Dest('studio', S.studio, Icons.auto_awesome_mosaic_outlined),
   _Dest('builder', S.pbTitolo, Icons.dashboard_customize_outlined, S.pack),
-  if (!Platform.isAndroid)
-    _Dest('pack', S.packCleanup, Icons.cleaning_services_outlined),
-  if (Platform.isAndroid) _Dest('apps', S.app, Icons.apps_rounded),
-  if (!Platform.isAndroid)
-    _Dest('bases', S.baseIcons, Icons.crop_square_rounded),
+  _Dest('apps', S.app, Icons.apps_rounded),
   _Dest('settings', S.impostazioni, Icons.settings_outlined, S.opzioni),
 ];
 
@@ -115,18 +108,6 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
     _requestFold(fold);
     return false;
   }
-
-  /// Glass style bar: the glass package's tab bar with its own material and
-  /// indicator; scrolling down it shrinks to the open tab, liquid-like.
-  Widget _glassNav() => appGlassTabBar(
-    key: _navKey,
-    icons: [for (final d in dests) d.icon],
-    labels: [for (final d in dests) d.label],
-    index: index,
-    onSelect: _select,
-    minimized: _navFolded,
-    onExpand: () => _setFold(false),
-  );
 
   /// Nothing style bar: a dark blurred pill in the middle, icons only; the
   /// open section sits in a darker circle.
@@ -212,11 +193,14 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    // after the first frame: "Novità" after an update, one message if the automatic backup fails
+    // after the first frame: "What is new" after an update, one message if the automatic backup fails
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) checkWhatsNew(context, appVersion);
     });
     AppState.I.autoBackupFailed.addListener(_onAutoBackupFailed);
+    // the tour may request a section before this shell exists (first run)
+    requestedTab.addListener(_onRequestedTab);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onRequestedTab());
     // one check per start, a few seconds after the first frame; off = no timer
     if (!_updateScheduled && AppState.I.checkUpdates) {
       _updateScheduled = true;
@@ -237,21 +221,27 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
           'studio' => StudioScreen(
             onOpenBases: _openBases,
             onOpenPack: () => _go('builder'),
-            onOpenApps: Platform.isAndroid ? () => _go('apps') : null,
+            onOpenApps: () => _go('apps'),
             onShow: () => _go('studio'),
             tabShown: studioShown,
           ),
-          'pack' => PackScreen(onOpenBases: _openBases),
           'builder' => const PackBuilderScreen(),
           'apps' => InstalledAppsScreen(onOpenBases: _openBases),
-          'bases' => const BasesScreen(),
           _ => SettingsScreen(key: _settingsKey),
         },
     ];
   }
 
+  void _onRequestedTab() {
+    final id = requestedTab.value;
+    if (id == null || !mounted) return;
+    requestedTab.value = null;
+    _go(id);
+  }
+
   @override
   void dispose() {
+    requestedTab.removeListener(_onRequestedTab);
     AppState.I.autoBackupFailed.removeListener(_onAutoBackupFailed);
     _updateTimer?.cancel();
     studioShown.dispose();
@@ -272,25 +262,20 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
     if (AppState.I.autoBackupFailed.value && mounted) showMsg(context, S.extra2BkAutoFallito, error: true);
   }
 
-  static const _digitKeys = [LogicalKeyboardKey.digit1, LogicalKeyboardKey.digit2, LogicalKeyboardKey.digit3, LogicalKeyboardKey.digit4];
-
-  /// Desktop shortcuts: Ctrl+1..4 sections, Ctrl+, settings, Ctrl+Shift+T light / dark.
-  late final Map<ShortcutActivator, VoidCallback> _shortcuts = {
-    for (var i = 0; i < 4; i++)
-      SingleActivator(_digitKeys[i], control: true): () {
-        if (i < dests.length) _select(i);
-      },
-    const SingleActivator(LogicalKeyboardKey.comma, control: true): () => _go('settings'),
-    const SingleActivator(LogicalKeyboardKey.keyT, control: true, shift: true): toggleLightDark,
-  };
-
   void _go(String id) => _select(dests.indexWhere((d) => d.id == id));
 
   /// Selects a section from the bar (or code); the pager follows. Adjacent
   /// sections slide, farther ones jump (no intermediate page is built).
+  /// A section change closes the keyboard and the notice on screen.
+  void _leaveSection() {
+    Toasts.dismiss();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   void _select(int i) {
     if (i < 0) return;
     final from = index;
+    _leaveSection();
     setState(() {
       index = i;
       _navFolded = _barsDown = _wantFold = false;
@@ -313,13 +298,14 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
   /// Swipeable sections; each one is kept alive (no reload when coming back).
   Widget _pagerView() => PageView(
     controller: _pager,
-    // pages may draw under the status bar ("Le tue app" scrolls up under
+    // pages may draw under the status bar ("Your apps" scrolls up under
     // it instead of being cut at the safe area); sideways the neighbours
     // are off screen anyway
     clipBehavior: Clip.none,
     physics: const PageScrollPhysics(parent: ClampingScrollPhysics()),
     onPageChanged: (i) {
       if (i != index) {
+        _leaveSection();
         setState(() {
           index = i;
           _navFolded = _barsDown = _wantFold = false;
@@ -332,13 +318,7 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
     children: [for (final p in pages) _KeepAlive(child: p)],
   );
 
-  void _openBases() {
-    if (dests.any((d) => d.id == 'bases')) {
-      _go('bases');
-    } else {
-      _openSettings(SettingsCat.bases);
-    }
-  }
+  void _openBases() => _openSettings(SettingsCat.bases);
 
   void _openSettings(SettingsCat c) {
     _go('settings');
@@ -349,21 +329,28 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // first-run hints float above the bottom bar of the phone layout
+    final narrowPhone = Platform.isAndroid && MediaQuery.sizeOf(context).width < 840;
+    return CoachHintLayer(
+      tabId: dests[index].id,
+      bottom: narrowPhone ? _navCovered + MediaQuery.viewPaddingOf(context).bottom : 0,
+      child: _shellBody(context),
+    );
+  }
+
+  Widget _shellBody(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final stack = IndexedStack(index: index, children: pages);
     if (Platform.isAndroid && w < 840) {
       final stack = _pagerView();
-      // Floating liquid-glass navigation: content scrolls underneath it.
-      // real height of the floating bar (measured after layout)
+      // Floating navigation pill: content scrolls underneath it. Its open
+      // height is fixed (12 + 70 + 12); it is set only while the bar is open,
+      // since the folded bar is lower and following it made the bars above
+      // sink and overlap the bar when it opened again.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        var h = _navKey.currentContext?.size?.height;
-        // measured only while the bar is open: the folded bar is lower, and
-        // following it made the bars above sink and overlap the bar when it
-        // opened again
-        // Nothing pill: its open height is fixed (12 + 70 + 12)
-        if (nothingStyle) h = 94;
-        if (!_navFolded && h != null && (h - _navCovered).abs() > 0.5 && mounted)
-          setState(() => _navCovered = h!);
+        const h = 94.0;
+        if (!_navFolded && (h - _navCovered).abs() > 0.5 && mounted) setState(() => _navCovered = h);
+        // the notice floats above the bar
+        if (mounted) Toasts.bottomInset.value = _navCovered + MediaQuery.viewPaddingOf(context).bottom;
       });
       final inset = MediaQuery.of(context).viewPadding.bottom;
       final covered = _navCovered + inset;
@@ -392,7 +379,7 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
                   left: 0,
                   right: 0,
                   bottom: inset,
-                  // nav redraws on every settings change (glass, accent, shadows)
+                  // nav redraws on every settings change (accent, theme)
                   // the tour owns the screen: the bar fades out while it is open
                   child: ValueListenableBuilder<bool>(
                     valueListenable: tourOpen,
@@ -406,8 +393,7 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
                     ),
                     child: ListenableBuilder(
                       listenable: AppState.I,
-                      builder: (context, _) =>
-                          nothingStyle ? _nothingNav() : _glassNav(),
+                      builder: (context, _) => _nothingNav(),
                     ),
                   ),
                 ),
@@ -416,176 +402,26 @@ class _ShellState extends State<Shell> with SingleTickerProviderStateMixin {
         ),
       );
     }
-    if (Platform.isAndroid) {
-      final stack = _pagerView();
-      return Scaffold(
-        body: Backdrop(
-          child: SafeArea(
-            child: Row(
-              children: [
-                NavigationRail(
-                  backgroundColor: Colors.transparent,
-                  selectedIndex: index,
-                  labelType: NavigationRailLabelType.all,
-                  onDestinationSelected: _select,
-                  destinations: [
-                    for (final d in dests)
-                      NavigationRailDestination(
-                        icon: Icon(d.icon),
-                        label: Text(d.label),
-                      ),
-                  ],
-                ),
-                Expanded(child: stack),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    // Windows / desktop: sidebar. The shortcuts need a focus scope below them: a
-    // text field that loses focus hands it to its nearest scope, and a scope above
-    // this one would silence the shortcuts.
-    return CallbackShortcuts(
-      bindings: _shortcuts,
-      child: FocusScope(
-        autofocus: true,
-        child: Scaffold(
+    final stack = _pagerView();
+    return Scaffold(
       body: Backdrop(
-        child: Column(
-          children: [
-            const AppTitleBar(),
-            Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: 220,
-                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
-                    decoration: BoxDecoration(
-                      color: Palette.fg.withValues(alpha: 0.02),
-                      border: Border(
-                        right: BorderSide(
-                          color: Palette.fg.withValues(alpha: 0.06),
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 4),
-                        for (var i = 0; i < dests.length; i++)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: _SideItem(
-                              d: dests[i],
-                              selected: i == index,
-                              onTap: () => _select(i),
-                            ),
-                          ),
-                        const Spacer(),
-                        ListenableBuilder(
-                          listenable: AppState.I,
-                          builder: (context, _) {
-                            final b = AppState.I.selectedBase;
-                            return Glass(
-                              padding: const EdgeInsets.all(10),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 30,
-                                    height: 30,
-                                    child: b == null
-                                        ? const SizedBox()
-                                        : IconImage(path: b.path),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          S.baseAttivo,
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Palette.text3,
-                                          ),
-                                        ),
-                                        Text(
-                                          b?.label ?? '—',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(child: stack),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SideItem extends StatelessWidget {
-  const _SideItem({
-    required this.d,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _Dest d;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: Duration(
-            milliseconds: AppState.I.appearance.animations ? 160 : 0,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: selected
-                ? accent.withValues(alpha: 0.12)
-                : Colors.transparent,
-            border: Border.all(
-              color: selected
-                  ? accent.withValues(alpha: 0.35)
-                  : Colors.transparent,
-            ),
-          ),
+        child: SafeArea(
           child: Row(
             children: [
-              Icon(d.icon, size: 19, color: selected ? accent : Palette.text2),
-              const SizedBox(width: 12),
-              Text(
-                d.label,
-                style: TextStyle(
-                  color: selected ? Palette.text : Palette.text2,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
+              NavigationRail(
+                backgroundColor: Colors.transparent,
+                selectedIndex: index,
+                labelType: NavigationRailLabelType.all,
+                onDestinationSelected: _select,
+                destinations: [
+                  for (final d in dests)
+                    NavigationRailDestination(
+                      icon: Icon(d.icon),
+                      label: Text(d.label),
+                    ),
+                ],
               ),
+              Expanded(child: stack),
             ],
           ),
         ),

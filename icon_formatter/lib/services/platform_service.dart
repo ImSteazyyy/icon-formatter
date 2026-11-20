@@ -138,7 +138,7 @@ class PlatformService {
       ((await _ch.invokeMethod<Map>('autoSyncIgnoredSet', {'packages': packages})) ?? {}).cast<String, dynamic>();
 
   // --- background notification while a batch runs (ProcessingService.kt) ---
-  /// Starts the "Elaborazione icone 0/total" notification. False when Android refuses or on other platforms.
+  /// Starts the "Processing icons 0/total" notification. False when Android refuses or on other platforms.
   static Future<bool> processingStart(int total) => _ok('processingStart', {'total': total});
   static Future<bool> processingProgress(int done, int total) => _ok('processingProgress', {'done': done, 'total': total});
   /// Idempotent: safe to call when nothing runs.

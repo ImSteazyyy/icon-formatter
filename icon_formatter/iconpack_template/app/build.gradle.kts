@@ -20,7 +20,7 @@ android {
         versionCode = packVersionCode
         versionName = packVersionName
         resValue("string", "app_name", packName)
-        // accent colour of Icon Formatter (Impostazioni › Aspetto)
+        // accent colour of Icon Formatter (Settings › Appearance)
         resValue("string", "accent", packAccent)
     }
 

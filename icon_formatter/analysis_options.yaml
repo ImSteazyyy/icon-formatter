@@ -7,4 +7,3 @@ analyzer:
     - native/**
     - build/**
     - android/**
-    - windows/**

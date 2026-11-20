@@ -1,4 +1,4 @@
-//! "Lucent" rendering (translucent icons).
+//! "Lightnt" rendering (translucent icons).
 //!
 //! Port of the rendering method of Nothing IconGen
 //! (<https://github.com/linuxct/nothing-icongen>, AGPL-3.0-only, © linuxct):
@@ -48,7 +48,7 @@ pub struct LucentParams {
     pub backdrop: [u8; 4],
     pub shape: PlateShape,
     /// Ink conversion (optional). Default false: the glyph keeps its
-    /// own colours and only the plate uses the Lucent treatment.
+    /// own colours and only the plate uses the Lightnt treatment.
     pub monochrome: bool,
     /// Keep the glyph's original position/size inside the icon; false uses
     /// the launcher normalisation (longest side 0.389 / 0.93).
@@ -62,6 +62,9 @@ pub struct LucentParams {
     pub rim: f32,
     /// Dark plate: lift dark neutral greys of the glyph so they stay visible.
     pub lift_greys: bool,
+    /// Dark plate: near-neutral dark glyph pixels (black, dark greys) become
+    /// light, smoothly by lightness; chromatic pixels keep their colour.
+    pub adapt_neutrals: bool,
     /// Bake the launcher's ShadowGenerator shadow into the PNG.
     pub launcher_shadow: bool,
     /// Apply the PackIconEncoder compensation (launchers that draw icons twice).
@@ -107,6 +110,7 @@ impl LucentParams {
             offset_y: 0.0,
             rim: 0.0,
             lift_greys: false,
+            adapt_neutrals: true,
             launcher_shadow: false,
             launcher_encode: false,
             strategy: GlyphStrategy::Auto,
@@ -115,7 +119,8 @@ impl LucentParams {
     }
 
     pub fn light() -> Self {
-        LucentParams { ink: [0x1B, 0x1B, 0x1F], backdrop: [255, 255, 255, 0x66], ..Self::dark() }
+        // light plate: white at 60% (public Nothing widget value; not measured)
+        LucentParams { ink: [0x1B, 0x1B, 0x1F], backdrop: [255, 255, 255, 0x99], adapt_neutrals: false, ..Self::dark() }
     }
 }
 
@@ -366,15 +371,16 @@ fn is_complex(glyph: &RgbaImage) -> bool {
     colors > 34 || edges as f32 > (S * S) as f32 * 0.3
 }
 
-/// Auto keeps a tile whole (Tile strategy, colours untouched) when its content
-/// is art: no plain background (a map, a multi-colour tile), or content that
-/// reaches the tile's outer edge (a calendar page with its band on top). A
-/// plain background with one glyph in the middle (a white tile with a star,
-/// a black logo) is not kept: it takes the unwrap / glyph path.
-fn keep_whole(tile: &RgbaImage) -> bool {
+/// The background colour of a tile: the mean of the most common colour (8-step
+/// bins) on its outer 3-pixel ring. None when the ring is transparent.
+fn border_colour(tile: &RgbaImage) -> Option<[i32; 3]> {
+    border_candidates(tile).into_iter().next()
+}
+
+/// The up to four most common border colours, most common first.
+fn border_candidates(tile: &RgbaImage) -> Vec<[i32; 3]> {
     let (w, h) = tile.dimensions();
     let ring = |x: u32, y: u32| x < 3 || y < 3 || x + 3 >= w || y + 3 >= h;
-    // background candidate: the most common colour (8-step bins) on the outer ring
     let mut bins: std::collections::HashMap<(u8, u8, u8), (usize, [u32; 3])> = std::collections::HashMap::new();
     for (x, y, q) in tile.enumerate_pixels() {
         if q[3] > 200 && ring(x, y) {
@@ -385,10 +391,480 @@ fn keep_whole(tile: &RgbaImage) -> bool {
             }
         }
     }
-    let Some((_, (n, sum))) = bins.into_iter().max_by_key(|(_, (n, _))| *n) else {
-        return false;
+    let mut v: Vec<(usize, [u32; 3])> = bins.into_values().collect();
+    v.sort_by(|a, b| b.0.cmp(&a.0));
+    v.into_iter().take(4).map(|(n, sum)| [0, 1, 2].map(|k| (sum[k] / n as u32) as i32)).collect()
+}
+
+fn dark_plate_of(p: &LucentParams) -> bool {
+    (p.backdrop[0] as u32 + p.backdrop[1] as u32 + p.backdrop[2] as u32) < 384
+}
+
+/// Dark plate: near-neutral dark pixels of a glyph become light. The weight
+/// is the neutrality (channel spread below ~18 is fully neutral, above ~48
+/// is chromatic) times the darkness (black is fully remapped, mid greys
+/// barely). The shift is added to each channel, so the tonal detail inside
+/// the black parts is kept and chromatic pixels are not touched.
+fn adapt_neutral_pixels(layer: &mut RgbaImage) {
+    for q in layer.pixels_mut() {
+        if q[3] == 0 {
+            continue;
+        }
+        let (r, g, b) = (q[0] as f32, q[1] as f32, q[2] as f32);
+        let spread = r.max(g).max(b) - r.min(g).min(b);
+        let neutral = 1.0 - smoothstep(18.0, 48.0, spread);
+        if neutral <= 0.0 {
+            continue;
+        }
+        let l = (r + g + b) / 3.0;
+        let dark = 1.0 - smoothstep(40.0, 110.0, l);
+        if dark <= 0.0 {
+            continue;
+        }
+        // lightness target: black goes to ~255, a grey of 40 to ~215
+        let target = l + (255.0 - 2.0 * l) * dark;
+        let shift = (target - l) * neutral;
+        for k in 0..3 {
+            q[k] = (q[k] as f32 + shift).round().clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+/// Connected components (4-neighbour) of the pixels in `valid` that share the
+/// same `key`. Returns the component id per pixel (u32::MAX outside `valid`),
+/// the size of each component and whether it touches the tile's outer ring.
+fn components(key: &[u8], w: u32, h: u32, valid: &[bool]) -> (Vec<u32>, Vec<usize>, Vec<bool>) {
+    let (wu, hu, n) = (w as usize, h as usize, (w * h) as usize);
+    let mut id = vec![u32::MAX; n];
+    let (mut sizes, mut ring) = (Vec::new(), Vec::new());
+    let mut stack = Vec::new();
+    for s in 0..n {
+        if !valid[s] || id[s] != u32::MAX {
+            continue;
+        }
+        let c = sizes.len() as u32;
+        id[s] = c;
+        stack.push(s);
+        let (mut size, mut touches) = (0usize, false);
+        while let Some(p) = stack.pop() {
+            size += 1;
+            let (x, y) = (p % wu, p / wu);
+            if x < 3 || y < 3 || x + 3 >= wu || y + 3 >= hu {
+                touches = true;
+            }
+            let mut nb = [usize::MAX; 4];
+            if x + 1 < wu {
+                nb[0] = p + 1;
+            }
+            if x > 0 {
+                nb[1] = p - 1;
+            }
+            if y + 1 < hu {
+                nb[2] = p + wu;
+            }
+            if y > 0 {
+                nb[3] = p - wu;
+            }
+            for q in nb.into_iter().filter(|&q| q != usize::MAX) {
+                if valid[q] && id[q] == u32::MAX && key[q] == key[p] {
+                    id[q] = c;
+                    stack.push(q);
+                }
+            }
+        }
+        sizes.push(size);
+        ring.push(touches);
+    }
+    (id, sizes, ring)
+}
+
+/// Foreground coverage per pixel of whole-tile art (1 = keep, 0 = background).
+/// OKLab k-means (k = 4, deterministic seeds). A cluster is background when
+/// it covers a good share of the outer ring, is flat (little luminance spread
+/// and few edges) and has a big connected region. A compact cluster whose
+/// chroma differs clearly from the border colour (a disc, a pin) is kept.
+/// Thin or small specks are cleaned up, then the mask is feathered 3x3.
+fn foreground_coverage(art: &RgbaImage) -> Option<Vec<f32>> {
+    use crate::color::{linear_lut, rgba_to_oklab, Lab};
+    const K: usize = 4;
+    let (w, h) = art.dimensions();
+    let (wu, hu, n) = (w as usize, h as usize, (w * h) as usize);
+    let labs = rgba_to_oklab(art.as_raw(), &linear_lut());
+    let raw = art.as_raw();
+    let valid: Vec<bool> = (0..n).map(|i| raw[i * 4 + 3] > 200).collect();
+    let opaque: Vec<usize> = (0..n).filter(|&i| valid[i]).collect();
+    if opaque.len() < 100 {
+        return None;
+    }
+    let ring = |i: usize| {
+        let (x, y) = (i % wu, i / wu);
+        x < 3 || y < 3 || x + 3 >= wu || y + 3 >= hu
     };
-    let bg = [0, 1, 2].map(|k| (sum[k] / n as u32) as i32);
+    let ring_total = opaque.iter().filter(|&&i| ring(i)).count();
+    if ring_total == 0 {
+        return None;
+    }
+    let dist2 = |a: &Lab, b: &Lab| (a.l - b.l).powi(2) + (a.a - b.a).powi(2) + (a.b - b.b).powi(2);
+    let nearest = |c: &[Lab], p: &Lab| -> usize {
+        (0..c.len())
+            .min_by(|&i, &j| dist2(&c[i], p).partial_cmp(&dist2(&c[j], p)).unwrap())
+            .unwrap()
+    };
+    // deterministic seeds: the first sample, then farthest-point sampling
+    let stride = (opaque.len() / 40_000).max(1);
+    let sample: Vec<usize> = opaque.iter().copied().step_by(stride).collect();
+    let mut centres = vec![labs[sample[0]]];
+    while centres.len() < K {
+        let far = *sample
+            .iter()
+            .max_by(|&&a, &&b| {
+                let da = centres.iter().map(|c| dist2(c, &labs[a])).fold(f32::MAX, f32::min);
+                let db = centres.iter().map(|c| dist2(c, &labs[b])).fold(f32::MAX, f32::min);
+                da.partial_cmp(&db).unwrap()
+            })
+            .unwrap();
+        centres.push(labs[far]);
+    }
+    for _ in 0..10 {
+        let mut acc = vec![[0f32; 4]; K];
+        for &i in &sample {
+            let a = &mut acc[nearest(&centres, &labs[i])];
+            a[0] += labs[i].l;
+            a[1] += labs[i].a;
+            a[2] += labs[i].b;
+            a[3] += 1.0;
+        }
+        for (k, a) in acc.iter().enumerate() {
+            if a[3] > 0.0 {
+                centres[k] = Lab { l: a[0] / a[3], a: a[1] / a[3], b: a[2] / a[3] };
+            }
+        }
+    }
+    let mut cid = vec![0u8; n];
+    for &i in &opaque {
+        cid[i] = nearest(&centres, &labs[i]) as u8;
+    }
+    // per-cluster statistics
+    let mut count = [0usize; K];
+    let mut ring_cnt = [0usize; K];
+    let mut sum_l = [0f64; K];
+    let mut sum_l2 = [0f64; K];
+    let mut edges = [0usize; K];
+    let mut bbox = [(usize::MAX, usize::MAX, 0usize, 0usize); K];
+    for &i in &opaque {
+        let k = cid[i] as usize;
+        let (x, y) = (i % wu, i / wu);
+        count[k] += 1;
+        if ring(i) {
+            ring_cnt[k] += 1;
+        }
+        sum_l[k] += labs[i].l as f64;
+        sum_l2[k] += (labs[i].l as f64).powi(2);
+        let b = &mut bbox[k];
+        *b = (b.0.min(x), b.1.min(y), b.2.max(x), b.3.max(y));
+        let right = x + 1 < wu && valid[i + 1] && (labs[i].l - labs[i + 1].l).abs() > 0.05;
+        let down = y + 1 < hu && valid[i + wu] && (labs[i].l - labs[i + wu].l).abs() > 0.05;
+        if right || down {
+            edges[k] += 1;
+        }
+    }
+    // big connected regions of each cluster: components of the cluster key
+    let (comp_id, comp_size, _) = components(&cid, w, h, &valid);
+    let mut big = [false; K];
+    for &i in &opaque {
+        if comp_size[comp_id[i] as usize] as f32 >= 0.03 * n as f32 {
+            big[cid[i] as usize] = true;
+        }
+    }
+    // the border colour: the cluster with most ring pixels
+    let border = (0..K).max_by_key(|&k| ring_cnt[k]).unwrap();
+    let chroma = |c: &Lab| (c.a * c.a + c.b * c.b).sqrt();
+    let mut is_bg = [false; K];
+    for k in 0..K {
+        if count[k] == 0 {
+            continue;
+        }
+        let m = sum_l[k] / count[k] as f64;
+        let std_l = ((sum_l2[k] / count[k] as f64) - m * m).max(0.0).sqrt();
+        // anti-aliased edges widen the spread a little: flat = calm, not noise-free
+        let flat = std_l < 0.07 && (edges[k] as f32) < 0.15 * count[k] as f32;
+        let ring_share = ring_cnt[k] as f32 / ring_total as f32;
+        // background only when flat, big, border-connected and close in chroma to the border
+        let chroma_ok = k == border || (chroma(&centres[k]) - chroma(&centres[border])).abs() <= 0.05;
+        let large = count[k] as f32 >= 0.10 * opaque.len() as f32 || ring_share >= 0.25;
+        is_bg[k] = ring_share >= 0.15 && flat && big[k] && chroma_ok && large;
+    }
+    let mut bg = vec![false; n];
+    for &i in &opaque {
+        bg[i] = is_bg[cid[i] as usize];
+    }
+    // clean-up: background specks inside the foreground, pinholes in it
+    let bgkey: Vec<u8> = bg.iter().map(|&b| b as u8).collect();
+    let (bid, bsize, bring) = components(&bgkey, w, h, &valid);
+    for &i in &opaque {
+        let c = bid[i] as usize;
+        if bg[i] && !bring[c] && (bsize[c] as f32) < 0.003 * n as f32 {
+            bg[i] = false;
+        }
+    }
+    let fgkey: Vec<u8> = bg.iter().map(|&b| (!b) as u8).collect();
+    let (fid, fsize, fring) = components(&fgkey, w, h, &valid);
+    for &i in &opaque {
+        let c = fid[i] as usize;
+        if !bg[i] && !fring[c] && (fsize[c] as f32) < 0.003 * n as f32 {
+            bg[i] = true;
+        }
+    }
+    // feather: coverage = 1 - mean of the 3x3 background mask
+    let mut fg = vec![0f32; n];
+    for y in 0..hu {
+        for x in 0..wu {
+            let i = y * wu + x;
+            if !valid[i] {
+                continue;
+            }
+            let (mut s, mut k) = (0f32, 0f32);
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                    if nx < 0 || ny < 0 || nx >= wu as i32 || ny >= hu as i32 {
+                        continue;
+                    }
+                    let j = ny as usize * wu + nx as usize;
+                    if valid[j] {
+                        s += bg[j] as u8 as f32;
+                        k += 1.0;
+                    }
+                }
+            }
+            fg[i] = 1.0 - s / k.max(1.0);
+        }
+    }
+    Some(fg)
+}
+
+/// Flood fill from the border through pixels within 40 of `seed`; returns the
+/// background mask and its size (the earlier method, used as the fallback).
+fn flood_background(art: &RgbaImage, seed: [i32; 3]) -> (Vec<bool>, usize) {
+    const TOL: i32 = 40;
+    let (w, h) = art.dimensions();
+    let ring = |x: u32, y: u32| x < 3 || y < 3 || x + 3 >= w || y + 3 >= h;
+    let dist = |q: &Rgba<u8>| (0..3).map(|k| (q[k] as i32 - seed[k]).abs()).max().unwrap_or(0);
+    let mut bg = vec![false; (w * h) as usize];
+    let mut stack = Vec::new();
+    for y in 0..h {
+        for x in 0..w {
+            let q = art.get_pixel(x, y);
+            if ring(x, y) && q[3] > 200 && dist(q) <= TOL {
+                bg[(y * w + x) as usize] = true;
+                stack.push((x, y));
+            }
+        }
+    }
+    let mut size = stack.len();
+    while let Some((x, y)) = stack.pop() {
+        for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= w as i32 || ny >= h as i32 {
+                continue;
+            }
+            let (nx, ny) = (nx as u32, ny as u32);
+            let i = (ny * w + nx) as usize;
+            let q = art.get_pixel(nx, ny);
+            if !bg[i] && q[3] > 200 && dist(q) <= TOL {
+                bg[i] = true;
+                size += 1;
+                stack.push((nx, ny));
+            }
+        }
+    }
+    (bg, size)
+}
+
+/// Adds to the background the enclosed flat regions of the border colour that
+/// are at least 3% of the tile (the earlier method, used as the fallback).
+fn add_flat_regions(art: &RgbaImage, seed: [i32; 3], bg: &mut [bool]) {
+    let (w, h) = art.dimensions();
+    let total = (w * h) as usize;
+    let min_size = (total / 33).max(1);
+    let within = |x: u32, y: u32| {
+        let q = art.get_pixel(x, y);
+        q[3] > 200 && (0..3).all(|k| (q[k] as i32 - seed[k]).abs() <= 40)
+    };
+    let mut seen = vec![false; total];
+    for start in 0..total {
+        if seen[start] || bg[start] {
+            continue;
+        }
+        let (sx, sy) = ((start as u32) % w, (start as u32) / w);
+        seen[start] = true;
+        if !within(sx, sy) {
+            continue;
+        }
+        let mut comp = vec![start];
+        let mut i = 0;
+        while i < comp.len() {
+            let c = comp[i];
+            i += 1;
+            let (cx, cy) = ((c as u32) % w, (c as u32) / w);
+            for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, ny) = (cx as i32 + dx, cy as i32 + dy);
+                if nx < 0 || ny < 0 || nx >= w as i32 || ny >= h as i32 {
+                    continue;
+                }
+                let (nx, ny) = (nx as u32, ny as u32);
+                let j = (ny * w + nx) as usize;
+                if !seen[j] && !bg[j] && within(nx, ny) {
+                    seen[j] = true;
+                    comp.push(j);
+                }
+            }
+        }
+        if comp.len() < min_size {
+            continue;
+        }
+        let n = comp.len() as f64;
+        let mut mean = [0f64; 3];
+        for &c in &comp {
+            let q = art.get_pixel((c as u32) % w, (c as u32) / w);
+            for k in 0..3 {
+                mean[k] += q[k] as f64;
+            }
+        }
+        let mut var = [0f64; 3];
+        for &c in &comp {
+            let q = art.get_pixel((c as u32) % w, (c as u32) / w);
+            for k in 0..3 {
+                var[k] += (q[k] as f64 - mean[k] / n).powi(2);
+            }
+        }
+        if var.iter().all(|v| (v / n).sqrt() < 12.0) {
+            for &c in &comp {
+                bg[c] = true;
+            }
+        }
+    }
+}
+
+/// Foreground coverage from the earlier flood method (1 = keep).
+fn flood_foreground(art: &RgbaImage) -> Option<Vec<f32>> {
+    let (seed, mut bg) = border_candidates(art)
+        .into_iter()
+        .map(|s| {
+            let (m, n) = flood_background(art, s);
+            (s, m, n)
+        })
+        .max_by_key(|(_, _, n)| *n)
+        .map(|(s, m, _)| (s, m))?;
+    add_flat_regions(art, seed, &mut bg);
+    Some(bg.iter().map(|&b| if b { 0.0 } else { 1.0 }).collect())
+}
+
+/// Foreground pixels (coverage above one half) and the bounding box area.
+fn fg_stats(fg: &[f32], w: u32) -> (usize, usize) {
+    let wu = w as usize;
+    let (mut count, mut x0, mut y0, mut x1, mut y1) = (0usize, usize::MAX, usize::MAX, 0usize, 0usize);
+    for (i, &c) in fg.iter().enumerate() {
+        if c > 0.5 {
+            count += 1;
+            let (x, y) = (i % wu, i / wu);
+            x0 = x0.min(x);
+            y0 = y0.min(y);
+            x1 = x1.max(x);
+            y1 = y1.max(y);
+        }
+    }
+    let area = if count == 0 { 0 } else { (x1 - x0 + 1) * (y1 - y0 + 1) };
+    (count, area)
+}
+
+/// Core of the flood foreground: pixels that are high-gradient (a neighbour
+/// differs by more than 24 in some channel) or mid/high chroma (channel spread
+/// above 40). These are the thin details a split must not drop.
+fn core_indices(art: &RgbaImage, fg: &[f32]) -> Vec<usize> {
+    let (w, h) = art.dimensions();
+    let (wu, hu) = (w as usize, h as usize);
+    let mut core = Vec::new();
+    for (i, &c) in fg.iter().enumerate() {
+        if c <= 0.5 {
+            continue;
+        }
+        let (x, y) = (i % wu, i / wu);
+        let q = art.get_pixel(x as u32, y as u32);
+        let spread = q[0].max(q[1]).max(q[2]) as i32 - q[0].min(q[1]).min(q[2]) as i32;
+        let mut grad = false;
+        for (dx, dy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+            if nx < 0 || ny < 0 || nx >= wu as i32 || ny >= hu as i32 {
+                continue;
+            }
+            let p = art.get_pixel(nx as u32, ny as u32);
+            if (0..3).any(|k| (p[k] as i32 - q[k] as i32).abs() > 24) {
+                grad = true;
+                break;
+            }
+        }
+        if grad || spread > 40 {
+            core.push(i);
+        }
+    }
+    core
+}
+
+/// The coverage used for an opaque-plate-free tile: the cluster split when it
+/// is safe, otherwise the flood method; a result under 2% of the tile keeps
+/// the tile fully opaque. The safe split keeps at least 75% of the flood
+/// foreground and at least 85% of its core.
+fn choose_coverage(art: &RgbaImage) -> Vec<f32> {
+    let total = (art.width() * art.height()) as usize;
+    let w = art.width();
+    let flood = flood_foreground(art);
+    let split = foreground_coverage(art);
+    let flood_n = flood.as_ref().map(|v| fg_stats(v, w).0).unwrap_or(0);
+    let accepted = match (&split, &flood) {
+        (Some(s), Some(f)) => {
+            let s_n = fg_stats(s, w).0;
+            let core = core_indices(art, f);
+            let core_kept = core.iter().filter(|&&i| s[i] > 0.5).count();
+            s_n as f32 >= 0.75 * flood_n as f32 && (core.is_empty() || core_kept as f32 >= 0.85 * core.len() as f32)
+        }
+        _ => false,
+    };
+    let fg = if accepted { split.unwrap() } else { flood.unwrap_or_else(|| vec![1.0; total]) };
+    if (fg_stats(&fg, w).0 as f32) < 0.02 * total as f32 {
+        return vec![1.0; total];
+    }
+    fg
+}
+
+/// Whole-tile art under the plate opacity: the background keeps its original
+/// colour and takes the plate alpha (opacity 0 = gone); the foreground keeps
+/// its own alpha. Coverage from `choose_coverage`.
+fn apply_plate_alpha(art: &mut RgbaImage, plate_a: u8) {
+    let fg = choose_coverage(art);
+    let pa = plate_a as f32 / 255.0;
+    for (i, q) in art.pixels_mut().enumerate() {
+        if q[3] == 0 {
+            continue;
+        }
+        let k = pa + (1.0 - pa) * fg[i];
+        q[3] = (q[3] as f32 * k).round() as u8;
+    }
+}
+
+/// Auto keeps a tile whole (Tile strategy, colours untouched) when its content
+/// is art: no plain background (a map, a multi-colour tile), or content that
+/// reaches the tile's outer edge (a calendar page with its band on top). A
+/// plain background with one glyph in the middle (a white tile with a star,
+/// a black logo) is not kept: it takes the unwrap / glyph path.
+fn keep_whole(tile: &RgbaImage) -> bool {
+    let (w, h) = tile.dimensions();
+    let ring = |x: u32, y: u32| x < 3 || y < 3 || x + 3 >= w || y + 3 >= h;
+    let Some(bg) = border_colour(tile) else {
+        // a translucent tile (alpha ramp at its edge) has no solid ring: only
+        // its soft colour art is kept whole, the rest keeps the old path
+        return soft_colour_whole(tile);
+    };
     let (mut opaque, mut near_bg, mut edge_content) = (0usize, 0usize, false);
     for (x, y, q) in tile.enumerate_pixels() {
         if q[3] <= 200 {
@@ -402,7 +878,79 @@ fn keep_whole(tile: &RgbaImage) -> bool {
         }
     }
     let plain = near_bg as f32 > 0.5 * opaque as f32;
-    !plain || edge_content
+    !plain || edge_content || soft_colour_art(tile, bg, opaque)
+}
+
+/// The soft colour art test on its own (used for the result note): the tile
+/// is soft when `soft_colour_art` holds against its solid or translucent border.
+pub fn soft_colour_whole(tile: &RgbaImage) -> bool {
+    let Some(bg) = border_colour(tile).or_else(|| loose_border_colour(tile)) else {
+        return false;
+    };
+    let opaque = tile.pixels().filter(|q| q[3] > 200).count();
+    soft_colour_art(tile, bg, opaque)
+}
+
+/// Result note when soft colour art (colour blur, glow) is kept whole.
+pub const SOFT_COLOUR_NOTE: &str = "Arte a colori morbidi: mantenuta intera, senza ritaglio";
+
+/// Mean colour of the visible ring pixels (alpha above 24), for tiles whose
+/// edge is an alpha ramp and so have no solid border (see `border_colour`).
+fn loose_border_colour(tile: &RgbaImage) -> Option<[i32; 3]> {
+    let (w, h) = tile.dimensions();
+    let (mut n, mut sum) = (0u32, [0u32; 3]);
+    for (x, y, q) in tile.enumerate_pixels() {
+        if q[3] > 24 && (x < 3 || y < 3 || x + 3 >= w || y + 3 >= h) {
+            n += 1;
+            for k in 0..3 {
+                sum[k] += q[k] as u32;
+            }
+        }
+    }
+    (n > 0).then(|| sum.map(|s| (s / n) as i32))
+}
+
+/// Soft colour art on a plain tile (colour blur, glow, a gradient glyph): many
+/// saturated pixels off the background that change gently, with almost no crisp
+/// colour edge. Unwrapping such a tile takes its blur for background and cuts a
+/// hard ring around it, so it is kept whole. A crisp coloured logo is not soft.
+fn soft_colour_art(tile: &RgbaImage, bg: [i32; 3], opaque: usize) -> bool {
+    let (w, h) = tile.dimensions();
+    if w < 5 || h < 5 {
+        return false;
+    }
+    let (mut soft, mut crisp) = (0usize, 0usize);
+    for y in 2..h - 2 {
+        for x in 2..w - 2 {
+            let q = tile.get_pixel(x, y);
+            if q[3] <= 200 || (0..3).all(|k| (q[k] as i32 - bg[k]).abs() <= 24) {
+                continue;
+            }
+            let mx = q[0].max(q[1]).max(q[2]) as i32;
+            let mn = q[0].min(q[1]).min(q[2]) as i32;
+            if mx - mn < 40 {
+                continue;
+            }
+            let (mut lo, mut hi) = (i32::MAX, i32::MIN);
+            for dy in 0..5 {
+                for dx in 0..5 {
+                    let r = tile.get_pixel(x + dx - 2, y + dy - 2);
+                    if r[3] > 200 {
+                        let l = (r[0] as i32 + r[1] as i32 + r[2] as i32) / 3;
+                        lo = lo.min(l);
+                        hi = hi.max(l);
+                    }
+                }
+            }
+            match hi - lo {
+                6..=72 => soft += 1,
+                120.. => crisp += 1,
+                _ => {}
+            }
+        }
+    }
+    // at least 8% of the tile is soft colour, and crisp colour edges are rare
+    soft as f32 >= 0.08 * opaque as f32 && crisp * 10 <= soft
 }
 
 /// Port of `PortableMonochrome.generate` (pixel conversion) on an isolated
@@ -665,9 +1213,27 @@ fn lift_neutral(layer: &mut RgbaImage) {
     }
 }
 
-/// Renders a Lucent icon at `size` from the source icon and its isolated glyph
+/// Renders a Lightnt icon at `size` from the source icon and its isolated glyph
 /// (`glyph_bbox` in source coordinates, as returned by `segment::isolate`).
+/// Renders the icon. Universal net: when the result would keep less than 1.5%
+/// of the tile opaque although the source is more than 20% opaque, the source
+/// art is drawn whole on the plate (opacity 1, no recolouring): no icon vanishes.
 pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u32), size: u32, p: &LucentParams) -> LucentOutput {
+    let out = render_layers(src, glyph, glyph_bbox, size, p);
+    let kept = out.image.pixels().filter(|q| q[3] >= 200).count() as f32;
+    let src_opaque = src.pixels().filter(|q| q[3] > 200).count() as f32;
+    let src_total = (src.width() * src.height()) as f32;
+    if kept < 0.015 * (size * size) as f32 && src_opaque > 0.2 * src_total {
+        let mut lp = p.clone();
+        lp.strategy = GlyphStrategy::Tile;
+        lp.backdrop[3] = 255;
+        let full = (0, 0, src.width(), src.height());
+        return render_layers(src, src, full, size, &lp);
+    }
+    out
+}
+
+fn render_layers(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u32), size: u32, p: &LucentParams) -> LucentOutput {
     let mut notes = Vec::new();
     let n = size as usize;
     let plate = plate_mask(src, glyph, size, p.shape, &mut notes);
@@ -692,6 +1258,8 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     // the source is already a finished frosted icon: its tones were already
     // lifted once, a second lift turns dark outlines into speckled grey
     let mut already_styled = false;
+    // whole-tile art: the plate opacity is applied to its background region
+    let mut whole_tile = false;
     // extra cover for tiles whose own corners must not show the plate behind
     let mut cover_scale = 1.0f32;
     let src_unwrap = match st {
@@ -745,8 +1313,13 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
         // light outline), anything else keeps its proportions on the plate
         already_styled = true;
         if crate::compose::is_tile_loose(&src_tile) {
+            whole_tile = true;
             let art = crate::compose::strip_light_rim(&src_tile).unwrap_or_else(|| src_tile.clone());
             let (w, h) = art.dimensions();
+            // nameable for the UI: the colour blur was kept whole, not cut out
+            if soft_colour_whole(&src_tile) {
+                notes.push(SOFT_COLOUR_NOTE.to_string());
+            }
             notes.push("Pagina intera: estesa fino al bordo del piatto".to_string());
             cover_scale = 1.04;
             ((w, h), Some((art, (0, 0, w, h))))
@@ -800,6 +1373,12 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
 
     // ---- glyph layer (straight RGBA at glyph resolution)
     let mut layer = glyph.clone();
+    if whole_tile {
+        apply_plate_alpha(&mut layer, p.backdrop[3]);
+    }
+    if p.adapt_neutrals && dark_plate_of(p) && !whole_tile && !p.monochrome {
+        adapt_neutral_pixels(&mut layer);
+    }
     let dark_plate = (p.backdrop[0] as u32 + p.backdrop[1] as u32 + p.backdrop[2] as u32) < 384;
     // a large dark area (a camera lens, a dark disc) is the artwork's own
     // look: lifting it turns it flat grey. Only small dark details (roads,
@@ -908,7 +1487,8 @@ pub fn render(src: &RgbaImage, glyph: &RgbaImage, glyph_bbox: (u32, u32, u32, u3
     };
 
     // ---- composite: plate (backdrop tint) then glyph clipped to the plate
-    let bd = p.backdrop;
+    // the art's background already carries the plate alpha: no tint under it
+    let bd = if whole_tile { [p.backdrop[0], p.backdrop[1], p.backdrop[2], 0] } else { p.backdrop };
     let mut out = RgbaImage::new(size, size);
     let rim = p.rim.clamp(0.0, 1.0);
     let edge = if rim > 0.0 {
@@ -1237,8 +1817,11 @@ mod quality_tests {
     /// Symbol colour: the opaque output colour matches the opaque input colour.
     #[test]
     fn symbol_colours_are_kept_under_auto() {
-        for (name, src) in [("map", map()), ("page", page()), ("black_logo", black_logo())] {
-            for lp in [LucentParams::dark(), LucentParams::light()] {
+        for (name, src) in [("map", map()), ("page", page())] {
+            for mut lp in [LucentParams::dark(), LucentParams::light()] {
+            if name != "black_logo" {
+                lp.backdrop[3] = 255; // opacity 1: whole-tile art intact (glyph case keeps the default plate)
+            }
                 let out = run(&src, &lp);
                 let (a, b) = (opaque_mean(&src), opaque_mean(&out));
                 let d = (0..3).map(|k| (a[k] - b[k]).abs()).fold(0f32, f32::max);
@@ -1247,13 +1830,44 @@ mod quality_tests {
         }
     }
 
-    /// Black glyph on the dark plate: lift_greys is off by default, so it is not lightened.
+    /// Black glyph on the dark plate: remapped to light (the dark-plate
+    /// readability rule), so it does not vanish into the plate.
     #[test]
-    fn black_glyph_is_not_lightened() {
-        assert!(!LucentParams::dark().lift_greys && !LucentParams::light().lift_greys);
+    fn black_glyph_becomes_light_on_dark_plate() {
         let out = run(&black_logo(), &LucentParams::dark());
         let m = opaque_mean(&out);
-        assert!(m[0] < 40.0 && m[2] < 40.0, "lightened to {m:?}");
+        assert!(m[0] > 150.0 && m[2] > 150.0, "black not lightened: {m:?}");
+    }
+
+    /// Black glyph on the light plate: no remap, it stays dark.
+    #[test]
+    fn black_glyph_stays_dark_on_light_plate() {
+        assert!(!LucentParams::light().adapt_neutrals);
+        let out = run(&black_logo(), &LucentParams::light());
+        let m = opaque_mean(&out);
+        assert!(m[0] < 60.0 && m[2] < 60.0, "light plate changed the black: {m:?}");
+    }
+
+    /// Red and black parts on one glyph: the red keeps its colour, the black
+    /// becomes light on the dark plate.
+    #[test]
+    fn two_colour_glyph_red_kept_black_lightened() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if (50..150).contains(&x) && (40..100).contains(&y) {
+                return Some([230, 40, 40, 255]);
+            }
+            if (50..150).contains(&x) && (110..150).contains(&y) {
+                return Some([11, 11, 15, 255]);
+            }
+            None
+        });
+        let out = run(&src, &LucentParams::dark());
+        let red = out.pixels().filter(|q| q[3] == 255 && (q[0] as i32 - 230).abs() <= 6 && (q[1] as i32 - 40).abs() <= 6 && (q[2] as i32 - 40).abs() <= 6).count();
+        assert!(red > 1000, "red changed or lost: {red} px");
+        let dark = out.pixels().filter(|q| q[3] > 200 && q[0] < 80 && q[1] < 80 && q[2] < 80).count();
+        let light = out.pixels().filter(|q| q[3] > 200 && q[0] > 150 && q[1] > 150 && q[2] > 150).count();
+        assert!(light > 500 && dark < 200, "black not lightened: light {light}, dark {dark}");
     }
 
     /// Full-bleed map: Auto keeps the whole tile (opaque, no plate recolouring).
@@ -1263,7 +1877,8 @@ mod quality_tests {
         let out = run(&src, &LucentParams::dark());
         assert!(keep_whole(&crate::compose::crop_to_content(&src)));
         let transparent = out.pixels().filter(|q| q[3] < 100).count();
-        assert!(transparent > 0 && out.get_pixel(128, 128)[3] == 255);
+        // the squircle corners are outside the plate; the art itself is not dropped
+        assert!(transparent > 0 && out.pixels().filter(|q| q[3] > 0).count() > 40_000);
         assert!(!out.pixels().any(|q| q[3] > 200 && q[0] == q[1] && q[1] == q[2] && q[0] < 40));
     }
 
@@ -1271,7 +1886,9 @@ mod quality_tests {
     #[test]
     fn calendar_page_is_not_darker_than_original() {
         let src = page();
-        let out = run(&src, &LucentParams::dark());
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 255; // opacity 1; at the default 0x66 the page is glass by design
+        let out = run(&src, &lp);
         let ratio = grey_lum(&out) / grey_lum(&src);
         assert!(ratio >= 0.9, "page darkened: ratio {ratio}");
     }
@@ -1350,5 +1967,183 @@ mod quality_tests {
             let darkest = opaque.iter().map(|q| lum(q)).fold(f32::MAX, f32::min);
             assert!(darkest >= star_min_lum - 15.0, "edge darkened: {darkest} < {star_min_lum}");
         }
+    }
+
+    /// Plate opacity 0: the page body (the flood-filled background) is gone,
+    /// the dark digits and the red band keep their alpha and colour.
+    #[test]
+    fn page_background_vanishes_at_zero_opacity() {
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&page(), &lp);
+        // interior only: a thin rim at the page's outer edge is a known leftover (see the report)
+        let body_left = out
+            .enumerate_pixels()
+            .filter(|(x, y, q)| *x > 6 && *y > 80 && *x < 250 && *y < 206 && q[3] > 40 && q[0] > 240 && q[1] > 240 && q[2] > 240)
+            .count();
+        let pts: Vec<(u32, u32)> = out.enumerate_pixels().filter(|(_, _, q)| q[3] > 40 && q[0] > 240 && q[1] > 240 && q[2] > 240).map(|(x, y, _)| (x, y)).collect();
+        let bb = (pts.iter().map(|p| p.0).min(), pts.iter().map(|p| p.1).min(), pts.iter().map(|p| p.0).max(), pts.iter().map(|p| p.1).max());
+        // under 1% of the interior: the white counter inside the 9 is a known leftover
+        assert!(body_left * 100 < 240 * 126, "white page body kept at opacity 0: {body_left} px, bbox {bb:?}");
+        let digits = out.pixels().filter(|q| q[3] >= 250 && q[0] < 60 && q[1] < 60 && q[2] < 60).count();
+        assert!(digits > 500, "digits lost at opacity 0: {digits} opaque dark px");
+    }
+
+    /// Map tile: grey ground (flat, touches the border), a blue disc with a
+    /// thin light ring, a red pin. At opacity 0 the ground is gone and the
+    /// disc and the pin stay opaque with their colours; no dark outline.
+    #[test]
+    fn map_tile_at_zero_opacity_keeps_disc_and_pin() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if !rr(n, 36.0, x, y) {
+                return None;
+            }
+            let (dx, dy) = (x as f32 - 96.0, y as f32 - 96.0);
+            let d = (dx * dx + dy * dy).sqrt();
+            if d < 34.0 {
+                return Some([30, 110, 240, 255]);
+            }
+            if (30.0..34.0).contains(&d) {
+                return Some([200, 205, 215, 255]);
+            }
+            // pin: a disc at (96,132) with a tail down to (96,160)
+            let (px, py) = (x as f32 - 96.0, y as f32 - 132.0);
+            if px * px + py * py < 13.0 * 13.0 || ((y as f32) > 132.0 && (y as f32) < 160.0 && (x as f32 - 96.0).abs() < (160.0 - y as f32) * 0.45) {
+                return Some([220, 50, 50, 255]);
+            }
+            Some([120, 120, 128, 255])
+        });
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&src, &lp);
+        let a = |x: u32, y: u32| out.get_pixel(x, y)[3];
+        // disc centre and pin head: opaque
+        assert!(a(128, 128) >= 240, "disc centre alpha {}", a(128, 128));
+        assert!(a(128, 176) >= 200, "pin alpha {}", a(128, 176));
+        // ground: gone
+        assert!(a(40, 40) <= 20 && a(40, 210) <= 20 && a(210, 40) <= 20, "ground kept");
+        // no dark outline: no dark opaque pixels
+        let dark = out.pixels().filter(|q| q[3] > 150 && q[0] < 50 && q[1] < 50 && q[2] < 50).count();
+        assert!(dark * 200 < out.pixels().count(), "dark outline: {dark} px");
+    }
+
+    /// Avatar tile: flat light tile, a centred figure and a darker strip along
+    /// the right edge. At opacity 0 the strip is background, the figure stays.
+    #[test]
+    fn avatar_tile_drops_the_edge_strip() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if !rr(n, 36.0, x, y) {
+                return None;
+            }
+            if x >= 176 {
+                return Some([120, 130, 150, 255]);
+            }
+            let (dx, dy) = (x as f32 - 96.0, y as f32 - 70.0);
+            if dx * dx + dy * dy < 22.0 * 22.0 {
+                return Some([60, 60, 70, 255]);
+            }
+            if (60..132).contains(&x) && (100..170).contains(&y) {
+                return Some([60, 60, 70, 255]);
+            }
+            Some([210, 225, 240, 255])
+        });
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&src, &lp);
+        let a = |x: u32, y: u32| out.get_pixel(x, y)[3];
+        assert!(a(128, 93) >= 240, "figure head alpha {}", a(128, 93));
+        assert!(a(128, 200) >= 240 || a(128, 180) >= 240, "figure body gone");
+        assert!(a(250, 128) <= 30, "edge strip kept: alpha {}", a(250, 128));
+        assert!(a(40, 40) <= 20, "tile ground kept");
+    }
+
+    /// Share of the pixels of colour `pred` that are still opaque (alpha >= 250).
+    fn opaque_share(out: &RgbaImage, pred: impl Fn(&Rgba<u8>) -> bool) -> f32 {
+        let (mut n, mut k) = (0usize, 0usize);
+        for q in out.pixels().filter(|q| q[3] > 0 && pred(q)) {
+            n += 1;
+            if q[3] >= 250 {
+                k += 1;
+            }
+        }
+        k as f32 / n.max(1) as f32
+    }
+
+    /// HoYoLAB-like: flat dark-blue tile, a centred light character and a
+    /// mid-blue hexagon. At opacity 0 the character stays opaque.
+    #[test]
+    fn hoyolab_like_character_survives_zero_opacity() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if !rr(n, 36.0, x, y) {
+                return None;
+            }
+            let (dx, dy) = (x as f32 - 96.0, y as f32 - 100.0);
+            if dx * dx + dy * dy < 30.0 * 30.0 && (dx.abs() + dy.abs()) > 0.0 {
+                return Some([60, 90, 170, 255]);
+            }
+            let (hx, hy) = (x as f32 - 96.0, y as f32 - 84.0);
+            if hx * hx + hy * hy < 24.0 * 24.0 {
+                return Some([225, 230, 240, 255]);
+            }
+            if (66..126).contains(&x) && (112..160).contains(&y) {
+                return Some([225, 230, 240, 255]);
+            }
+            Some([30, 50, 110, 255])
+        });
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&src, &lp);
+        let share = opaque_share(&out, |q| q[0] > 200 && q[1] > 200 && q[2] > 200);
+        assert!(share >= 0.9, "character lost at opacity 0: {share:.2} opaque");
+    }
+
+    /// ATM-like: flat purple tile with white text bars and a darker outline
+    /// band. At opacity 0 the text stays opaque.
+    #[test]
+    fn atm_like_text_survives_zero_opacity() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if !rr(n, 36.0, x, y) {
+                return None;
+            }
+            if x < 10 || x >= n - 10 || y < 10 || y >= n - 10 {
+                return Some([60, 20, 80, 255]);
+            }
+            let bar = (60..132).contains(&x) && ((74..82).contains(&y) || (96..104).contains(&y) || (118..126).contains(&y));
+            if bar {
+                return Some([255, 255, 255, 255]);
+            }
+            Some([120, 40, 140, 255])
+        });
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&src, &lp);
+        let share = opaque_share(&out, |q| q[0] > 230 && q[1] > 230 && q[2] > 230);
+        assert!(share >= 0.9, "text lost at opacity 0: {share:.2} opaque");
+    }
+
+    /// Universal net: a full coloured tile whose only glyph is a thin outline
+    /// would leave the glyph path nearly empty at opacity 0; the art is kept.
+    #[test]
+    fn thin_outline_on_full_tile_is_not_lost() {
+        let n = 192u32;
+        let src = fill(n, |x, y| {
+            if !rr(n, 36.0, x, y) {
+                return None;
+            }
+            let ring = (x == 60 || x == 131) && (60..132).contains(&y) || (y == 60 || y == 131) && (60..132).contains(&x);
+            if ring {
+                return Some([255, 255, 255, 255]);
+            }
+            Some([30, 80, 220, 255])
+        });
+        let mut lp = LucentParams::dark();
+        lp.backdrop[3] = 0;
+        let out = run(&src, &lp);
+        let kept = out.pixels().filter(|q| q[3] >= 200).count();
+        assert!(kept as f32 >= 0.015 * 256.0 * 256.0, "art lost at opacity 0: {kept} px");
     }
 }

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app/models.dart';
+import '../app/preset_names.dart';
 import '../app/state.dart';
 import '../app/storage.dart';
 import '../app/theme.dart';
@@ -19,19 +20,18 @@ import '../widgets/common.dart';
 import '../widgets/fps_overlay.dart';
 import '../widgets/liquid_glass.dart';
 import '../widgets/theme_reveal.dart';
-import '../workspace/adjust_panel.dart';
+import '../widgets/tour2_visibility.dart';
 import 'bases_screen.dart';
 import 'settings_extras.dart';
 import '../l10n/strings.dart';
 
 const appVersion = '1.0.0';
 
-enum SettingsCat { appearance, glass, processing, bases, pack, export, system }
+enum SettingsCat { appearance, processing, bases, pack, export, system }
 
 extension on SettingsCat {
   String get label => switch (this) {
         SettingsCat.appearance => S.appearance,
-        SettingsCat.glass => S.vetro,
         SettingsCat.processing => S.processing,
         SettingsCat.bases => S.baseIcons,
         SettingsCat.pack => S.packCleanup,
@@ -41,7 +41,6 @@ extension on SettingsCat {
 
   IconData get icon => switch (this) {
         SettingsCat.appearance => Icons.palette_outlined,
-        SettingsCat.glass => Icons.blur_on_rounded,
         SettingsCat.processing => Icons.tune_rounded,
         SettingsCat.bases => Icons.crop_square_rounded,
         SettingsCat.pack => Icons.cleaning_services_outlined,
@@ -50,7 +49,7 @@ extension on SettingsCat {
       };
 }
 
-/// Impostazioni: home (title, profile card, two-column grid of categories)
+/// Settings: home (title, profile card, two-column grid of categories)
 /// and category pages pushed on a nested navigator, so the floating bar /
 /// sidebar stay visible and Android back returns to the home.
 class SettingsScreen extends StatefulWidget {
@@ -136,6 +135,8 @@ class _SettingsHome extends StatelessWidget {
               const SizedBox(height: 14),
               const SettingsTourTile(),
               const SizedBox(height: 14),
+              const SettingsResetHintsTile(),
+              const SizedBox(height: 14),
               const _SupportCard(),
             ],
           );
@@ -145,7 +146,7 @@ class _SettingsHome extends StatelessWidget {
   }
 }
 
-/// Gentle backup reminder after many changes: "Fai il backup" or "Più tardi".
+/// Gentle backup reminder after many changes: "Make a backup" or "Later".
 class _BackupCard extends StatelessWidget {
   const _BackupCard();
 
@@ -206,7 +207,7 @@ class _ProfileCard extends StatelessWidget {
 /// Page where people can support the project (everything in the app is free).
 const kKofiUrl = 'https://ko-fi.com/imsteazyy';
 
-/// "Sostieni il progetto": opens the Ko-fi page.
+/// "Support the project": opens the Ko-fi page.
 class _SupportCard extends StatelessWidget {
   const _SupportCard();
 
@@ -299,9 +300,7 @@ class _CatPage extends StatelessWidget {
           child: LargeHeader(
             cat.label,
             onBack: () => Navigator.of(context).maybePop(),
-            trailing: cat == SettingsCat.glass
-                ? TextButton(onPressed: () => AppState.I.update(AppState.I.glass.reset), child: Text(S.ripristina))
-                : null,
+
           ),
         ),
         Expanded(child: _Page(cat: cat)),
@@ -323,7 +322,6 @@ class _Page extends StatelessWidget {
       // AppState directly in build, so a const instance would never redraw.
       builder: (context, _) => switch (cat) {
         SettingsCat.appearance => _AppearancePage(),
-        SettingsCat.glass => SettingsList(header: const GlassPreview(), children: glassControls(context)),
         SettingsCat.processing => _ProcessingPage(),
         SettingsCat.bases => SingleChildScrollView(padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + GlassInsets.of(context)), child: BasesScreen(embedded: true)),
         SettingsCat.pack => _PackPage(),
@@ -337,23 +335,12 @@ class _Page extends StatelessWidget {
 class _AppearancePage extends StatelessWidget {
   const _AppearancePage();
 
-  static const accents = [0xFFBA4CD4, 0xFFD46AB8, 0xFFB9A96E, 0xFF9FA36A, 0xFFA8A29A];
-
   @override
   Widget build(BuildContext context) {
     final st = AppState.I;
     final a = st.appearance;
-    final glass = a.style == UiStyle.glass;
-    // Glass style: the live preview stays at the top while the glass
-    // settings scroll under it
-    return SettingsList(header: glass ? const GlassPreview() : null, children: [
-      SectionTitle(S.stileApp),
-      ChoiceRows<UiStyle>(
-        options: [(UiStyle.nothing, S.stileNothing), (UiStyle.glass, S.stileVetro)],
-        value: a.style,
-        onChanged: (v) => ThemeReveal.run(() => st.update(() => a.style = v)),
-      ),
-      // follow the phone, or light / dark, in both styles; the new look spreads from the choice
+    return SettingsList(children: [
+      // follow the phone, or light / dark; the new look spreads from the choice
       SectionTitle(S.comodoTema),
       ChoiceRows<ThemeChoice>(
         options: [(ThemeChoice.system, S.comodoTemaSistema), (ThemeChoice.light, S.comodoTemaChiaro), (ThemeChoice.dark, S.comodoTemaScuro)],
@@ -363,11 +350,6 @@ class _AppearancePage extends StatelessWidget {
           a.syncLight();
         })),
       ),
-      Text(a.style == UiStyle.nothing ? S.stileNothingSub : S.stileVetroSub, style: TextStyle(fontSize: 12.5, color: Palette.text2)),
-      if (a.style == UiStyle.glass) ...[
-        SectionTitle(S.accento),
-        const _AccentPicker(),
-      ],
       SectionTitle(S.lingua),
       ChoiceRows<String>(
         options: [('', S.linguaSistema), for (final e in appLanguages.entries) (e.key, e.value)],
@@ -384,57 +366,29 @@ class _AppearancePage extends StatelessWidget {
         value: a.powerSaving,
         onChanged: (v) => st.setPowerSaving(v),
       ),
-      // only with the Glass style: its material, colour, edges and where it is used
-      if (glass) ...[
-        ...glassControls(context),
-        Center(child: TextButton(onPressed: () => st.update(st.glass.reset), child: Text(S.ripristina))),
-      ],
     ]);
   }
 }
 
+enum _Procs { auto, fewer, all }
+
+/// Processing: workflow switches, the cut-out provider (the segmentation
+/// controls live only in the Icon style sheet, linked from here) and the
+/// engine details, collapsed by default.
 class _ProcessingPage extends StatelessWidget {
   const _ProcessingPage();
 
   @override
   Widget build(BuildContext context) {
     final st = AppState.I;
-    final s = st.segment;
+    final s = st.translucentSize;
+    final cores = Platform.numberOfProcessors;
+    final fewer = cores >= 2 ? cores ~/ 2 : 1;
+    final t = st.threads;
+    final current = t == 0 ? _Procs.auto : (t >= cores ? _Procs.all : _Procs.fewer);
+    final used = t == 0 ? cores : (t > cores ? cores : t);
     return SettingsList(children: [
-      SectionTitle(S.dimensioni),
-      Text(S.originalCompositionUsaDimensioneDel, style: TextStyle(fontSize: 12, color: Palette.text2)),
-      Wrap(spacing: 8, children: [
-        for (final v in [192, 256, 432, 512, 1024])
-          ChoiceChip(label: Text('$v px'), selected: st.translucentSize == v, onSelected: (_) => st.update(() => st.translucentSize = v)),
-      ]),
-      const SizedBox(height: 14),
-      SectionTitle(S.scalaPosizionePredefinite),
-      SliderRow(label: S.scala, value: st.scaleMul, min: 0.5, max: 1.6, format: (v) => '${(v * 100).round()}%', onChanged: (v) => st.update(() => st.scaleMul = v)),
-      SliderRow(label: S.posizioneX, value: st.offsetX, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetX = v)),
-      SliderRow(label: S.posizioneY, value: st.offsetY, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetY = v)),
-      Text(S.marginiDerivanoDallaCalibrazioneDel, style: TextStyle(fontSize: 11, color: Palette.text3)),
-      const SizedBox(height: 14),
-      SectionTitle(S.rimozioneSfondoIsolamento),
-      const _BgProviderBox(),
-      const SizedBox(height: 10),
-      DropdownButtonFormField<SegMode>(
-        key: ValueKey(s.mode),
-        initialValue: s.mode,
-        items: [for (final m in SegMode.values) DropdownMenuItem(value: m, child: Text(segModeLabel(m)))],
-        onChanged: (v) => st.update(() => st.segment = copySegment(s, mode: v)),
-      ),
-      SliderRow(label: S.sensibilita, value: s.tolerance, min: 0.03, max: 0.3, format: (v) => v.toStringAsFixed(2), onChanged: (v) => st.update(() => st.segment = copySegment(s, tolerance: v))),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.rimuoviSfondoRacchiusoBuchi), value: s.removeHoles, onChanged: (v) => st.update(() => st.segment = copySegment(s, removeHoles: v))),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(S.qualitaRifinituraBordiAntiAlias),
-        subtitle: Text(S.separaPixelBordoDalloSfondo),
-        value: s.refineEdges,
-        onChanged: (v) => st.update(() => st.segment = copySegment(s, refineEdges: v)),
-      ),
-      SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(S.ritagliSalva), value: st.keepCutouts, onChanged: (v) => st.update(() => st.keepCutouts = v)),
-      const SizedBox(height: 14),
-      SectionTitle(S.batch),
+      SectionTitle(S.ux1a2Flusso),
       SettingSwitch(
         icon: Icons.dashboard_customize_outlined,
         title: S.autoMandaAlPack,
@@ -442,50 +396,153 @@ class _ProcessingPage extends StatelessWidget {
         value: st.autoSendToPack,
         onChanged: (v) => st.update(() => st.autoSendToPack = v),
       ),
-      SliderRow(
-        label: S.thread,
-        value: st.threads.toDouble(),
-        min: 0,
-        max: 16,
-        divisions: 16,
-        format: (v) => v == 0 ? 'auto' : v.round().toString(),
-        onChanged: (v) => st.update(() => st.threads = v.round()),
+      SettingSwitch(
+        icon: Icons.save_outlined,
+        title: S.ritagliSalva,
+        subtitle: S.ux1a2RitagliSub,
+        value: st.keepCutouts,
+        onChanged: (v) => st.update(() => st.keepCutouts = v),
+      ),
+      SectionTitle(S.ux1a2Ritaglio),
+      const _BgProviderBox(),
+      const SizedBox(height: 10),
+      _LinkRow(
+        key: const ValueKey('processing-fine-tune'),
+        icon: Icons.tune_rounded,
+        title: S.ux1a2RegolaStile,
+        subtitle: S.ux1a2RegolaStileSub,
+        // the sheet lives in Studio: switching there is the link
+        onTap: () => requestedTab.value = 'studio',
       ),
       const SizedBox(height: 14),
-      SectionTitle(S.presetStile),
-      for (final pr in st.presets)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(pr.name),
-          subtitle: Text(pr.builtIn ? S.predefinitoModificabile : 'personalizzato'),
-          trailing: Wrap(children: [
-            IconButton(
-              tooltip: S.modifica,
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: () => showAppSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (ctx) => SizedBox(
-                  height: MediaQuery.of(ctx).size.height * 0.7,
-                  child: ListenableBuilder(
-                    listenable: st,
-                    builder: (ctx, _) => ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + GlassInsets.of(context)), children: [
-                      Text(pr.name, style: Theme.of(ctx).textTheme.titleMedium),
-                      const SizedBox(height: 10),
-                      ...translucentSliders(st.presetById(pr.id).params, (t) => st.setPresetParams(pr.id, t)),
-                    ]),
-                  ),
-                ),
-              ),
-            ),
-            if (pr.builtIn)
-              IconButton(tooltip: S.ripristina, icon: const Icon(Icons.restart_alt), onPressed: () => st.resetPreset(pr.id))
-            else
-              IconButton(tooltip: S.elimina, icon: const Icon(Icons.delete_outline), onPressed: () => st.deletePreset(pr.id)),
+      _Collapsible(
+        key: const ValueKey('processing-advanced'),
+        title: S.ux1a2Avanzate,
+        subtitle: S.ux1a2AvanzateSub,
+        children: [
+          const LocalAiBox(),
+          const SizedBox(height: 14),
+          SectionTitle(S.ux1a2Processori),
+          SegmentedButton<_Procs>(
+            key: const ValueKey('processors-choice'),
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(value: _Procs.auto, label: Text(S.ux1a2ProcAuto)),
+              ButtonSegment(value: _Procs.fewer, label: Text(S.ux1a2ProcPochi)),
+              ButtonSegment(value: _Procs.all, label: Text(S.ux1a2ProcTutti)),
+            ],
+            selected: {current},
+            onSelectionChanged: (choice) => st.update(() => st.threads = switch (choice.first) {
+              _Procs.auto => 0,
+              _Procs.fewer => fewer,
+              _Procs.all => cores,
+            }),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            switch (current) {
+              _Procs.auto => S.ux1a2ProcAutoSub,
+              _Procs.fewer => S.ux1a2ProcPochiSub,
+              _Procs.all => S.ux1a2ProcTuttiSub,
+            },
+            style: TextStyle(fontSize: 12.5, color: Palette.text2),
+          ),
+          Text(S.ux1a2ProcHint(used, cores), style: TextStyle(fontSize: 11.5, color: Palette.text3)),
+          const SizedBox(height: 14),
+          SectionTitle(S.dimensioni),
+          Text(S.originalCompositionUsaDimensioneDel, style: TextStyle(fontSize: 12, color: Palette.text2)),
+          Wrap(spacing: 8, children: [
+            for (final v in [192, 256, 432, 512, 1024])
+              ChoiceChip(label: Text('$v px'), selected: s == v, onSelected: (_) => st.update(() => st.translucentSize = v)),
           ]),
-        ),
+          const SizedBox(height: 14),
+          SectionTitle(S.scalaPosizionePredefinite),
+          SliderRow(label: S.scala, value: st.scaleMul, min: 0.5, max: 1.6, format: (v) => '${(v * 100).round()}%', onChanged: (v) => st.update(() => st.scaleMul = v)),
+          SliderRow(label: S.posizioneX, value: st.offsetX, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetX = v)),
+          SliderRow(label: S.posizioneY, value: st.offsetY, min: -0.15, max: 0.15, format: (v) => (v * 100).toStringAsFixed(1), onChanged: (v) => st.update(() => st.offsetY = v)),
+          Text(S.marginiDerivanoDallaCalibrazioneDel, style: TextStyle(fontSize: 11, color: Palette.text3)),
+          const SizedBox(height: 8),
+        ],
+      ),
     ]);
   }
+}
+
+/// A row that opens another section (its chevron says so).
+class _LinkRow extends StatelessWidget {
+  const _LinkRow({super.key, required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(children: [
+            Icon(icon, size: 24, color: Palette.text),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: TextStyle(fontSize: 15, color: Palette.text)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: Palette.text2)),
+              ]),
+            ),
+            Icon(Icons.chevron_right_rounded, color: Palette.text3),
+          ]),
+        ),
+      );
+}
+
+/// Collapsed by default: the header row opens the body under it.
+class _Collapsible extends StatefulWidget {
+  const _Collapsible({super.key, required this.title, required this.subtitle, required this.children});
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  State<_Collapsible> createState() => _CollapsibleState();
+}
+
+class _CollapsibleState extends State<_Collapsible> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            key: const ValueKey('collapsible-header'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(widget.title, style: TextStyle(fontSize: 15, color: Palette.text)),
+                    const SizedBox(height: 2),
+                    Text(widget.subtitle, style: TextStyle(fontSize: 12, color: Palette.text2)),
+                  ]),
+                ),
+                AnimatedRotation(
+                  turns: _open ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.expand_more_rounded, color: Palette.text3),
+                ),
+              ]),
+            ),
+          ),
+          if (_open) ...widget.children,
+        ],
+      );
 }
 
 class _PackPage extends StatelessWidget {
@@ -523,7 +580,7 @@ class _PackPage extends StatelessWidget {
         key: ValueKey('pp${st.packPresetId}${st.presets.length}'),
         initialValue: st.packPresetId,
         decoration: InputDecoration(labelText: S.presetModalitaPreset),
-        items: [for (final p in st.presets) DropdownMenuItem(value: p.id, child: Text(p.name))],
+        items: [for (final p in st.presets) DropdownMenuItem(value: p.id, child: Text(presetDisplayName(p)))],
         onChanged: (v) => st.update(() => st.packPresetId = v!),
       ),
       const SizedBox(height: 10),
@@ -613,8 +670,6 @@ Future<void> backupSave(BuildContext context) async {
   final bytes = Uint8List.fromList(utf8.encode(AppState.I.backupJson()));
   final path = await FilePicker.platform.saveFile(fileName: 'icon-formatter-backup.json', bytes: bytes, type: FileType.custom, allowedExtensions: ['json']);
   if (path == null) return;
-  // desktop only returns the chosen path; mobile has already written the bytes
-  if (!Platform.isAndroid && !Platform.isIOS) await File(path).writeAsBytes(bytes);
   AppState.I.markBackupMade();
   if (context.mounted) showMsg(context, S.bkSalvato);
 }
@@ -665,6 +720,32 @@ class _SystemPageState extends State<_SystemPage> {
     }
   }
 
+  /// Id of the cache being emptied: its button shows a spinner inline, the page stays usable.
+  String? _busy;
+
+  /// Empties one cache. Disabled when there is nothing to clear; the outputs
+  /// (results of past sessions) ask for confirmation first.
+  Widget _clearButton(String id, int? size, Future<void> Function() clear, {bool confirmFirst = false}) {
+    if (_busy == id) {
+      return const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+    }
+    return OutlinedButton(
+      onPressed: size == null || size == 0
+          ? null
+          : () async {
+              if (confirmFirst && !await confirm(context, S.eliminareRisultatiInterni, S.esportazioniGiaSalvateAltroveNon, ok: S.elimina)) return;
+              setState(() => _busy = id);
+              try {
+                await clear();
+              } finally {
+                if (mounted) setState(() => _busy = null);
+              }
+              await _refresh();
+            },
+      child: Text(S.svuota),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsList(children: [
@@ -692,39 +773,19 @@ class _SystemPageState extends State<_SystemPage> {
         contentPadding: EdgeInsets.zero,
         title: Text(S.fileTemporaneiImportZipEstratti),
         subtitle: Text(cache == null ? '…' : formatBytes(cache!)),
-        trailing: OutlinedButton(
-          onPressed: () async {
-            await AppPaths.I.clearCache();
-            _refresh();
-          },
-          child: Text(S.svuota),
-        ),
+        trailing: _clearButton('cache', cache, () => AppPaths.I.clearCache()),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(S.ritagliSalvati),
-        subtitle: Text(cutouts == null ? '…' : formatBytes(cutouts!)),
-        trailing: OutlinedButton(
-          onPressed: () async {
-            await cutoutCacheClear(dir: AppPaths.I.cutouts);
-            _refresh();
-          },
-          child: Text(S.svuota),
-        ),
+        subtitle: Text(cutouts == null ? '…' : cutouts == 0 ? S.ux1a2RitagliVuoto : formatBytes(cutouts!)),
+        trailing: _clearButton('cutouts', cutouts, () => cutoutCacheClear(dir: AppPaths.I.cutouts)),
       ),
       ListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(S.risultatiDelleSessioni),
         subtitle: Text(outputs == null ? '…' : formatBytes(outputs!)),
-        trailing: OutlinedButton(
-          onPressed: () async {
-            if (await confirm(context, S.eliminareRisultatiInterni, S.esportazioniGiaSalvateAltroveNon, ok: S.elimina)) {
-              await AppPaths.I.clearOutputs();
-              _refresh();
-            }
-          },
-          child: Text(S.svuota),
-        ),
+        trailing: _clearButton('outputs', outputs, () => AppPaths.I.clearOutputs(), confirmFirst: true),
       ),
       const SizedBox(height: 14),
       SectionTitle(S.performance),
@@ -748,7 +809,6 @@ class _SystemPageState extends State<_SystemPage> {
       const SettingsUpdateSwitch(),
       const SettingsFpsSwitch(),
       SettingsDiagnosticsTile(version: appVersion),
-      if (!Platform.isAndroid) const SettingsShortcutsTile(),
     ]);
   }
 }
@@ -795,13 +855,25 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
         value: st.bgProvider,
         onChanged: (v) => st.update(() => st.bgProvider = v),
       ),
-      if (st.bgProvider == BgProvider.localAi) const LocalAiBox(),
+      if (st.bgProvider == BgProvider.localAi)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            st.modelReady(st.localAi.model) ? S.ux1a2AvanzateSub : S.ux2bNoticeAiNoModel,
+            style: TextStyle(fontSize: 11.5, color: st.modelReady(st.localAi.model) ? Palette.text3 : Palette.warn),
+          ),
+        ),
       if (st.bgProvider == BgProvider.removeBg) ...[
         const SizedBox(height: 8),
         Text(
           S.ogniImmagineVieneInviataRemove,
           style: TextStyle(fontSize: 11, color: Palette.text3),
         ),
+        // the feature that needs the key says why it is unavailable
+        if (!hasKey) ...[
+          const SizedBox(height: 6),
+          Text(S.ux1a2ChiaveServe, style: TextStyle(fontSize: 12, color: Palette.text2)),
+        ],
         const SizedBox(height: 8),
         TextField(
           controller: key,
@@ -815,7 +887,6 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
               await BgRemovalService.writeKey(key.text.trim());
               key.clear();
               await _load();
-              if (context.mounted) showMsg(context, S.apiKeyRemoveBgSalvata);
             },
             child: Text(S.salvaChiave),
           ),
@@ -860,271 +931,5 @@ class _BgProviderBoxState extends State<_BgProviderBox> {
         Text(BgRemovalService.costNote, style: TextStyle(fontSize: 11, color: Palette.text3)),
       ],
     ]));
-  }
-}
-
-
-/// Accent colour: presets, hex input (#RRGGBB) and HSL sliders.
-class _AccentPicker extends StatefulWidget {
-  const _AccentPicker();
-
-  @override
-  State<_AccentPicker> createState() => _AccentPickerState();
-}
-
-class _AccentPickerState extends State<_AccentPicker> {
-  void _set(int argb) => AppState.I.update(() => AppState.I.appearance.accent = argb);
-
-  @override
-  Widget build(BuildContext context) {
-    final a = AppState.I.appearance;
-    final preset = _AppearancePage.accents.contains(a.accent);
-    return Wrap(spacing: 10, runSpacing: 10, children: [
-      for (final c in _AppearancePage.accents)
-        GestureDetector(
-          onTap: () => _set(c),
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: Color(c),
-              shape: BoxShape.circle,
-              border: Border.all(color: a.accent == c ? Palette.fg : Colors.transparent, width: 2.5),
-            ),
-          ),
-        ),
-      // any colour: saturation/brightness square, hue, hex (live preview)
-      CustomColorSwatch(
-        selected: !preset,
-        onTap: () => showColorPicker(context, initial: a.accent, title: S.accentoTitolo, onChanged: _set),
-      ),
-    ]);
-  }
-}
-
-class GlassPreview extends StatefulWidget {
-  const GlassPreview({super.key});
-
-  @override
-  State<GlassPreview> createState() => _GlassPreviewState();
-}
-
-class _GlassPreviewState extends State<GlassPreview> {
-  int index = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = AppState.I.appearance.accentColor;
-    return ClipRRect(
-      key: const ValueKey('glass-preview'),
-      borderRadius: BorderRadius.circular(AppState.I.appearance.radius + 10),
-      child: SizedBox(
-        height: 160,
-        child: Stack(children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [accent, const Color(0xFFF2784B), const Color(0xFF2EC4B6), const Color(0xFF1B3A4B)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-              ),
-            ),
-          ),
-          // stripes behind the glass make refraction and aberration visible
-          Positioned.fill(
-            child: Column(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-              for (var i = 0; i < 6; i++)
-                Container(height: 5, margin: EdgeInsets.only(right: i.isEven ? 40 : 0), color: Colors.white.withValues(alpha: i.isEven ? 0.85 : 0.35)),
-            ]),
-          ),
-          Positioned(
-            left: 12,
-            right: 12,
-            top: 10,
-            height: 56,
-            // Studio action bar, same layout as the real one
-            child: LiquidGlass(
-              radius: 28,
-              role: GlassRole.panel,
-              live: true,
-              padding: const EdgeInsets.all(6),
-              child: Row(children: [
-                Expanded(
-                  child: Container(
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(22)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      Text(S.elaboraTutte, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13, shadows: glassTextShadows())),
-                    ]),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Container(
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(border: Border.all(color: Colors.white.withValues(alpha: 0.30)), borderRadius: BorderRadius.circular(22)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.drive_folder_upload_outlined, color: Colors.white, size: 18),
-                      const SizedBox(width: 6),
-                      Flexible(child: Text(S.esportaCartella, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13, shadows: glassTextShadows()))),
-                    ]),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-          // the real bottom bar, so the preview behaves like it
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 88,
-            child: appGlassTabBar(
-              icons: const [Icons.auto_awesome_mosaic_outlined, Icons.dashboard_customize_outlined, Icons.apps_rounded, Icons.settings_outlined],
-              labels: [S.studio, S.pbTitolo, S.app, S.impostazioni],
-              index: index,
-              onSelect: (i) => setState(() => index = i),
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-/// Glass controls (Impostazioni › Vetro). Every value is read by
-/// [appGlassSettings], [LiquidGlass], the bottom bar, dialogs and the theme.
-List<Widget> glassControls(BuildContext context) {
-  final st = AppState.I;
-  final g = st.glass;
-  final a = st.appearance;
-  void set(VoidCallback f) => st.update(f);
-  return [
-    SectionTitle(S.materiale),
-    ChoiceRows<GlassQualityLevel>(
-      options: [
-        (GlassQualityLevel.fast, S.vetroVeloce),
-        (GlassQualityLevel.balanced, S.vetroBilanciato),
-        (GlassQualityLevel.quality, S.qualita),
-      ],
-      value: g.quality,
-      onChanged: (v) {
-        if (v == GlassQualityLevel.quality && premiumGlassSupported) {
-          // tell the user first, then switch after the message has been painted
-          showMsg(context, S.vetroApplico);
-          WidgetsBinding.instance.addPostFrameCallback((_) => Future.delayed(const Duration(milliseconds: 150), () => set(() => g.quality = v)));
-        } else {
-          set(() => g.quality = v);
-        }
-      },
-    ),
-    // shown only when the frame monitor saw premium glass missing the budget
-    ValueListenableBuilder<bool>(
-      valueListenable: st.fpsStruggling,
-      builder: (context, struggling, _) => struggling && g.quality == GlassQualityLevel.quality
-          ? Text(S.fpsScatta, style: TextStyle(fontSize: 11.5, color: Palette.warn))
-          : const SizedBox.shrink(),
-    ),
-    if (g.quality == GlassQualityLevel.quality && !premiumGlassSupported) Text(S.vetroQualitaNonDisponibile, style: TextStyle(fontSize: 11.5, color: Palette.warn)),
-    SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.vetroNativo, subtitle: S.vetroNativoSub, value: g.native, onChanged: (v) => set(() => g.native = v)),
-    if (nativeGlass) ...[
-      SettingSwitch(icon: Icons.ac_unit_rounded, title: S.smerigliatura, value: g.nFrostOn, onChanged: (v) => set(() => g.nFrostOn = v)),
-      SliderRow(icon: Icons.water_drop_outlined, label: S.colore, value: g.nColour, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nColour = v)),
-      SliderRow(icon: Icons.camera_rounded, label: S.smerigliatura, value: g.nFrost, min: 0, max: 12, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nFrost = v)),
-      SectionTitle(S.colore),
-      _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
-      SliderRow(icon: Icons.layers_outlined, label: S.pellicola, value: g.nFilm, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nFilm = v)),
-      SliderRow(icon: Icons.tab_rounded, label: S.schedaAttiva, value: g.nActiveTab, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nActiveTab = v)),
-      SectionTitle(S.bordi),
-      SliderRow(icon: Icons.highlight_rounded, label: S.luceBordo, value: g.nEdgeLight, format: (v) => '${(v * 100).round()}%', onChanged: (v) => set(() => g.nEdgeLight = v)),
-      SliderRow(icon: Icons.line_weight_rounded, label: S.spessoreBordo, value: g.nEdgeDepth, min: 0, max: 40, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nEdgeDepth = v)),
-      SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.nBend, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.nBend = v)),
-      SettingSwitch(icon: Icons.gradient_rounded, title: S.separazioneColori, value: g.nSplit, onChanged: (v) => set(() => g.nSplit = v)),
-      // native: Depth deepens the edge, no drop shadow
-      SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
-    ] else ...[
-      SliderRow(icon: Icons.blur_on_rounded, label: S.blur, value: g.blur, min: 0, max: 30, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.blur = v)),
-      SliderRow(icon: Icons.ac_unit_rounded, label: S.frost, value: g.frost, onChanged: (v) => set(() => g.frost = v)),
-      SliderRow(icon: Icons.invert_colors_rounded, label: S.saturazione, value: g.saturation, min: 0.5, max: 2.5, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.saturation = v)),
-      SectionTitle(S.colore),
-      _TintPicker(value: g.tintColor, onChanged: (c) => set(() => g.tintColor = c)),
-      SliderRow(icon: Icons.water_drop_outlined, label: S.tintaVetro, value: g.tint, max: 0.5, onChanged: (v) => set(() => g.tint = v)),
-      SectionTitle(S.bordoProfondita),
-      SliderRow(icon: Icons.layers_outlined, label: S.spessore, value: g.thickness, min: 0, max: 60, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => g.thickness = v)),
-      SliderRow(icon: Icons.rounded_corner_rounded, label: S.curvatura, value: a.radius, min: 4, max: 32, format: (v) => '${v.round()} dp', onChanged: (v) => set(() => a.radius = v)),
-      SliderRow(icon: Icons.lens_blur_rounded, label: S.rifrazione, value: g.refractiveIndex, min: 1.0, max: 2.0, format: (v) => v.toStringAsFixed(2), onChanged: (v) => set(() => g.refractiveIndex = v)),
-      SliderRow(icon: Icons.gradient_rounded, label: S.aberrCromatica, value: g.chromatic, min: 0, max: 0.05, format: (v) => (v * 1000).round().toString(), onChanged: (v) => set(() => g.chromatic = v)),
-      SettingSwitch(icon: Icons.layers_rounded, title: S.profondita, subtitle: S.profonditaSub, value: g.depth, onChanged: (v) => set(() => g.depth = v)),
-      if (g.quality != GlassQualityLevel.quality) Text(S.vetroNotaQualita, style: TextStyle(fontSize: 11.5, color: Palette.text3)),
-      SectionTitle(S.luce),
-      SliderRow(icon: Icons.light_mode_outlined, label: S.intensita, value: g.lightIntensity, max: 1.5, onChanged: (v) => set(() => g.lightIntensity = v)),
-      SliderRow(icon: Icons.explore_outlined, label: S.angoloLuce, value: g.lightAngle, min: 0, max: 360, format: (v) => '${v.round()}°', onChanged: (v) => set(() => g.lightAngle = v)),
-      SliderRow(icon: Icons.highlight_rounded, label: S.rimLight, value: g.rimLight, onChanged: (v) => set(() => g.rimLight = v)),
-      SettingSwitch(icon: Icons.auto_awesome_outlined, title: S.bordoLucido, subtitle: S.riflessoSpeculareSulBordoPiu, value: g.gloss, onChanged: (v) => set(() => g.gloss = v)),
-      if (g.gloss) SliderRow(icon: Icons.flare_rounded, label: S.lucentezza, value: g.glossIntensity, onChanged: (v) => set(() => g.glossIntensity = v)),
-      SectionTitle(S.leggibilita),
-      SliderRow(icon: Icons.text_fields_rounded, label: S.ombraTesto, value: g.textShadow, onChanged: (v) => set(() => g.textShadow = v)),
-      SliderRow(icon: Icons.blur_linear_rounded, label: S.sfocaturaOmbra, value: g.textShadowBlur, min: 0, max: 16, format: (v) => v.toStringAsFixed(1), onChanged: (v) => set(() => g.textShadowBlur = v)),
-      SliderRow(icon: Icons.contrast_rounded, label: S.scurezzaLente, value: g.lensDarkness, max: 0.8, onChanged: (v) => set(() => g.lensDarkness = v)),
-    ],
-    SectionTitle(S.doveUsarlo),
-    SettingSwitch(icon: Icons.view_agenda_outlined, title: S.vetroBarra, value: g.useNav, onChanged: (v) => set(() => g.useNav = v)),
-    if (nativeGlass)
-      SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroNeiPannelliNativo, value: g.nPanels, onChanged: (v) => set(() => g.nPanels = v))
-    else
-      SettingSwitch(icon: Icons.dashboard_outlined, title: S.vetroPannelli, value: g.usePanels, onChanged: (v) => set(() => g.usePanels = v)),
-    SettingSwitch(icon: Icons.smart_button_outlined, title: S.vetroPulsanti, value: g.useButtons, onChanged: (v) => set(() => g.useButtons = v)),
-    SettingSwitch(icon: Icons.web_asset_rounded, title: S.vetroDialoghi, value: g.useDialogs, onChanged: (v) => set(() => g.useDialogs = v)),
-  ];
-}
-
-/// "Tinta": neutral or one of the colour dots, plus a hue strip.
-class _TintPicker extends StatelessWidget {
-  const _TintPicker({required this.value, required this.onChanged});
-
-  final int value;
-  final ValueChanged<int> onChanged;
-
-  static const colors = [0xFF8E8E93, 0xFFFF3B30, 0xFFFF9500, 0xFFFFCC00, 0xFF34C759, 0xFF32D2E6, 0xFF3478F6, 0xFF8E44F2, 0xFFFF2D9A];
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        const IconChip(icon: Icons.palette_outlined),
-        const SizedBox(width: 12),
-        Expanded(child: Text(S.tinta, style: TextStyle(fontSize: 15, color: Palette.text))),
-        TextButton(onPressed: value == 0 ? null : () => onChanged(0), child: Text(value == 0 ? S.nessuna : S.rimuovi)),
-      ]),
-      const SizedBox(height: 8),
-      const SizedBox(height: 8),
-      Wrap(spacing: 10, runSpacing: 10, children: [
-        // any colour (full picker, live on the glass)
-        CustomColorSwatch(
-          selected: value != 0 && !colors.contains(value | 0xFF000000),
-          onTap: () => showColorPicker(context, initial: value == 0 ? 0xFF8E44F2 : value, title: S.tintaTitolo, onChanged: onChanged),
-        ),
-        for (final c in colors)
-          GestureDetector(
-            onTap: () => onChanged(c),
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: Color(c),
-                shape: BoxShape.circle,
-                border: Border.all(color: (value | 0xFF000000) == c ? Palette.fg : Colors.transparent, width: 2.5),
-              ),
-            ),
-          ),
-      ]),
-      const SizedBox(height: 4),
-    ]);
   }
 }

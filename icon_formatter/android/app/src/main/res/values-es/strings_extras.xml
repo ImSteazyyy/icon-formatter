@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- compartir, accesos directos, notificaciones de procesado -->
+<!-- share, shortcuts, processing notifications -->
 <resources>
     <string name="share_label">Compartir con Icon Formatter</string>
     <string name="shortcut_check_short">Comprobar ahora</string>

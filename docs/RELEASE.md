@@ -1,76 +1,75 @@
-# Pubblicare una release
+# Publishing a release
 
-Questa guida spiega come Icon Formatter viene compilato, firmato e pubblicato su GitHub. Le pipeline sono in `.github/workflows/`:
+This guide explains how Icon Formatter is built, signed and published on GitHub. The workflows live in `.github/workflows/`:
 
-- `ci.yml` gira su ogni push e ogni pull request: `flutter analyze`, `flutter test`, `cargo test` su `native/icon_core` e il controllo delle traduzioni (`tool/l10n_gen.py --check`).
-- `release.yml` gira quando pubblichi un tag `v*`: compila gli APK Android (split per ABI più universale) e lo zip Windows, li firma con la chiave di release e crea o aggiorna la release GitHub con gli asset e le note prese da `CHANGELOG.md`.
+- `ci.yml` runs on every push and pull request: `flutter analyze`, `flutter test`, `cargo test` on `native/icon_core`, and the translation check (`tool/l10n_gen.py --check`).
+- `release.yml` runs when you push a tag `v*`. It builds the Android APKs (split per ABI, plus a universal one), signs the APKs with the release key, and creates or updates the GitHub release with the assets and with the notes taken from `CHANGELOG.md`.
 
-## Nomi degli asset
+## Asset names
 
-Per la versione `1.0.0` la release contiene:
+For version `1.0.0`, the release contains these files:
 
 - `IconFormatter-1.0.0-arm64-v8a.apk`
 - `IconFormatter-1.0.0-armeabi-v7a.apk`
 - `IconFormatter-1.0.0-x86_64.apk`
 - `IconFormatter-1.0.0-universal.apk`
-- `IconFormatter-1.0.0-windows-x64.zip`
 
-## Come pubblicare una release
+## How to publish a release
 
-1. Aggiorna la versione in `icon_formatter/pubspec.yaml` (per esempio `version: 1.0.1+5`). Il numero dopo il `+` è il build number, non entra nel tag.
-2. Aggiungi in cima a `CHANGELOG.md` una sezione `## 1.0.1 — AAAA-MM-GG`. Il testo della sezione diventa il corpo della release.
-3. Fai commit e push su `main`, aspetta che CI sia verde.
-4. Crea e pubblica il tag, con lo stesso numero della versione:
+1. Update the version in `icon_formatter/pubspec.yaml`, for example `version: 1.0.1+8`. The number after the `+` is the build number. It is not part of the tag.
+2. Add a new section at the top of `CHANGELOG.md`, with the heading `## 1.0.1 — YYYY-MM-DD`. Keep the heading format exactly: the workflow uses it to find the notes. The text of the section becomes the body of the release.
+3. Commit and push to `main`, and wait for CI to pass.
+4. Create and push the tag, using the same number as the version:
 
    ```
    git tag v1.0.1
    git push origin v1.0.1
    ```
 
-5. Vai su **Actions**, apri il workflow **Release** e controlla che i tre job (android, windows, publish) finiscano verdi. Se il tag non corrisponde a `version:` in `pubspec.yaml`, il job fallisce subito con un messaggio chiaro: in quel caso elimina il tag remoto (`git push --delete origin v1.0.1`) e ricrealo dopo aver corretto la versione.
-6. Apri la pagina **Releases**: trovi la release con i cinque file. Puoi ripubblicare lo stesso tag: gli asset con lo stesso nome vengono sostituiti.
+5. Go to **Actions**, open the **Release** workflow, and check that the two jobs (android, publish) finish green. If the tag does not match `version:` in `pubspec.yaml`, the job fails at once with a clear message. In that case, delete the remote tag (`git push --delete origin v1.0.1`), fix the version, and create the tag again.
+6. Open the **Releases** page. You should see the release with the five files. You can publish the same tag again: assets with the same name are replaced.
 
-## Secret da configurare (una volta sola)
+## Secrets to configure (once)
 
-In GitHub: repository **Settings › Secrets and variables › Actions › New repository secret**. Aggiungi quattro secret:
+In GitHub, go to the repository **Settings › Secrets and variables › Actions › New repository secret**, and add these four secrets:
 
-| Nome | Valore |
+| Name | Value |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | il keystore codificato in base64 (vedi sotto) |
-| `ANDROID_KEYSTORE_PASSWORD` | la password del keystore, da `KEYSTORE-INFO.txt` |
+| `ANDROID_KEYSTORE_BASE64` | the keystore, encoded in base64 (see below) |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password, from `KEYSTORE-INFO.txt` |
 | `ANDROID_KEY_ALIAS` | `iconformatter` |
-| `ANDROID_KEY_PASSWORD` | la password della chiave, da `KEYSTORE-INFO.txt` (è uguale a quella del keystore) |
+| `ANDROID_KEY_PASSWORD` | the key password, from `KEYSTORE-INFO.txt` (it is the same as the keystore password) |
 
-Per il keystore in base64, in PowerShell:
+To encode the keystore in base64, run this in PowerShell:
 
 ```powershell
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.icon-formatter-keys\release.jks")) | Set-Clipboard
 ```
 
-Poi incolla negli appunti nel campo `ANDROID_KEYSTORE_BASE64`. Non salvare mai questo valore in file del repository.
+Then paste the clipboard into the `ANDROID_KEYSTORE_BASE64` field. Never save this value in a file inside the repository.
 
-Se un secret manca, il job android si ferma con l'elenco di quelli mancanti. Nessun APK viene firmato con una chiave diversa da quella di release.
+If a secret is missing, the android job stops and lists the missing ones. No APK is ever signed with a key other than the release key.
 
-## Chiave di firma: da conservare
+## Signing key: keep it safe
 
-La chiave è in `$env:USERPROFILE\.icon-formatter-keys\release.jks`, con le password e l'impronta SHA-256 in `KEYSTORE-INFO.txt` nella stessa cartella. Sono fuori dal repository e non vanno committati.
+The key is at `$env:USERPROFILE\.icon-formatter-keys\release.jks`. Its passwords and SHA-256 fingerprint are in `KEYSTORE-INFO.txt`, in the same folder. Both stay outside the repository and must never be committed.
 
-Fai un backup di entrambi i file in un posto sicuro (per esempio una chiavetta o un gestore di password). Se li perdi, non puoi più pubblicare aggiornamenti che si installano sopra le versioni esistenti: gli utenti dovranno disinstallare e reinstallare l'app.
+Keep a backup of both files somewhere safe, such as a USB drive or a password manager. If you lose them, you cannot publish updates that install over existing versions, and users would have to uninstall and reinstall the app.
 
-## Verificare la firma di un APK
+## Verifying the signature of an APK
 
-Con il build-tools dell'SDK Android:
+With the build-tools of the Android SDK:
 
 ```
 apksigner verify --print-certs IconFormatter-1.0.1-universal.apk
 ```
 
-Il campo `SHA-256 digest` deve coincidere con l'impronta in `KEYSTORE-INFO.txt`.
+The `SHA-256 digest` field must match the fingerprint in `KEYSTORE-INFO.txt`.
 
-## Nota per chi aggiorna dalla versione con la chiave di debug
+## Note for users updating from a debug-signed build
 
-Le build precedenti erano firmate con la chiave di debug. Questa è la prima con la chiave di release. Android rifiuta un aggiornamento firmato con una chiave diversa, quindi la prima installazione mostra "signatures do not match". Una volta sola bisogna disinstallare l'app e installare la nuova. Il pack di icone installato resta sul telefono. Da quel momento in poi gli aggiornamenti si installano normalmente sopra la versione precedente.
+Builds before build 5 were signed with the debug key. Builds from build 5 onward are signed with the release key. Android refuses an update signed with a different key, so the first install shows "signatures do not match". Users must uninstall the app once and install the new one. The installed icon pack stays on the phone. After that step, updates install over the previous version as usual. The README explains the backup steps for users.
 
-## Build locale
+## Local build
 
-Senza `android/key.properties` la build di release locale usa la chiave di debug, così `flutter run --release` continua a funzionare. Con `key.properties` (già presente sul PC di sviluppo, ignorato da git) la build usa la chiave di release. Su CI la variabile `CI=true` rende obbligatoria la chiave: senza, la build fallisce invece di firmare con il debug.
+Without `android/key.properties`, a local release build uses the debug key, so `flutter run --release` keeps working. With `key.properties` (which is git-ignored and already present on the development PC), the build uses the release key. On CI, the variable `CI=true` makes the key mandatory: without it, the build fails instead of signing with the debug key.

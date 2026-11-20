@@ -18,6 +18,11 @@ import '../src/rust/api/engine.dart';
 import 'models.dart';
 import 'storage.dart';
 
+part 'state/state_backup.dart';
+part 'state/state_presets.dart';
+part 'state/state_bases.dart';
+part 'state/state_studio.dart';
+
 enum StudioMode { original, translucent, preset }
 
 /// Global persisted app state.
@@ -38,7 +43,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final LookConfig look = LookConfig();
 
   List<StylePreset> presets = [];
-  String activePresetId = 'nothing';
+  String activePresetId = kDefaultPresetId;
   List<BaseIcon> bases = [];
   String? selectedBaseId;
 
@@ -58,10 +63,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Size limit of the saved cutouts in MB; the oldest are removed above it.
   int cutoutLimitMb = 500;
 
+  /// Online fallback for a single icon (Pack, "Try the online icon"). Off by default: the user turns it on in Settings.
+  bool onlineIconsEnabled = false;
+
   /// Background removal provider (local Rust is the default).
   BgProvider bgProvider = BgProvider.local;
 
-  /// Studio: after "Elabora tutte" the results go to the Pack builder.
+  /// Studio: after "Process all" the results go to the Pack builder.
   bool autoSendToPack = false;
 
   /// First-launch setup done (Android).
@@ -70,7 +78,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   // Pack cleanup
   late SegmentSettings packSegment;
   StudioMode packMode = StudioMode.translucent;
-  String packPresetId = 'nothing';
+  String packPresetId = kDefaultPresetId;
 
   // Android: packages processed into the current pack
   Set<String> processedPackages = {};
@@ -103,7 +111,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   int snoozeUntilMs = 0;
   int _lastChangeMs = 0;
 
-  /// App version whose "Novità" was last shown or recorded ('' = none yet).
+  /// App version whose "What is new" was last shown or recorded ('' = none yet).
   String lastSeenBuild = '';
 
   /// Automatic backup folder (null = off). Not part of the backup file.
@@ -116,9 +124,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Looks for a newer release once per start (Settings > System).
   bool checkUpdates = true;
-  /// Frame monitor overlay (Impostazioni > Sistema). Not part of the backup file.
+  /// Frame monitor overlay (Settings > System). Not part of the backup file.
   bool showFps = false;
-  /// Premium glass that keeps missing the frame budget (set only while the monitor runs).
+  /// Set by the frame monitor while the app keeps missing the frame budget.
   final ValueNotifier<bool> fpsStruggling = ValueNotifier(false);
 
   /// Folder whose new images are imported while the Studio is shown (null = off).
@@ -170,175 +178,22 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     Future<void>.delayed(const Duration(seconds: 4)).then((_) => pruneCutouts());
   }
 
-  /// Backup file text: look, styles, presets and defaults (no AI settings).
-  String backupJson() => const JsonEncoder.withIndent(' ').convert(toJson()..remove('localAi')..remove('backupReminder')..remove('lastSeenBuild')..remove('autoBackupDir')..remove('watchDir')..remove('showFps'));
-
-  /// Restores a backup made by [backupJson]; throws FormatException if it is not one.
-  Future<void> restoreBackup(String text) async {
-    final j = jsonDecode(text);
-    if (j is! Map<String, dynamic> || j['appearance'] is! Map) throw const FormatException('backup');
-    final ai = localAi.toJson();
-    _fromJson(j);
-    localAi.load(ai);
-    notifyListeners();
-    await save();
-  }
-
-  void _fromJson(Map<String, dynamic> j) {
-    appearance.load((j['appearance'] as Map?)?.cast() ?? {});
-    // v1 used the olive/gold accent as default: move untouched defaults to v2
-    if ((j['version'] as num? ?? 1) < 2 && appearance.accent == Appearance.legacyAccent) {
-      appearance.accent = Appearance.defaultAccent;
-    }
-    export.load((j['export'] as Map?)?.cast() ?? {});
-    glass.load((j['glass'] as Map?)?.cast() ?? {});
-    lucent.load((j['lucent'] as Map?)?.cast() ?? {});
-    look.load((j['look'] as Map?)?.cast() ?? {});
-    // v3: the Lucent plate is the reference squircle (the clipping edge)
-    if ((j['version'] as num? ?? 1) < 3) lucent.shape = LucentShape.squircle;
-    localAi.load((j['localAi'] as Map?)?.cast() ?? {});
-    final ps = (j['presets'] as List?)?.map((e) => StylePreset.fromJson((e as Map).cast(), defaultTranslucent)).toList();
-    if (ps != null && ps.isNotEmpty) {
-      // keep built-ins present even if a stored list misses them
-      final ids = ps.map((e) => e.id).toSet();
-      presets = [...ps, ...builtInPresets(defaultTranslucent).where((b) => !ids.contains(b.id))];
-    }
-    activePresetId = j['activePresetId'] as String? ?? activePresetId;
-    bases = ((j['bases'] as List?) ?? [])
-        .map((e) => BaseIcon.fromJson((e as Map).cast(), defaultPlacement))
-        .where((b) => File(b.path).existsSync())
-        .toList();
-    selectedBaseId = j['selectedBaseId'] as String?;
-    segment = segmentFromJson((j['segment'] as Map?)?.cast() ?? {}, defaultSegment);
-    packSegment = segmentFromJson((j['packSegment'] as Map?)?.cast() ?? {}, defaultSegment);
-    scaleMul = (j['scaleMul'] as num?)?.toDouble() ?? scaleMul;
-    offsetX = (j['offsetX'] as num?)?.toDouble() ?? offsetX;
-    offsetY = (j['offsetY'] as num?)?.toDouble() ?? offsetY;
-    useBaseCalibrationForTranslucent = j['useBaseCalibrationForTranslucent'] as bool? ?? false;
-    translucentSize = (j['translucentSize'] as num?)?.toInt() ?? translucentSize;
-    threads = (j['threads'] as num?)?.toInt() ?? threads;
-    keepCutouts = j['keepCutouts'] as bool? ?? keepCutouts;
-    cutoutLimitMb = (j['cutoutLimitMb'] as num?)?.toInt() ?? cutoutLimitMb;
-    bgProvider = BgProvider.values.firstWhere((b) => b.name == j['bgProvider'], orElse: () => BgProvider.local);
-    autoSendToPack = j['autoSendToPack'] as bool? ?? false;
-    setupDone = j['setupDone'] as bool? ?? false;
-    packMode = StudioMode.values.firstWhere((m) => m.name == j['packMode'], orElse: () => packMode);
-    packPresetId = j['packPresetId'] as String? ?? packPresetId;
-    processedPackages = ((j['processedPackages'] as List?) ?? []).cast<String>().toSet();
-    packCorrections = ((j['packCorrections'] as Map?) ?? {}).map((k, v) => MapEntry(k as String, (v as Map).cast<String, dynamic>()));
-    seenGuides = ((j['seenGuides'] as List?) ?? []).cast<String>().toSet();
-    tourDone = j['tourDone'] as bool? ?? false;
-    final br = (j['backupReminder'] as Map?)?.cast<String, dynamic>() ?? {};
-    backupChanges = (br['changes'] as num?)?.toInt() ?? backupChanges;
-    lastBackupMs = (br['lastBackupMs'] as num?)?.toInt() ?? lastBackupMs;
-    snoozeUntilMs = (br['snoozeUntilMs'] as num?)?.toInt() ?? snoozeUntilMs;
-    packLog = ((j['packLog'] as List?) ?? []).cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
-    packProfiles = ((j['packProfiles'] as List?) ?? []).cast<Map>().map((e) => e.cast<String, dynamic>()).toList();
-    appLists = appListsFromJson(j['appLists']);
-    packExportSnapshot = (j['packExportSnapshot'] as Map?)?.cast<String, String>();
-    packFingerprints = ((j['packFingerprints'] as Map?) ?? {}).cast<String, String>();
-    lastSeenBuild = j['lastSeenBuild'] as String? ?? lastSeenBuild;
-    autoBackupDir = j['autoBackupDir'] as String? ?? autoBackupDir;
-    checkUpdates = j['checkUpdates'] as bool? ?? true;
-    showFps = j['showFps'] as bool? ?? showFps;
-    watchDir = j['watchDir'] as String? ?? watchDir;
-  }
-
-  Map<String, dynamic> toJson() => {
-        'version': 3,
-        'appearance': appearance.toJson(),
-        'export': export.toJson(),
-        'glass': glass.toJson(),
-        'lucent': lucent.toJson(),
-        'look': look.toJson(),
-        'localAi': localAi.toJson(),
-        'presets': presets.map((e) => e.toJson()).toList(),
-        'activePresetId': activePresetId,
-        'bases': bases.map((e) => e.toJson()).toList(),
-        'selectedBaseId': selectedBaseId,
-        'segment': segmentToJson(segment),
-        'packSegment': segmentToJson(packSegment),
-        'scaleMul': scaleMul,
-        'offsetX': offsetX,
-        'offsetY': offsetY,
-        'useBaseCalibrationForTranslucent': useBaseCalibrationForTranslucent,
-        'translucentSize': translucentSize,
-        'threads': threads,
-        'keepCutouts': keepCutouts,
-        'cutoutLimitMb': cutoutLimitMb,
-        'bgProvider': bgProvider.name,
-        'autoSendToPack': autoSendToPack,
-      'setupDone': setupDone,
-        'packMode': packMode.name,
-        'packPresetId': packPresetId,
-        'processedPackages': processedPackages.toList(),
-        'packCorrections': packCorrections,
-        'packLog': packLog,
-        'packProfiles': packProfiles,
-        'appLists': listsToJson(appLists),
-        'packExportSnapshot': packExportSnapshot,
-        'packFingerprints': packFingerprints,
-        'seenGuides': seenGuides.toList(),
-        'tourDone': tourDone,
-        'backupReminder': {'changes': backupChanges, 'lastBackupMs': lastBackupMs, 'snoozeUntilMs': snoozeUntilMs},
-        'lastSeenBuild': lastSeenBuild,
-        'autoBackupDir': autoBackupDir,
-        'checkUpdates': checkUpdates,
-        'showFps': showFps,
-        'watchDir': watchDir,
-      };
-
   Future<void>? _pending;
 
-  /// Phone light / dark switched: only the "Segui il telefono" choice changes.
+  /// Phone light / dark switched: only the "Follow the phone" choice changes.
   @override
   void didChangePlatformBrightness() {
     if (appearance.themeChoice == ThemeChoice.system && appearance.syncLight()) notifyListeners();
   }
 
-  /// Backup saved: the reminder starts counting again from zero.
-  void markBackupMade() => update(() {
-        backupChanges = 0;
-        lastBackupMs = DateTime.now().millisecondsSinceEpoch;
-        snoozeUntilMs = 0;
-      });
-
-  /// "Più tardi": no reminder for seven days.
-  void snoozeBackupReminder() => update(() => snoozeUntilMs = DateTime.now().add(const Duration(days: 7)).millisecondsSinceEpoch);
-
-  /// Automatic backup once the reminder threshold is reached. A failure waits
-  /// for another full threshold of changes before the next try.
-  void _maybeAutoBackup() {
-    final dir = autoBackupDir;
-    if (dir == null || _autoBackupRunning || backupChanges < kBackupReminderChanges || backupChanges < _autoBackupRetryAt) return;
-    _autoBackupRunning = true;
-    writeAutoBackup(dir, backupJson()).then((ok) {
-      _autoBackupRunning = false;
-      if (ok) {
-        _autoBackupRetryAt = 0;
-        autoBackupFailed.value = false;
-        markBackupMade();
-      } else {
-        _autoBackupRetryAt = backupChanges + kBackupReminderChanges;
-        autoBackupFailed.value = true;
-      }
-    });
-  }
-
-  /// Power saving: fast glass and no animations; the user's values are put back when it goes off.
+  /// Power saving: no animations; the user's value is put back when it goes off.
   void setPowerSaving(bool on) => update(() {
         final a = appearance;
         if (on == a.powerSaving) return;
         if (on) {
-          a.savedGlassQuality = glass.quality.name;
           a.savedAnimations = a.animations;
-          glass.quality = GlassQualityLevel.fast;
           a.animations = false;
         } else {
-          // only put back what is still the forced value, so a choice made meanwhile survives
-          if (glass.quality == GlassQualityLevel.fast) {
-            glass.quality = GlassQualityLevel.values.firstWhere((q) => q.name == a.savedGlassQuality, orElse: () => glass.quality);
-          }
           if (!a.animations) a.animations = a.savedAnimations;
         }
         a.powerSaving = on;
@@ -363,6 +218,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await save();
       _maybeAutoBackup();
     });
+  }
+
+  /// Restores a backup made by [backupJson]; throws FormatException if it is not one.
+  Future<void> restoreBackup(String text) async {
+    final j = jsonDecode(text);
+    if (j is! Map<String, dynamic> || j['appearance'] is! Map) throw const FormatException('backup');
+    final ai = localAi.toJson();
+    _fromJson(j);
+    localAi.load(ai);
+    notifyListeners();
+    await save();
   }
 
   Future<void> save() async {
@@ -392,7 +258,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     look.load(LookConfig().toJson());
     localAi.load(LocalAiConfig().toJson());
     presets = builtInPresets(defaultTranslucent);
-    activePresetId = 'nothing';
+    activePresetId = kDefaultPresetId;
     segment = defaultSegment;
     packSegment = defaultSegment;
     scaleMul = 1;
@@ -406,210 +272,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     bgProvider = BgProvider.local;
     autoSendToPack = false;
     packMode = StudioMode.translucent;
-    packPresetId = 'nothing';
+    packPresetId = kDefaultPresetId;
     processedPackages = {};
     update();
   }
 
   // ------------------------------------------------------------ presets
 
-  StylePreset get activePreset => presets.firstWhere((e) => e.id == activePresetId, orElse: () => presets.first);
-
-  StylePreset presetById(String id) => presets.firstWhere((e) => e.id == id, orElse: () => presets.first);
-
-  void setPresetParams(String id, TranslucentSettings t) => update(() => presetById(id).params = t);
-
-  StylePreset savePresetAs(String name, TranslucentSettings t) {
-    final pr = StylePreset(id: 'u${DateTime.now().millisecondsSinceEpoch}', name: name, params: t);
-    update(() {
-      presets.add(pr);
-      activePresetId = pr.id;
-    });
-    return pr;
-  }
-
-  /// Adds imported presets under new ids and unique names; returns the first new id.
-  String? importPresets(List<({String name, TranslucentSettings params})> items) {
-    final ids = <String>[];
-    update(() {
-      for (final (i, it) in items.indexed) {
-        final id = 'u${DateTime.now().microsecondsSinceEpoch}$i';
-        ids.add(id);
-        presets.add(StylePreset(id: id, name: uniqueName(it.name, presets.map((e) => e.name)), params: it.params));
-      }
-    });
-    return ids.firstOrNull;
-  }
-
-  void resetPreset(String id) {
-    final b = builtInPresets(defaultTranslucent).where((e) => e.id == id);
-    if (b.isNotEmpty) update(() => presetById(id).params = b.first.params);
-  }
-
-  void deletePreset(String id) {
-    final pr = presetById(id);
-    if (pr.builtIn) return;
-    update(() {
-      presets.remove(pr);
-      if (activePresetId == id) activePresetId = 'nothing';
-      if (packPresetId == id) packPresetId = 'nothing';
-    });
-  }
-
   // ------------------------------------------------------------ bases
-
-  BaseIcon? get selectedBase {
-    for (final b in bases) {
-      if (b.id == selectedBaseId) return b;
-    }
-    return bases.isEmpty ? null : bases.first;
-  }
-
-  Future<BaseIcon> importBase(String src, String name) async {
-    final id = 'b${DateTime.now().microsecondsSinceEpoch}';
-    final dest = p.join(AppPaths.I.bases, '$id.png');
-    final dims = await importAsPng(src: src, dest: dest);
-    final b = BaseIcon(id: id, name: name, path: dest, width: dims[0], height: dims[1]);
-    update(() {
-      bases.add(b);
-      selectedBaseId = id;
-    });
-    return b;
-  }
-
-  /// Saves a rendered background (e.g. the current translucent preset) as base.
-  Future<BaseIcon> addBaseFromPng(Uint8List png, String name, int size) async {
-    final id = 'b${DateTime.now().microsecondsSinceEpoch}';
-    final dest = p.join(AppPaths.I.bases, '$id.png');
-    await File(dest).writeAsBytes(png);
-    final b = BaseIcon(id: id, name: name, path: dest, width: size, height: size);
-    update(() {
-      bases.add(b);
-      selectedBaseId = id;
-    });
-    return b;
-  }
-
-  void renameBase(BaseIcon b, String name) => update(() => b.name = name);
-
-  Future<void> deleteBase(BaseIcon b) async {
-    update(() {
-      bases.remove(b);
-      if (selectedBaseId == b.id) selectedBaseId = bases.isEmpty ? null : bases.first.id;
-    });
-    final f = File(b.path);
-    if (await f.exists()) await f.delete();
-  }
-
-  void saveCalibration(BaseIcon b, PlacementSettings pl, Map<String, dynamic> info) => update(() {
-        b.calibration = pl;
-        b.calibrationInfo = info;
-      });
-
-  /// Built-in bases, drawn by the app (tool/make_bases.py): a squircle and a
-  /// circle plate with the reference proportions and calibration. The old
-  /// "reference" base is replaced by the squircle.
-  Future<void> _ensureReferenceBase() async {
-    final cal = jsonDecode(await rootBundle.loadString('assets/bases/reference_calibration.json')) as Map<String, dynamic>;
-    final squircleCal = placementFromJson((cal['placement'] as Map).cast(), defaultPlacement);
-    var changed = false;
-    for (final (id, asset, glyph) in const [('squircle', 'assets/bases/squircle.png', 0.0), ('circle', 'assets/bases/circle.png', 0.62)]) {
-      final dest = p.join(AppPaths.I.bases, '$id.png');
-      if (bases.any((b) => b.id == id) && File(dest).existsSync()) continue;
-      final data = await rootBundle.load(asset);
-      await File(dest).writeAsBytes(data.buffer.asUint8List());
-      bases.removeWhere((b) => b.id == id);
-      bases.insert(
-        id == 'squircle' ? 0 : 1,
-        BaseIcon(
-          id: id,
-          name: id,
-          path: dest,
-          width: 192,
-          height: 192,
-          // the circle keeps the squircle's centre with a smaller symbol, so
-          // square glyphs stay inside the round plate
-          calibration: glyph > 0 ? copyPlacement(squircleCal, glyphRatio: glyph, areaRatio: glyph * glyph * 1.4) : squircleCal,
-          calibrationInfo: (cal['info'] as Map).cast(),
-        ),
-      );
-      changed = true;
-    }
-    if (bases.any((b) => b.id == 'reference')) {
-      bases.removeWhere((b) => b.id == 'reference');
-      if (selectedBaseId == 'reference') selectedBaseId = 'squircle';
-      changed = true;
-    }
-    if (selectedBaseId == null || !bases.any((b) => b.id == selectedBaseId)) {
-      selectedBaseId = 'squircle';
-      changed = true;
-    }
-    if (changed) await save();
-  }
 
   // ------------------------------------------------------------ settings builders
 
-  PlacementSettings placementFor(StudioMode mode) {
-    var base = defaultPlacement;
-    final b = selectedBase;
-    if (mode == StudioMode.original || useBaseCalibrationForTranslucent) {
-      if (b?.calibration != null) base = b!.calibration!;
-    }
-    return copyPlacement(base, scaleMul: scaleMul, offsetX: offsetX, offsetY: offsetY, opticalCentre: look.opticalCentre);
-  }
-
-  int sizeFor(StudioMode mode) {
-    if (export.customSize) return export.size;
-    if (mode == StudioMode.original && selectedBase != null) return selectedBase!.size;
-    return translucentSize;
-  }
-
-  BackgroundSettings backgroundFor(StudioMode mode, {String? presetId}) {
-    switch (mode) {
-      case StudioMode.original:
-        final b = selectedBase;
-        return b == null ? const BackgroundSettings.transparent() : BackgroundSettings.baseImage(path: b.path);
-      case StudioMode.translucent:
-        return BackgroundSettings.lucent(params: lucent.toSettings());
-      case StudioMode.preset:
-        return BackgroundSettings.translucent(params: presetById(presetId ?? activePresetId).params);
-    }
-  }
-
-  /// Folder of the saved cutouts, or null while the setting is off.
-  String? get cutCacheDir => keepCutouts ? AppPaths.I.cutouts : null;
-
-  /// Keeps the saved cutouts under the size limit. Rust does the work on its
-  /// own threads; a failure only leaves the folder larger.
-  Future<void> pruneCutouts() async {
-    if (!keepCutouts) return;
-    try {
-      await cutoutCachePrune(dir: AppPaths.I.cutouts, maxBytes: BigInt.from(cutoutLimitMb) * BigInt.from(1024 * 1024));
-    } catch (e) {
-      debugPrint('cutout prune failed: $e');
-    }
-  }
-
-  ProcessSettings settingsFor(StudioMode mode, {String? presetId, SegmentSettings? seg}) => ProcessSettings(
-        size: sizeFor(mode),
-        background: backgroundFor(mode, presetId: presetId),
-        placement: placementFor(mode),
-        segment: seg ?? segment,
-        ai: aiSettings,
-        effects: look.effects,
-        cutCacheDir: cutCacheDir,
-      );
-
-  /// Path of a downloaded local model.
-  String modelPath(AiModelInfo m) => '${AppPaths.I.models}${Platform.pathSeparator}${m.id}.onnx';
-
-  bool modelReady(AiModelInfo m) => File(modelPath(m)).existsSync();
-
-  /// Local AI settings when that engine is selected and its model is on disk.
-  AiSettings? get aiSettings {
-    if (bgProvider != BgProvider.localAi) return null;
-    final m = localAi.model;
-    if (!modelReady(m)) return null;
-    return AiSettings(modelPath: modelPath(m), model: m.kind, low: localAi.low, high: localAi.high);
-  }
 }

@@ -31,7 +31,7 @@ class RefreshTimeRow extends StatelessWidget {
           if (hour >= 0)
             IconButton(
               tooltip: S.comodoOrarioGiornoAzzera,
-              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              constraints: const BoxConstraints.tightFor(width: 48, height: 48),
               padding: EdgeInsets.zero,
               icon: const Icon(Icons.close_rounded, size: 18),
               onPressed: busy ? null : () => load(() => PlatformService.calendarHourSet(-1)),

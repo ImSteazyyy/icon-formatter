@@ -94,15 +94,4 @@ void main() {
     expect(xml, contains('ComponentInfo{com.example.app/com.example.app.Main}'));
     expect(File(p.join(dir.path, 'pack.zip')).existsSync(), true);
   });
-
-  test('reference icons calibrate on the reference base (Windows only)', () async {
-    final root = Directory(r'D:\Icon Formatter');
-    final base = File(r'D:\Icon Formatter\icon_formatter\assets\bases\reference_translucent.png');
-    if (!Platform.isWindows || !root.existsSync() || !base.existsSync()) return;
-    final samples = root.listSync().whereType<File>().where((f) => f.path.toLowerCase().endsWith('.png')).map((f) => f.path).toList();
-    final r = await calibrateBase(basePath: base.path, samplePaths: samples);
-    expect(r.inliers, greaterThanOrEqualTo(samples.length * 2 ~/ 3));
-    expect(r.placement.glyphRatio, closeTo(0.67, 0.04));
-    expect(r.placement.centerX, closeTo(0.5, 0.02));
-  });
 }

@@ -13,12 +13,6 @@ import '../l10n/strings.dart';
 /// cloud option is used only when the user selects it and saves an API key.
 enum BgProvider { local, localAi, removeBg }
 
-String bgProviderLabel(BgProvider b) => switch (b) {
-      BgProvider.local => S.localeRustOfflineGratuita,
-      BgProvider.localAi => S.aiLocaleOffline,
-      BgProvider.removeBg => S.removeBgCloudCrediti,
-    };
-
 class BgRemovalException implements Exception {
   BgRemovalException(this.message);
 

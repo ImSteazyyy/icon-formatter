@@ -12,7 +12,7 @@ import android.os.IBinder
 
 /**
  * Foreground service (dataSync) that keeps a batch alive in the background and
- * shows an ongoing "Elaborazione icone n/m" notification. Started, updated and
+ * shows an ongoing "Processing icons n/m" notification. Started, updated and
  * stopped from Dart through MainActivity; stop is safe at any time.
  */
 class ProcessingService : Service() {

@@ -11,7 +11,7 @@ fn main() {
     let mut sheet = RgbaImage::from_pixel(size * 2, size * ins.len() as u32, Rgba([200, 120, 200, 255]));
     for (r, p) in ins.iter().enumerate() {
         let src = imageops::decode_file(std::path::Path::new(p)).unwrap();
-        let job = Job { id: p.clone(), name: p.clone(), source: Source::Path(p.into()), output: "x".into(), segment: None, placement: None, skip_isolation: false };
+        let job = Job { id: p.clone(), name: p.clone(), source: Source::Path(p.into()), output: "x".into(), segment: None, placement: None, skip_isolation: false, shape: None, backdrop: None };
         let (out, res) = process_one(&src, &cfg, &job);
         eprintln!("{p}: edge={} {}", reaches_edges(&src, (0,0,0,0)), res.method);
         imageops::draw_over(&mut sheet, &imageops::resize(&src, size, size), 0, (r as u32 * size) as i32, 1.0);

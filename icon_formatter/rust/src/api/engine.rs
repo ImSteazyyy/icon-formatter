@@ -56,7 +56,7 @@ pub struct EffectSettings {
     pub hue: f32,
     /// Monochrome symbol colour (ARGB). None keeps the colours.
     pub recolor: Option<u32>,
-    /// 0..1: plate colour pulled towards the symbol's mean colour (Lucent).
+    /// 0..1: plate colour pulled towards the symbol's mean colour (Lightnt).
     pub plate_tint: f32,
     /// 0..1: unsharp strength for symbols scaled up more than 2x.
     pub sharpen: f32,
@@ -92,7 +92,7 @@ pub enum LucentShape {
     Squircle,
 }
 
-/// Lucent plate (see native/icon_core/src/lucent.rs).
+/// Lightnt plate (see native/icon_core/src/lucent.rs).
 #[derive(Clone, Debug)]
 pub struct LucentSettings {
     /// Ink colour (ARGB) for the optional monochrome glyph.
@@ -110,7 +110,7 @@ pub struct LucentSettings {
     pub strategy: LucentStrategy,
 }
 
-/// Per-app choice in "Rigenera" (Automatica / Colore del piatto / Bordo pieno / Normale).
+/// Per-app choice in "Regenerate" (Automatic / Plate colour / Full edge / Normal).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LucentStrategy {
     Auto,
@@ -152,6 +152,8 @@ impl From<&LucentSettings> for lucent::LucentParams {
             offset_y: 0.0,
             rim: l.rim,
             lift_greys: false,
+            // dark plates only: near-neutral dark glyph pixels become light
+            adapt_neutrals: (b[0] as u32 + b[1] as u32 + b[2] as u32) < 384,
             launcher_shadow: l.launcher_shadow,
             launcher_encode: l.launcher_encode,
             strategy: match l.strategy {
@@ -624,9 +626,9 @@ pub struct BatchItem {
     pub segment: Option<SegmentSettings>,
     pub placement: Option<PlacementSettings>,
     pub skip_isolation: bool,
-    /// Per-icon plate shape (Lucent only); None = the global shape.
+    /// Per-icon plate shape (Lightnt only); None = the global shape.
     pub shape: Option<LucentShape>,
-    /// Per-icon plate colour, ARGB (Lucent only); None = the global colour.
+    /// Per-icon plate colour, ARGB (Lightnt only); None = the global colour.
     pub backdrop: Option<u32>,
 }
 

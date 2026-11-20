@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'package:sqflite/sqflite.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../app/storage.dart';
 import 'packdb_db.dart';
@@ -427,8 +427,4 @@ void _backup(String file) {
   }
 }
 
-DatabaseFactory _defaultFactory() {
-  if (Platform.isAndroid || Platform.isIOS) return databaseFactory;
-  sqfliteFfiInit();
-  return databaseFactoryFfi;
-}
+DatabaseFactory _defaultFactory() => databaseFactory;

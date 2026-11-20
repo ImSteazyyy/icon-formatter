@@ -53,8 +53,8 @@ void main() {
     });
 
     test('unicode name round trips', () {
-      final l = AppList.fromJson({'id': 'u', 'name': 'Più amate ✨'});
-      expect(l.name, 'Più amate ✨');
+      final l = AppList.fromJson({'id': 'u', 'name': 'Most loved ✨'});
+      expect(l.name, 'Most loved ✨');
     });
   });
 

@@ -16,7 +16,6 @@ import 'package:icon_formatter/src/rust/api/engine.dart';
 import 'package:icon_formatter/src/rust/frb_generated.dart';
 import 'package:icon_formatter/widgets/theme_reveal.dart';
 import 'package:icon_formatter/workspace/workspace_controller.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:path/path.dart' as p;
 
 bool _booted = false;
@@ -25,7 +24,6 @@ bool _booted = false;
 Future<void> bootstrapApp() async {
   if (_booted) return;
   _booted = true;
-  await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   await RustLib.init();
   await AppPaths.init();
   await AppState.I.load();
@@ -39,12 +37,8 @@ Future<void> bootstrapApp() async {
   S.current = stringsFor('it');
 }
 
-/// The widget tree of main(): the app wrapped by the glass and theme-reveal layers.
-Widget appUnderTest() => LiquidGlassWidgets.wrap(
-      child: ThemeReveal.wrap(const IconFormatterApp()),
-      brightnessResolver: Theme.maybeBrightnessOf,
-      adaptiveQuality: false,
-    );
+/// The widget tree of main(): the app wrapped by the theme-reveal layer.
+Widget appUnderTest() => ThemeReveal.wrap(const IconFormatterApp());
 
 /// Pumps the app from scratch (fresh Shell, first tab selected).
 Future<void> pumpApp(WidgetTester tester) async {

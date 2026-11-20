@@ -4,7 +4,7 @@ SLOTS empty drawables (slot_0000.png ...) and placeholder res/xml files.
 On Android, Icon Formatter fills the slots with the pack's PNGs, writes
 appfilter/drawable XML and mapping.json, re-signs the APK with apksig and
 installs it through Shizuku (see android/.../PackInstaller.kt). Run on
-Windows with the Android SDK + JDK:  python tool/make_base_apk.py
+On a PC with the Android SDK + JDK:  python tool/make_base_apk.py
 """
 import base64
 import os

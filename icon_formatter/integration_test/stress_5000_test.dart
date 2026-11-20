@@ -1,5 +1,5 @@
 // Stress test: writes N distinct 512x512 synthetic icons into the app cache,
-// imports them through the Studio, taps "Elabora tutte" and records every 100
+// imports them through the Studio, taps "Process all" and records every 100
 // finished icons: elapsed time, RSS and janky frames. Skipped unless enabled:
 //
 //   flutter test integration_test/stress_5000_test.dart -d emulator-5554 \

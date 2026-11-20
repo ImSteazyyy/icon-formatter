@@ -24,7 +24,7 @@ List<int> packIconIndexes(List<String> rels, Map<String, (String, String)> compo
   return keep;
 }
 
-/// Whether a bulk render ("Crea con lo Studio", the change check) may render
+/// Whether a bulk render ("Create with Studio", the change check) may render
 /// the original [originalId]. Icons of a pack (ids "pk...") and icons already
 /// made in the Studio are finished and never rendered again by a bulk action.
 bool renderOnBulk({required String originalId, required bool hasStudioIcon, required bool rowFinished}) =>

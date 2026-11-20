@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import '../app/models.dart' show copySegment, copyPlacement;
 import '../app/state.dart';
 import '../app/storage.dart';
+import '../l10n/strings.dart';
 import '../services/batch_controller.dart';
 import '../services/bg_removal_service.dart';
 import '../src/rust/api/engine.dart';
@@ -39,17 +40,17 @@ class WorkItem {
   SegmentSettings? segOverride;
   PlacementSettings? placementOverride;
 
-  /// Per-app symbol mode (Rigenera › Modalità); null = Automatica.
+  /// Per-app symbol mode (Regenerate › Mode); null = Automatic.
   LucentStrategy? strategyOverride;
 
-  /// Per-icon plate shape and colour (Lucent only); null = the global ones.
+  /// Per-icon plate shape and colour (Lightnt only); null = the global ones.
   LucentShape? shapeOverride;
   int? backdropOverride;
 
   /// 1..31: one day of a dynamic calendar icon taken from an icon pack.
   int? calendarDay;
 
-  /// "Sfondo come il pack": after every processing the plate is brought to the
+  /// "Background like the pack": after every processing the plate is brought to the
   /// transparency of the other icons.
   bool matchPlate = false;
   ItemResult? result;
@@ -438,7 +439,7 @@ class WorkspaceController extends ChangeNotifier {
         ),
       );
     }
-    return ProcessSettings(size: s.size, background: bg, placement: _placementOf(it, s), segment: it.segOverride ?? s.segment, effects: s.effects, cutCacheDir: s.cutCacheDir);
+    return ProcessSettings(size: s.size, background: bg, placement: _placementOf(it, s), segment: it.segOverride ?? s.segment, ai: s.ai, effects: s.effects, cutCacheDir: s.cutCacheDir);
   }
 
   /// Placement of [it] with the global optical-centre switch applied.
@@ -448,13 +449,15 @@ class WorkspaceController extends ChangeNotifier {
   PlacementSettings get editPlacement {
     final it = selected;
     if (editSelectedOnly && it?.placementOverride != null) return it!.placementOverride!;
-    return settings.placement;
+    // same value as settings.placement, without building the whole engine
+    // settings (which needs the native library) on every panel build
+    return AppState.I.placementFor(mode);
   }
 
   SegmentSettings get editSegment {
     final it = selected;
     if (editSelectedOnly && it?.segOverride != null) return it!.segOverride!;
-    return settings.segment;
+    return globalSegment;
   }
 
   void setPlacement(PlacementSettings pl) {
@@ -493,7 +496,7 @@ class WorkspaceController extends ChangeNotifier {
     }
   }
 
-  /// Rigenera › Modalità: forces how the symbol is taken for one icon.
+  /// Regenerate › Mode: forces how the symbol is taken for one icon.
   void setStrategy(WorkItem it, LucentStrategy? st) {
     _edit('strategy', [it], () {
       it.strategyOverride = st == LucentStrategy.auto ? null : st;
@@ -503,7 +506,7 @@ class WorkspaceController extends ChangeNotifier {
     schedulePreview(immediate: true);
   }
 
-  /// Per-icon plate shape / colour (Lucent): undoable, and the icon is processed again.
+  /// Per-icon plate shape / colour (Lightnt): undoable, and the icon is processed again.
   void setItemShape(WorkItem it, LucentShape? v) => _setLook('shape', it, () => it.shapeOverride = v);
 
   void setItemBackdrop(WorkItem it, int? v) => _setLook('backdrop', it, () => it.backdropOverride = v);
@@ -545,7 +548,7 @@ class WorkspaceController extends ChangeNotifier {
   /// Icons that take the corrections of [src]; calendar pages keep their own.
   List<WorkItem> overrideTargets(WorkItem src) => [for (final i in active) if (i != src && i.calendarDay == null) i];
 
-  /// "Applica a tutte le icone": copies the corrections of [src] onto the
+  /// "Apply to all icons": copies the corrections of [src] onto the
   /// [overrideTargets] (replacing theirs) and processes them again.
   /// Returns how many icons were changed.
   Future<int> applyOverridesToAll(WorkItem src) => applyOverridesTo(src, overrideTargets(src));
@@ -706,9 +709,17 @@ class WorkspaceController extends ChangeNotifier {
   Future<void> process({Iterable<WorkItem>? only}) async {
     final list = (only ?? active).where((i) => !i.excluded).toList();
     if (list.isEmpty || batch.running) return;
+    batch.clearCancel();
+    batch.notice = null;
     outputDir ??= await AppPaths.I.outputSession(tag);
     final s = settings;
-    final cloud = AppState.I.bgProvider == BgProvider.removeBg;
+    // a cut-out provider that cannot run falls back to the classic cut, and says so
+    var cloud = AppState.I.bgProvider == BgProvider.removeBg;
+    if (cloud && (await BgRemovalService.readKey() ?? '').isEmpty) {
+      cloud = false;
+      batch.notice = S.ux2bNoticeRemoveBgNoKey;
+    }
+    if (AppState.I.bgProvider == BgProvider.localAi && s.ai == null) batch.notice = S.ux2bNoticeAiNoModel;
     final cutouts = <String, String>{};
     if (cloud) {
       // Cloud pre-pass: one remove.bg call per image (cached), 3 in flight.
@@ -754,7 +765,7 @@ class WorkspaceController extends ChangeNotifier {
       );
     }
     if (batchItems.isEmpty) return;
-    // the per-icon symbol mode (Rigenera › Modalità, calendar pages) lives
+    // the per-icon symbol mode (Regenerate › Mode, calendar pages) lives
     // in the background settings: one run per mode, the plain ones first
     final byMode = <LucentStrategy?, List<BatchItem>>{};
     final itemById = {for (final it in list) it.id: it};
@@ -764,14 +775,26 @@ class WorkspaceController extends ChangeNotifier {
     for (final e in byMode.entries) {
       if (batch.cancelRequested) break;
       final first = itemById[e.value.first.id]!;
-      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment, effects: s.effects, cutCacheDir: s.cutCacheDir));
+      await batch.run(e.value, e.key == null ? s : ProcessSettings(size: s.size, background: settingsForItem(first).background, placement: s.placement, segment: s.segment, ai: s.ai, effects: s.effects, cutCacheDir: s.cutCacheDir));
     }
-    // icons marked "Sfondo come il pack" keep it through a new processing
+    // icons marked "Background like the pack" keep it through a new processing
     final marked = list.where((i) => i.matchPlate).toList();
     if (marked.isNotEmpty && !batch.cancelRequested) await _applyPlateMatch(marked);
   }
 
-  /// "Sfondo come il pack": the plate of [its] takes the transparency of the
+  /// Re-composes every processed icon with the current plate. The saved cut-outs
+  /// are reused, so an icon whose cut is in the cache skips segmentation (the
+  /// strip then says how many were re-composed and how many were cut again).
+  /// Cheap check for the buttons: no disk access (see [processed] for that).
+  bool get canRecompose => !batch.running && items.any((i) => !i.excluded && i.outputPath != null);
+
+  Future<void> recomposeProcessed() async {
+    final list = processed;
+    if (list.isEmpty) return batch.setNotice(S.ux2bNothingToRecompose);
+    await process(only: list);
+  }
+
+  /// "Background like the pack": the plate of [its] takes the transparency of the
   /// other processed icons (their median); with none, the plate of the current
   /// style. Remembered per icon, so a new processing keeps it. Null when
   /// there is nothing processed to work on.
@@ -836,8 +859,6 @@ class WorkspaceController extends ChangeNotifier {
   /// What the grid shows: search, filter and sort (display only; processing
   /// always works on [active]).
   List<WorkItem> get visibleItems => studioArrange(items, query: query, sort: sort, filter: filter);
-
-  int get processedCount => items.where((i) => !i.excluded && i.outputPath != null).length;
 
   List<WorkItem> get ambiguous => items.where((i) => i.result?.ambiguous == true && i.result?.ok == true).toList();
 

@@ -1,5 +1,5 @@
 //! Visual check of the plate shapes: one row per input, columns =
-//! source | Squircle | Original | Circle (Lucent, dark), on a mid checker so
+//! source | Squircle | Original | Circle (Lightnt, dark), on a mid checker so
 //! faint edges and stray light lines show.
 //!
 //! cargo run --release --example shapes_sheet -- OUT.png in1.png in2.png ...

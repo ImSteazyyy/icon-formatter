@@ -1,4 +1,4 @@
-//! "Solo posizione e dimensione" as compose_glyph_png does it.
+//! "Position and size only" as compose_glyph_png does it.
 use icon_core::{compose, imageops, lucent};
 fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();

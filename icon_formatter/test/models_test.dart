@@ -25,11 +25,12 @@ void main() {
     expect(back.exponent, 4.25);
   });
 
-  test('built-in presets exist and are editable copies', () {
+  test('built-in presets are the four Lucent looks and survive a JSON copy', () {
     final ps = builtInPresets(t0);
-    expect(ps.map((e) => e.name), containsAll(['Vetro', 'Traslucido', 'Minimale', 'Scuro piatto', 'Personalizzato']));
+    expect(ps.map((e) => e.id), ['sqColour', 'sqMono', 'ciColour', 'ciMono']);
     final pr = StylePreset.fromJson(ps[1].toJson(), t0);
-    expect(pr.params.reflection, ps[1].params.reflection);
+    expect(pr.lucent!.monochrome, ps[1].lucent!.monochrome);
+    expect(pr.lucent!.shape, ps[1].lucent!.shape);
   });
 
   test('export naming', () {

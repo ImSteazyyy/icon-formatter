@@ -1,230 +1,309 @@
 <p align="center">
-  <img src="docs/media/hero.png" alt="Icone di app con sfondi e forme diverse, trasformate in un unico stile" width="800">
+  <img src="docs/media/hero.png" alt="App icons with different backgrounds and shapes, converted into one uniform style" width="800">
 </p>
 
 # Icon Formatter
 
-Trasforma le icone delle app in uno stile uniforme e crea icon pack pronti da installare. Su Android installa e applica il pack nel launcher con Shizuku, senza PC e senza root.
+Icon Formatter turns app icons into one consistent style and builds icon packs you can install. On Android it installs the pack and selects it in the launcher through Shizuku, with no PC and no root.
 
-[![Licenza](https://img.shields.io/github/license/ImSteazyyy/icon-formatter)](LICENSE)
-[![Ultima release](https://img.shields.io/github/v/release/ImSteazyyy/icon-formatter)](https://github.com/ImSteazyyy/icon-formatter/releases/latest)
-[![Piattaforme: Android e Windows](https://img.shields.io/badge/piattaforme-Android%20%7C%20Windows-3DDC84)](#installazione)
-[![Flutter e Rust](https://img.shields.io/badge/built%20with-Flutter%20%2B%20Rust-02569B)](#compilare-dal-sorgente)
+[![License](https://img.shields.io/github/license/ImSteazyyy/icon-formatter)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/ImSteazyyy/icon-formatter)](https://github.com/ImSteazyyy/icon-formatter/releases/latest)
+[![Platform: Android](https://img.shields.io/badge/platform-Android-3DDC84)](#install)
+[![Built with Flutter and Rust](https://img.shields.io/badge/built%20with-Flutter%20%2B%20Rust-02569B)](#build-from-source)
 
-## Cosa fa
+## What it does
 
-Le icone che hai raccolto arrivano da posti diversi, con sfondi, forme e dimensioni che non combaciano. Icon Formatter le riporta tutte allo stesso stile, ti aiuta ad abbinarle alle app installate e crea il pacchetto. Gira su Android e su Windows. L'elaborazione avviene sul dispositivo; un servizio online entra in gioco solo se scegli tu di usarlo per togliere lo sfondo.
+Icons collected from different sources rarely match. Each one has its own background, shape and size. Icon Formatter redraws them in one style, matches them to the apps installed on your phone, and packages the result as an icon pack.
 
-## In breve
+The icons use the **Lucent** style: each one sits on a translucent plate, a circle or a squircle that follows the shape of the original icon. The symbol keeps its colours, or takes one colour for the whole set. The app interface has two styles: **Nothing** (black and grey with a red accent, the default) and **Glass**.
 
-| Area | Cosa ottieni |
-|---|---|
-| Studio | Importi immagini, cartelle, icon pack, app del telefono, appunti o condivisioni, e le porti nello stesso stile. |
-| Stili | Lucent (piatto traslucido), stile traslucido classico, composizione originale, preset e basi tue. |
-| Pack | Abbinamento alle app, controllo di ogni abbinamento, esportazione in cartella, ZIP o APK. |
-| Android | Installazione e applicazione del pack con Shizuku, aggiornamento automatico, calendario con il giorno di oggi. |
-| Aspetto | Stile Nothing o Vetro, in chiaro, scuro o come il telefono, con risparmio energetico. |
-| Lingue | Italiano, inglese, spagnolo, francese, tedesco e portoghese. |
+Processing happens on the device. The only online services are optional, and they are listed in [Privacy](#privacy).
 
-## Studio
+- **Platform:** Android 7.0 or later.
+- **Languages:** Italian, English, Spanish, French, German and Portuguese. The app follows the language of the phone and can be changed in Settings.
+- **Cost:** free. No ads, no accounts, no analytics.
+- **Licence:** AGPL-3.0-only.
 
-Lo Studio è il punto di partenza. Importi immagini (PNG, JPG, WEBP o SVG), una cartella, un icon pack in ZIP o APK, oppure le app installate sul telefono. Puoi incollare dagli appunti e ricevere immagini dal menu Condividi di Android. Scegli lo stile, premi **Elabora tutte** e ogni icona esce con lo stesso piatto, la stessa dimensione e lo stesso sfondo.
+## Features
 
-<p align="center">
-  <img src="docs/media/studio-import.gif" width="320" alt="Importazione di alcune icone nello Studio, poi elaborazione">
-</p>
+### Studio
 
-Dopo l'elaborazione puoi rifinire il risultato:
+The Studio is where you start. You can import PNG, JPG, WEBP or SVG images, a folder, an icon pack (ZIP or APK), the icons of the apps on your phone, pasted images, or images shared from other apps. A watched folder sends new images to the Studio by itself.
 
-- correggere una singola icona (dimensione, posizione, colore del simbolo, centratura ottica, forma e colore del piatto) e copiare la correzione su tutte le altre;
-- annullare e ripristinare ogni modifica;
-- selezionare più icone, cercarle per nome, ordinarle e filtrarle (solo modificate, solo con errori, solo escluse);
-- riconoscere le icone duplicate ed escluderle con un tocco;
-- mostrare la guida dell'area sicura, con il contorno del piatto e la croce al centro, solo nell'anteprima;
-- confrontare due stili sulla stessa icona;
-- togliere lo sfondo in tre modi: metodo standard sul dispositivo, AI locale con un modello facoltativo, oppure remove.bg con una tua chiave API.
+Press **Process all**, and every icon gets the same plate, the same size and the same background.
 
 <p align="center">
-  <img src="docs/media/studio-corrections.png" width="320" alt="Anteprima di un'icona con i controlli di correzione">
+  <img src="docs/media/studio-import.gif" width="320" alt="Importing a few icons into the Studio, then processing them">
 </p>
 
-## Stili
+After processing you can refine each result:
 
-- **Lucent**: un piatto traslucido, scuro o chiaro, sulla forma dell'icona originale (cerchio o squircle). Il simbolo resta com'era, con i suoi colori oppure in un colore solo.
-- **Traslucido**: lo stile classico con il piatto semitrasparente.
-- **Composizione originale**: ogni icona mantiene la posizione e le proporzioni dell'originale, dentro la dimensione dell'icona base scelta.
-- **Preset**: Minimale, Scuro piatto e quelli che crei tu. I preset si esportano in un file e si importano su un altro dispositivo.
-- **Basi**: Cerchio e Squircle sono incluse. Puoi importare una tua base e calibrarla con una ventina di icone di esempio, così margini e centro vengono misurati.
+- correct one icon (size, position, symbol colour, optical centring, plate shape and colour), then copy the correction to all the others with **Apply corrections**;
+- undo and redo every change;
+- select several icons, search them by name, sort them, and filter them to edited, failed or excluded icons;
+- find duplicate files and exclude them with **Exclude duplicates**;
+- show the safe-area guide (plate edge and centre cross, in the preview only);
+- compare the before and after results by dragging the white line;
+- remove the background in one of three ways: the standard method on the device, AI on the device (an optional model), or remove.bg with your own API key.
 
 <p align="center">
-  <img src="docs/media/studio-style.gif" width="320" alt="Scelta dello stile Lucent, regolazione della dimensione e confronto prima e dopo">
+  <img src="docs/media/studio-before-after.png" width="320" alt="Before and after comparison of one icon, with the white dividing line in the middle">
 </p>
 
-## Pack
+<p align="center">
+  <img src="docs/media/studio-corrections.png" width="320" alt="Preview of one icon with the correction controls open">
+</p>
 
-Il Pack è dove le icone diventano un icon pack. Scegli le app, aggiungi le icone nuove (dallo Studio o importate) e premi **Abbina**. Ogni app riceve uno stato (abbinata, verificata, incerta, da verificare o icona mancante). Per le incerte puoi vedere il motivo dell'abbinamento: stesso componente, stesso pacchetto, stesso nome, stesso nome di file o somiglianza visiva.
+### Styles
 
-- **Dettagli con prima e dopo** per ogni abbinamento, con le ragioni.
-- **Controllo qualità**: segnala icone quasi vuote, troppo piccole, fuori centro, troppo scure o con poco contrasto.
-- **Conflitti**: stesso disegno per più app, stesso componente con disegni diversi, disegni o pacchetti vuoti.
-- **Suggerimenti** di icone libere per le app senza icona, alias per usare la stessa icona su altre app, fino a tre varianti per app e rinomina nel pack.
-- **Copertura**: quante app del telefono hanno ormai la loro icona.
-- **Importa abbinamenti** da un altro pack, in APK o ZIP.
-- **Pack salvati** e un registro delle operazioni che puoi copiare.
-- **Esportazione** in cartella, ZIP o APK, anche solo delle icone modificate dall'ultima volta.
-- **Anteprima della schermata home**, in chiaro e in scuro, e anteprima di tutte le icone.
-- **Pulizia pack**: ripulisce o unisce un icon pack che hai già, mantenendo nomi, percorsi e `appfilter.xml`. Gli originali non vengono toccati.
+- **Lucent:** a translucent dark or light plate on the shape of the original icon (circle or squircle). The symbol stays as it was, with its own colours or in a single colour.
+- **Translucent:** the classic style with a semi-transparent plate.
+- **Original composition:** every icon keeps its position and proportions inside the size of the base icon you chose.
+- **Presets:** Minimal, Flat dark and your own. Presets can be shared as a file and imported on another device.
+- **Base icons:** Circle and Squircle are included. You can import your own base and calibrate it with about twenty sample icons, so the margins and the centre are measured instead of guessed.
+
+<p align="center">
+  <img src="docs/media/studio-style.gif" width="320" alt="Choosing the Lucent style, changing the symbol size, and comparing before and after">
+</p>
+
+### Icon pack builder
+
+The **Pack** tab turns your icons into an icon pack. It works in three steps: **Apps** (the apps that receive new icons), **New icons** (the icons from the Studio or imported files), and **Export**. Press **Match** to pair the new icons with the installed apps.
+
+Each app gets a status: **Matched**, **Checked**, **Uncertain**, **To check** or **Icon missing**. An uncertain match shows the reason it was made: same package, same name, same file name, or visual similarity (for example "similarity 87%"). You can open the details of any match and correct it.
+
+- **Checks** flag icons that are nearly empty, too small, off centre, too dark or low in contrast.
+- **Conflicts** flag the same drawing used by several apps, the same component with different drawings, and empty drawings or packages.
+- **Suggestions** offer free icons for apps that have none. **Use for other apps** reuses one icon for several apps. Each app can have up to three variants, and any icon can be renamed inside the pack.
+- **Coverage** shows how many installed apps already have an icon, for example "12 of 40 apps have their icon".
+- **Import matches** reads the matches of another pack (APK or ZIP).
+- **Saved packs** store your corrections so you can load them again. The **Pack log** lists what happened and can be copied as release notes.
+- **Export** writes a folder, a ZIP or an APK. **Changed only** exports only the icons that changed since the last export.
+- **Preview** shows the home screen in **Light** and **Dark**, and contact sheets with all the icons.
+- **Pack cleanup** cleans up or merges an icon pack you already have. It keeps the names, the paths and `appfilter.xml`. The original files are never modified.
+
+Less frequent actions sit in the **More** sheet, grouped as **Checks**, **Export and share**, **Pack log**, **Saved packs**, **Open a pack**, **Import**, **Pack cleanup**, **Preview**, **Share** and **Build APK**.
+
+<p align="center">
+  <img src="docs/media/pack-tab.png" width="320" alt="Pack tab with the installed apps, their status badges and the coverage line">
+</p>
+
+<p align="center">
+  <img src="docs/media/pack-more-sheet.png" width="320" alt="The More sheet of the Pack tab, with its sections">
+</p>
+
+### Editing one icon
+
+Open the edit page with **Edit icon** for an app in the Pack, then pick an image (PNG, JPG or WEBP). The **How the icon looks** section shows one tile per treatment, each with a live preview of the icon:
+
+- **Automatic** (recommended): the app picks the best treatment.
+- **Symbol only**: removes the background and keeps the drawing.
+- **Plate colour**: the symbol takes the colour of the original background.
+- **Full edge**: the drawing reaches the edges, which suits maps and keyboards.
+- **More options**: **Whole icon** keeps the image as it is, inside the shape; **Original** applies no changes.
+
+The page uses the same style panel as the Studio. Hand-made corrections are saved and reapplied each time the pack is rebuilt.
+
+<p align="center">
+  <img src="docs/media/edit-page.png" width="320" alt="The edit page with the treatment tiles and a live preview of the icon">
+</p>
 
 ## Android
 
-Sul telefono il pack prende vita.
+On the phone, the pack comes to life.
 
-- **Le tue app**: l'elenco delle app installate con l'icona che usa il launcher. Le elabori e le mandi al Pack in un tocco. Compaiono solo le app che hanno un'icona nella schermata home.
-- **Installa e applica**: il pack viene creato sul telefono come app separata, a partire da un modello con 2000 posti per le icone, e firmato con una chiave che resta nell'Android Keystore. Con Shizuku lo installi e lo selezioni nel launcher senza PC. Senza Shizuku la conferma la dà il sistema e la scelta la fai a mano. Le correzioni fatte a mano restano salvate e vengono riapplicate a ogni rigenerazione.
-- **Aggiornamento automatico**: il controllo parte allo sblocco e poi ogni 6, 12 o 24 ore, facoltativamente solo mentre il telefono è in carica. Se un'app è nuova, è stata rimossa o ha cambiato icona, la trovi nel Pack con una notifica silenziosa, e **Rielabora** lavora solo su quelle. Le app che non ti interessano si possono escludere dall'elenco.
-- **Calendario dinamico**: l'icona del calendario mostra il giorno di oggi. Con Shizuku il pack aggiorna il giorno da solo, ogni mattina, all'ora che scegli oppure alla prima occasione.
-- **Condivisione e scorciatoie**: mandi immagini ad Icon Formatter dal menu Condividi, alla voce «Condividi con Icon Formatter». Dalla schermata home puoi avviare il controllo ora o aggiornare il giorno del calendario.
-- **Cartella osservata**: le immagini nuove che finiscono nella cartella che scegli arrivano nello Studio da sole.
-- **Controllo aggiornamenti**: all'avvio l'app verifica se è uscita una versione nuova e te lo segnala in Impostazioni › Sistema, senza installare nulla da sola.
-- **Elaborazione in background**: un lavoro lungo mostra una notifica con l'avanzamento.
-- **L'app del pack**: il pack ha una sua schermata con tutte le icone, ricerca, filtri (tutte, installate, mancanti) e ordinamento. Tenendo premuta un'app copi il nome del pacchetto o la apri.
+- **Your apps:** the apps installed on the phone, with the icon the launcher shows for each one. Process them and send them to the Pack in one tap. Only apps with an icon on the home screen are listed.
+- **Install and apply:** the pack is built on the phone as a separate app (`com.iconformatter.pack.device`), starting from a base APK with 2,000 icon slots. It is signed with a key that stays in the Android Keystore. With Shizuku the app installs the pack and selects it in the launcher. Without Shizuku, Android asks you to confirm the install, and you choose the pack yourself.
+- **Automatic update:** the app checks when you unlock the phone, then every 6, 12 or 24 hours. You can limit the checks to the time the phone is charging. When an app is new, removed or has a new icon, it appears in the Pack with a silent notification. **Redo** processes only those apps. Apps you do not care about can be left out of the updates.
+- **Calendar day:** the calendar icon shows today's date. Icon packs often hold one calendar icon per day, and Icon Formatter combines them into one entry. With Shizuku the pack updates the day every morning, at the time you set with **Update the day at**, or at the first chance. **Update day** applies the change immediately.
+- **Sharing and shortcuts:** send images to Icon Formatter from the Android share menu. Long jobs run as a foreground service and show a progress notification, so they keep running when you leave the app.
+- **Watched folder:** new images placed in the folder you choose are imported into the Studio.
+- **Pack app:** the installed pack has its own app with every icon, a search box, filters (All, Installed, Missing) and sorting. Hold an app to copy its package name or to open it.
 
 <p align="center">
-  <img src="docs/media/calendar.gif" width="320" alt="Giorno del calendario aggiornato in un'icona del pack">
-</p>
-
-## Aspetto
-
-- **Stile Nothing** (predefinito): nero, card grigie, titoli serif e accento rosso.
-- **Vetro**: superfici in vetro con rifrazione, smerigliatura e bordo luminoso. Si regola in Impostazioni › Vetro, dove scegli anche dove usarlo e il livello di qualità (Più veloce, Bilanciato, Qualità).
-- **Chiaro, scuro o come il telefono**. Il cambio tema si apre a cerchio dal punto che tocchi.
-- **Barra in basso** che si piega mentre scorri.
-- **Risparmio energetico**: riduce effetti e animazioni per avere più autonomia.
-- **Tour iniziale** con le cose essenziali e i permessi, tutti facoltativi. Lo rivedi quando vuoi con **Rivedi il tour** nelle Impostazioni.
-- **Backup**: salvi aspetto, stili e preferenze in un file e li ripristini quando vuoi. Dopo molte modifiche l'app può salvare anche una copia automatica nella cartella che scegli, tenendo le ultime tre.
-- **Copia info** per segnalare un problema: versione, sistema e impostazioni, senza dati personali.
-- **Su Windows**: Ctrl+1 fino a Ctrl+4 per le prime quattro sezioni, Ctrl+, per le Impostazioni, Ctrl+Maiusc+T per passare dal chiaro allo scuro.
-
-<p align="center">
-  <img src="docs/media/themes-nothing-glass.png" width="640" alt="Impostazioni di aspetto con lo stile Nothing e lo stile Vetro affiancati">
+  <img src="docs/media/pack-autosync.png" width="320" alt="The Automatic update section with the last check time and the Redo button">
 </p>
 
 <p align="center">
-  <img src="docs/media/onboarding.gif" width="320" alt="Primo avvio: lingua, aggiornamento automatico e tour iniziale">
+  <img src="docs/media/calendar.gif" width="320" alt="The calendar day updating on an icon of the pack">
 </p>
 
 <p align="center">
-  <img src="docs/media/settings.png" width="320" alt="Schermata Impostazioni con le sezioni">
+  <img src="docs/media/calendar-day-variants.png" width="320" alt="One calendar entry in the pack, with different day numbers shown as variants">
 </p>
 
-## Lingue
+<p align="center">
+  <img src="docs/media/apply-launcher.gif" width="320" alt="Applying the pack in the launcher: progress messages, then the result">
+</p>
 
-L'app è disponibile in italiano, inglese, spagnolo, francese, tedesco e portoghese. Segue la lingua del telefono. Per cambiarla vai in Impostazioni › Aspetto.
+### Large icon sets
 
-## Installazione
+Icon Formatter can process thousands of icons. Processing runs in parallel on the processors of the device, in the background, with a progress notification. The repository includes a stress test with 5,000 generated icons, which records time, memory and dropped frames (see [Testing](icon_formatter/docs/TESTING.md)).
 
-Scarica l'ultima versione dalla pagina [Releases](https://github.com/ImSteazyyy/icon-formatter/releases).
+Processed results and cut-outs are cached inside the app, so reprocessing an icon is faster. The cut-out cache has a size limit you can set, and you can clear it from Settings.
 
-Consigliato: **Nothing OS 5.0 (Android 16)** con il Nothing Launcher. È il sistema per cui sono pensati lo stile Lucent e l'applicazione automatica del pack.
+## Appearance and settings
 
-Requisiti minimi: Android 7.0 o successivo, oppure Windows 10 o 11 a 64 bit. Su altri telefoni e launcher l'app funziona e il pack si installa come un normale icon pack, ma l'applicazione automatica con Shizuku è pensata per il Nothing Launcher.
+- **Nothing style:** black and grey cards, serif titles, a red accent and frosted floating bars. It is the only style for now; a Glass style will come later.
+- **Light, dark or the phone's setting.** The change starts as a circle from the point you touch.
+- **Bottom bar** that bends while you scroll, with compact actions next to it.
+- **Power saving:** fewer effects and animations, for longer battery life.
+- **Welcome tour:** a short introduction to the language, the automatic updates and the optional permissions. You can replay it from Settings.
+- **Backup:** Settings › System › Backup saves the appearance, the styles and the preferences to one file, and restores them later. After many changes the app can also save a copy to a folder you choose, keeping the last three.
+- **Copy info:** copies the app version, the system and your settings to the clipboard, without personal data, for bug reports.
+- **Accessibility:** the text follows the system font size. Key controls, such as the treatment tiles on the edit page, have labels for screen readers. The text is shown at 93% of the system size.
 
-- **Android**: prendi l'APK `arm64-v8a`. Quasi tutti i telefoni degli ultimi anni lo supportano. Se non sei sicuro, o se quello non si installa, usa l'APK universale, quando la release lo include.
-- **Windows**: scarica lo ZIP, estrailo in una cartella e avvia il programma da lì.
+<p align="center">
+  <img src="docs/media/appearance-light.png" width="320" alt="The Studio in light mode">
+</p>
 
-Al primo tentativo Android chiede di consentire l'installazione dall'app con cui apri il file, per esempio il browser o il gestore dei file. La voce si trova di solito in Impostazioni, nelle sezioni App o Sicurezza, e cambia da un produttore all'altro.
+<p align="center">
+  <img src="docs/media/onboarding.gif" width="320" alt="First launch: language, automatic update and the welcome tour">
+</p>
 
-### Shizuku (facoltativo)
+<p align="center">
+  <img src="docs/media/settings.png" width="320" alt="The Settings screen with its sections">
+</p>
 
-[Shizuku](https://shizuku.rikka.app/) è un'app gratuita che permette ad altre app di usare alcune funzioni di sistema senza PC e senza root, grazie al Debug wireless del telefono. Con Shizuku attivo, Icon Formatter installa e seleziona il pack da solo, aggiorna il giorno del calendario e applica gli aggiornamenti automatici. Senza Shizuku, il sistema chiede conferma e la scelta del pack nel launcher la fai a mano.
+## Install
 
-Per attivarlo: installa Shizuku, attiva le opzioni sviluppatore e il Debug wireless, poi avvia Shizuku dalla sua app. Dopo ogni riavvio del telefono va avviato di nuovo. Icon Formatter chiede il permesso la prima volta che lo usi.
+Download the latest version from the [Releases](https://github.com/ImSteazyyy/icon-formatter/releases) page.
 
-## Come si usa
+**Recommended setup:** Nothing OS 5.0 (Android 16) with the Nothing Launcher. The Lucent style and the automatic application of the pack were designed for that setup. Other phones and launchers work too, but see [Known limits](#known-limits).
 
-1. **Importa** le icone nello Studio: immagini, una cartella, un icon pack o le app del telefono.
-2. **Scegli lo stile** e premi **Elabora tutte**. Le icone segnate in giallo sono incerte: controllale e correggile a mano.
-3. **Manda al Pack** e premi **Abbina**. Controlla gli abbinamenti incerti prima di esportare.
-4. **Installa e applica** su Android con Shizuku, oppure **esporta** cartella, ZIP o APK e installalo a mano.
-5. Su Android il pack si tiene aggiornato da solo quando installi, rimuovi o cambi app.
+### Android
 
-## Compilare dal sorgente
+Choose the APK for your phone:
 
-Il progetto Flutter sta nella cartella `icon_formatter/`.
+- `IconFormatter-<version>-arm64-v8a.apk`: for most phones released in the last few years.
+- `IconFormatter-<version>-universal.apk`: if you are not sure, or if the arm64 file does not install.
+- `IconFormatter-<version>-armeabi-v7a.apk` and `IconFormatter-<version>-x86_64.apk`: for older 32-bit phones and for x86 emulators.
 
-Requisiti:
+The first time, Android asks you to allow installs from the app you opened the file with, such as your browser or file manager. The setting usually sits under Settings, in Apps or Security, and its name depends on the manufacturer.
 
-- **Flutter**: il pacchetto richiede Dart `^3.13.7` (campo `environment` in `icon_formatter/pubspec.yaml`). Usa un Flutter stable che includa questa versione di Dart.
-- **Rust**: una toolchain stabile con `cargo`. Il motore usa l'edizione 2021.
-- **flutter_rust_bridge_codegen 2.13.0**, la stessa versione del pacchetto Dart: `cargo install flutter_rust_bridge_codegen --version 2.13.0`.
-- **Android**: Android SDK, NDK (quello indicato da Flutter) e JDK 17.
-- **Python 3** con **Pillow** per gli script in `tool/`.
+**Upgrading from a build before build 5.** Builds from build 5 onward are signed with the stable release key. Earlier builds were signed with a debug key, and Android refuses to install an update signed with a different key. The first install shows "signatures do not match". Uninstall the old app once, then install the new one. Before you uninstall:
 
-Da `icon_formatter/`:
+1. Open Settings › System › Backup and save a backup.
+2. Uninstall the old app.
+3. Install the new APK.
+4. Restore the backup from the same screen.
+
+The icon pack already installed on the phone stays where it is. After this one-time step, updates install over the previous version as usual.
+
+Download `IconFormatter-<version>-windows-x64.zip`, extract it to a folder, and run the program from there.
+
+### Shizuku (optional)
+
+[Shizuku](https://shizuku.rikka.app/) is a free app that lets other apps use some system functions without a PC and without root, through the phone's Wireless debugging. With Shizuku running, Icon Formatter installs and selects the pack by itself, updates the calendar day, and runs the automatic updates.
+
+To enable it, install Shizuku, turn on Developer options and Wireless debugging, then start Shizuku from its own app. Shizuku stops when the phone restarts, so start it again after each restart. Icon Formatter asks for the Shizuku permission the first time it needs it.
+
+### Applying the pack
+
+Open the Pack, build the pack, and tap **Apply in the launcher**:
+
+- **With Shizuku:** choose **Install and apply**. The app shows its progress ("Building the pack on the phone…", "Installing the pack…", "Selecting the pack in the launcher…") and ends with "Pack applied: N icons."
+- **Without Shizuku:** choose **Install (with system confirmation)**. Confirm the install in the system window, then select the pack in your launcher's icon pack settings.
+- **By hand:** choose **Export** and save a folder, a ZIP or an APK. Install it with any icon pack flow you already use.
+
+## How to use it
+
+1. **Import** icons into the Studio: images, a folder, an icon pack, or the apps on your phone.
+2. **Choose a style** and press **Process all**. Icons marked in yellow are uncertain. Check them and correct them by hand.
+3. **Send to Pack** and press **Match**. Review the uncertain matches before you export.
+4. **Install and apply** on Android with Shizuku, or **export** a folder, ZIP or APK and install it yourself.
+5. On Android, the pack keeps itself up to date when you install, remove or change apps.
+
+## Build from source
+
+The Flutter project is in the `icon_formatter/` folder.
+
+Requirements:
+
+- **Flutter:** the package needs the Dart SDK `^3.13.7`, as set in the `environment` section of `icon_formatter/pubspec.yaml`. Use a stable Flutter release that bundles this Dart version.
+- **Rust:** a stable toolchain with `cargo`. The engine uses the 2021 edition.
+- **flutter_rust_bridge_codegen 2.13.0**, the same version as the Dart package: `cargo install flutter_rust_bridge_codegen --version 2.13.0`.
+- **Android:** the Android SDK, the NDK that Flutter selects, and JDK 17.
+- **Python 3** with **Pillow** for the scripts in `tool/`.
+
+From `icon_formatter/`:
 
 ```bash
 flutter pub get
-flutter_rust_bridge_codegen generate   # solo se cambi l'API Rust in rust/src/api
+flutter_rust_bridge_codegen generate   # only after changing the Rust API in rust/src/api
 cargo test --release --manifest-path native/icon_core/Cargo.toml
 flutter test test
 flutter build apk --release --split-per-abi
-flutter build windows --release
 ```
 
-Per firmare la release con una tua chiave crea `android/key.properties` con `storeFile`, `storePassword`, `keyAlias` e `keyPassword`. Senza quel file la release usa la chiave di debug: va bene per le prove, non per distribuire.
+To sign a release with your own key, create `android/key.properties` with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`. Without that file, the release build uses the debug key. That is fine for testing, but not for distribution.
 
-Script di supporto:
+Support scripts:
 
-| Script | A cosa serve |
+| Script | Purpose |
 |---|---|
-| `tool/l10n_gen.py` | Rigenera le lingue in `lib/l10n` dai testi italiani in `source_it.dart` e dai file `tool/l10n/*.tsv`. Poi esegui `dart format lib/l10n`. Con `--check` elenca le chiavi mancanti per lingua. |
-| `tool/make_template_zip.py` | Ricrea `assets/iconpack_template.zip` dal progetto `iconpack_template/`, dopo una modifica al template. |
-| `tool/make_base_apk.py` | Ricrea `assets/iconpack_base.apk`, il modello con 2000 posti per le icone. Richiede Android SDK e JDK. |
-| `tool/make_bases.py` | Disegna le basi Cerchio e Squircle in `assets/bases/`. Richiede Pillow. |
-| `tool/make_app_icon.py`, `tool/make_pack_icon.py` | Creano le icone di lancio e l'`.ico` di Windows dai file in `assets/branding/`. Richiedono Pillow. |
-| `tool/unconst_strings.py` | Utility usata una volta per togliere `const` dalle espressioni con testi tradotti. Non serve per compilare. |
+| `tool/l10n_gen.py` | Regenerates the languages in `lib/l10n` from `source_it.dart` and the `tool/l10n/*.tsv` files. Run `dart format lib/l10n` afterwards. With `--check`, it lists the missing keys for each language. |
+| `tool/make_template_zip.py` | Rebuilds `assets/iconpack_template.zip` from the `iconpack_template/` project after you change the template. |
+| `tool/make_base_apk.py` | Rebuilds `assets/iconpack_base.apk`, the base APK with 2,000 icon slots. Needs the Android SDK and JDK. |
+| `tool/make_bases.py` | Draws the Circle and Squircle base icons in `assets/bases/`. Needs Pillow. |
+| `tool/make_app_icon.py`, `tool/make_pack_icon.py` | Create the launcher icons from the files in `assets/branding/`. Need Pillow. |
+| `tool/unconst_strings.py` | A one-time utility that removed `const` from expressions with translated strings. It is not needed to build. |
 
-## Struttura del progetto
+Tests and the release process are described in [icon_formatter/docs/TESTING.md](icon_formatter/docs/TESTING.md) and [docs/RELEASE.md](docs/RELEASE.md).
+
+## Project structure
 
 ```
 .
 ├── CHANGELOG.md, LICENSE, THIRD_PARTY_NOTICES.md
-├── docs/media/              immagini del README
-└── icon_formatter/          l'app
-    ├── lib/                 interfaccia Flutter: app, screens, workspace, services, widgets, l10n
-    ├── native/icon_core/    motore Rust: isolamento del simbolo, piatti, composizione, abbinamento, pack
-    ├── rust/                ponte flutter_rust_bridge (crate icon_bridge)
-    ├── rust_builder/        integrazione Cargokit per compilare Rust dentro il build Flutter
-    ├── android/             app Android: app installate, Shizuku, aggiornamenti, pack sul telefono, condivisione
-    ├── iconpack_template/   progetto del pack, da cui nasce il modello APK
-    ├── assets/              basi, font, branding, modello APK, template ZIP, testo delle novità
-    ├── tool/                script di build e manutenzione
-    ├── windows/             progetto Windows
+├── docs/media/              images used by this README
+└── icon_formatter/          the app
+    ├── lib/                 Flutter interface: app state, screens (Studio, Pack, Settings), workspace, services, widgets, l10n
+    ├── native/icon_core/    Rust engine: symbol cut-out, plates and shapes, composition, icon matching, pack writing
+    ├── rust/                flutter_rust_bridge layer (crate icon_bridge)
+    ├── rust_builder/        Cargokit integration that compiles Rust inside the Flutter build
+    ├── android/             Android app: installed apps, Shizuku, automatic updates, on-device pack, sharing
+    ├── iconpack_template/   the pack project the base APK is built from
+    ├── assets/              base icons, fonts, branding, base APK, template ZIP, release notes
+    ├── tool/                build and maintenance scripts
     └── test/, integration_test/
 ```
 
 ## Privacy
 
-- L'app funziona offline. Lo sfondo si toglie sul dispositivo, con il metodo standard o con l'AI locale.
-- Non ci sono account, analytics, telemetria né segnalazione automatica dei crash: nel progetto non c'è nessun SDK di questo tipo.
-- L'app si collega a internet solo in questi casi:
-  - **remove.bg**, se scegli questo metodo e salvi una tua chiave API. Ogni immagine viene inviata a remove.bg. Il test della chiave e la lettura dei crediti chiamano anche loro l'API di remove.bg.
-  - **Controllo aggiornamenti**: una volta per avvio, l'app chiede a `api.github.com` l'ultima release pubblicata del progetto e ti avvisa se ce n'è una nuova. Si spegne in Impostazioni › Sistema ed è attivo di default.
-  - **Download del modello AI**, solo se premi Scarica. Il modello U²-Net-p (circa 4,6 MB) viene dalle release del progetto rembg su GitHub. Il modello ISNet, disponibile solo su Windows, pesa circa 178 MB.
-  - **Link esterni**: Ko-fi e la pagina dei prezzi di remove.bg si aprono nel browser solo quando li tocchi.
-- La chiave di remove.bg viene salvata nell'archivio sicuro del sistema.
-- Su Android l'app non dichiara `QUERY_ALL_PACKAGES`: vede solo le app che le servono e le app di launcher e pack compatibili.
-- La copia info per le segnalazioni non contiene dati personali.
+- The app works offline. Background removal runs on the device, with the standard method or with the local AI model.
+- There are no accounts, analytics, telemetry or automatic crash reports. The project includes no SDK of this kind.
+- The app connects to the internet only in these cases:
+  - **remove.bg**, only if you choose that method and save your own API key. Each image you process is sent to remove.bg. Checking the key and reading your credits also call the remove.bg API.
+  - **Update check**, once per start: the app asks `api.github.com` for the latest published release and tells you if a newer version exists. It is on by default and can be turned off in Settings › System. It installs nothing by itself.
+  - **AI model download**, only when you tap **Download**. The U²-Net-p model (about 4.6 MB) comes from the GitHub releases of the rembg project.
+  - **External links:** the Ko-fi page and the remove.bg pricing page open in your browser, and only when you tap them.
+- The remove.bg API key is kept in the operating system's secure storage.
+- The app asks for these permissions: internet access (for the cases above), notifications (optional, for progress and new-app alerts), permission to install apps (only to install the pack), and the Shizuku permission (optional).
+- On Android the app does not declare `QUERY_ALL_PACKAGES`. It sees only the apps it needs: launchers and compatible pack apps.
+- The info you copy for a bug report contains no personal data.
 
-## Sostieni il progetto
+## Known limits
 
-Icon Formatter è gratuito. Se ti è utile, puoi offrirmi un caffè su [Ko-fi](https://ko-fi.com/imsteazyy). Il link è anche nella scheda "Sostieni il progetto" delle Impostazioni.
+- Tested only with the Nothing Launcher on Nothing OS 5.0 (Android 16). On other launchers the pack installs as a normal icon pack, but automatic application with Shizuku is designed for the Nothing Launcher.
+- On Android, only apps with an icon on the home screen are listed. Apps without a home-screen icon and apps in a work profile do not appear.
+- A pack built on the phone holds at most 2,000 icons.
+- Without Shizuku, Android does not allow a silent install or selecting the pack in the launcher automatically.
+- A pack made on another phone cannot be updated in place. Icon Formatter then offers to replace it, keeping the same icons and your changes.
+- After you uninstall the pack, Android may keep its data. **Delete leftover data** in the Pack removes it when Android allows it.
+- Background removal is rule-based. Uncertain results are marked in yellow so you can correct them by hand.
+- The 5,000-icon stress test is a benchmark to compare versions. Its memory budget is a chosen threshold, not a measurement of any phone, and results depend on the device.
 
+## Support
 
-## Licenza e crediti
+Icon Formatter is free. If you find it useful, you can buy the developer a coffee on [Ko-fi](https://ko-fi.com/imsteazyy). The link is also in the **Support the project** card in Settings.
 
-Icon Formatter è distribuito con licenza [AGPL-3.0-only](LICENSE). Il motore di rendering Lucent contiene codice derivato da nothing-icongen di linuxct, anch'esso AGPL-3.0-only. I font Inter e Instrument Serif sono sotto SIL Open Font License 1.1. L'elenco completo dei componenti di terze parti è in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) e nella pagina Licenze dell'app.
+To report a problem, open an issue on [GitHub](https://github.com/ImSteazyyy/icon-formatter/issues) and attach the output of **Copy info** from Settings › System.
 
-Nomi di prodotti e loghi citati (Android, Windows, Shizuku, remove.bg, Ko-fi e gli altri) appartengono ai rispettivi proprietari. Il progetto è indipendente e non è affiliato a nessuno di loro. Il nome dello stile "Nothing" è un nome interno dell'app. Il repository non distribuisce icone di terze parti: l'app lavora sulle icone presenti sul dispositivo dell'utente.
+## Licence and credits
 
-Sviluppato con Claude (Anthropic), tramite Claude Code: Claude è co-autore dei commit.
+Icon Formatter is licensed under [AGPL-3.0-only](LICENSE). The Lucent rendering engine contains code derived from [nothing-icongen](https://github.com/linuxct/nothing-icongen) by linuxct, which is also AGPL-3.0-only. The Inter and Instrument Serif fonts are licensed under the SIL Open Font License 1.1. The full list of third-party components is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and on the Licences page of the app.
+
+Icon Formatter is an independent project and is not affiliated with Nothing Technology Limited, Google or any other company whose name appears here. Product names, logos and trademarks belong to their owners and are mentioned only to indicate compatibility. The "Nothing" style is the name of one of the app's looks and is not a claim of endorsement. The repository distributes no third-party icons: the app works on the icons present on the user's own device.
+
+Developed with Claude (Anthropic) through Claude Code. Claude is listed as a co-author of the commits.

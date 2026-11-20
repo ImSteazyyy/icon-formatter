@@ -26,13 +26,14 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _controller = PageController();
-  int _index = 0;
+  // a language change rebuilds the whole app (new key on MaterialApp), so the
+  // page is remembered here and the tour comes back on the same page
+  static int _lastIndex = 0;
+  late final _controller = PageController(initialPage: _lastIndex);
+  late int _index = _lastIndex;
 
   // the permissions page only exists on Android
   List<OnboardingPage> get _pages => [
-    OnboardingPage.welcome,
-    OnboardingPage.theme,
     if (Platform.isAndroid) OnboardingPage.permissions,
     OnboardingPage.language,
     OnboardingPage.done,
@@ -60,15 +61,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // setupDone also covers "Salta": the tour is never shown again
   void _finish() {
+    _lastIndex = 0;
     AppState.I.update(() => AppState.I.setupDone = true);
     if (widget.replay && mounted) Navigator.of(context).pop();
+  }
+
+  /// A first step of the last page: finish the tour, then open its section.
+  void _finishTo(String tab) {
+    _finish();
+    requestedTab.value = tab;
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = _pages;
     final last = _index == pages.length - 1;
-    // rebuilt on every change so a new style or theme shows at once
+    // rebuilt on every change so a new theme shows at once
     return ListenableBuilder(
       listenable: AppState.I,
       builder: (context, _) => Scaffold(
@@ -94,11 +102,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: PageView.builder(
                   controller: _controller,
                   itemCount: pages.length,
-                  onPageChanged: (i) => setState(() => _index = i),
+                  onPageChanged: (i) => setState(() => _lastIndex = _index = i),
                   // gentle slide and fade: each page follows the swipe position
                   itemBuilder: (_, i) => AnimatedBuilder(
                     animation: _controller,
-                    child: OnboardingPageBody(page: pages[i]),
+                    child: OnboardingPageBody(page: pages[i], onStep: _finishTo),
                     builder: (context, child) {
                       final p = _controller.hasClients
                           ? (_controller.page ?? _index.toDouble())

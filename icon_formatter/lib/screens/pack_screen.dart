@@ -83,14 +83,21 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
     }
   }
 
-  void _nextAmbiguous() {
-    final amb = c.items.where((i) => i.result?.ambiguous == true || i.result?.ok == false).toList();
+  /// Icons to check: uncertain (yellow) or failed. Shared by the review row and
+  /// its previous/next buttons.
+  List<WorkItem> get _toReview => c.items.where((i) => i.result?.ambiguous == true || i.result?.ok == false).toList();
+
+  /// Moves the selection to the next (step 1) or previous (step -1) icon to check.
+  void _stepReview(int step) {
+    final amb = _toReview;
     if (amb.isEmpty) {
-      showMsg(context, S.nessunRisultatoVerificare);
+      showMsg(context, S.ux1bNoReview);
       return;
     }
     final idx = amb.indexWhere((i) => i.id == c.selectedId);
-    c.select(amb[(idx + 1) % amb.length].id);
+    // nothing selected yet: next starts at the first icon, previous at the last
+    final next = idx < 0 ? (step > 0 ? 0 : amb.length - 1) : (idx + step + amb.length) % amb.length;
+    c.select(amb[next].id);
   }
 
   Future<void> _export({required bool zip, bool share = false}) async {
@@ -128,24 +135,60 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
   Widget build(BuildContext context) {
     super.build(context);
     final pi = info;
-    final header = pi == null
-        ? null
-        : Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Glass(
+    final review = _toReview.length;
+    final header = Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // what this screen is for, then the three steps it walks through
+          Text(S.ux1bCleanupRole, style: TextStyle(fontSize: 13, color: Palette.text2)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 6, children: [
+            _stepChip(S.ux1bStep1, done: pi != null),
+            _stepChip(S.ux1bStep2, done: false),
+            _stepChip(S.ux1bStep3, done: false),
+          ]),
+          if (pi != null) ...[
+            const SizedBox(height: 10),
+            Glass(
               padding: const EdgeInsets.all(12),
               child: Wrap(spacing: 18, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 _stat(S.icone, '${pi.images.length}'),
-                _stat('appfilter.xml', pi.appfilter == null ? 'assente' : '${pi.appfilterItems.length} voci'),
+                _stat('appfilter.xml', pi.appfilter == null ? S.ux1bNone : S.ux1bEntries(pi.appfilterItems.length)),
                 _stat(S.drawableMancanti, '${pi.missingDrawables.length}', warn: pi.missingDrawables.isNotEmpty),
                 _stat(S.iconeNonMappate, '${pi.unmappedIcons.length}'),
                 _stat(S.altriFilePreservati, '${pi.otherFiles}'),
                 if (pi.missingDrawables.isNotEmpty || pi.notes.isNotEmpty)
                   TextButton(onPressed: () => _details(pi), child: Text(S.dettagli)),
-                TextButton.icon(onPressed: _nextAmbiguous, icon: const Icon(Icons.flag_outlined, size: 16), label: Text(S.prossimaVerificare)),
               ]),
             ),
-          );
+          ],
+          // the review row: a count, a legend for the yellow icons, and prev/next
+          if (pi != null) ...[
+            const SizedBox(height: 10),
+            Glass(
+              padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+              child: Row(children: [
+                Container(width: 10, height: 10, decoration: BoxDecoration(color: Palette.warn, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(review == 0 ? S.ux1bNoReview : S.ux1bReviewCount(review), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Palette.text)),
+                    Text(S.ux1bReviewLegend, style: TextStyle(fontSize: 12, color: Palette.text2)),
+                  ]),
+                ),
+                if (review > 0) ...[
+                  FilledButton(onPressed: () => _stepReview(1), child: Text(S.ux1bReviewStart)),
+                  IconButton(tooltip: S.ux1bPrev, icon: const Icon(Icons.chevron_left_rounded), onPressed: () => _stepReview(-1)),
+                  IconButton(tooltip: S.ux1bNext, icon: const Icon(Icons.chevron_right_rounded), onPressed: () => _stepReview(1)),
+                ],
+              ]),
+            ),
+          ],
+        ],
+      ),
+    );
     return ListenableBuilder(
       listenable: c,
       builder: (context, _) => WorkspaceView(
@@ -186,6 +229,16 @@ class _PackScreenState extends State<PackScreen> with AutomaticKeepAliveClientMi
       ),
     );
   }
+
+  /// One of the three steps: a neutral pill, filled once the step is done.
+  Widget _stepChip(String label, {required bool done}) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: done ? Palette.fg.withValues(alpha: 0.12) : Palette.fg.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: done ? Palette.text : Palette.text2)),
+      );
 
   Widget _stat(String k, String v, {bool warn = false}) => Row(mainAxisSize: MainAxisSize.min, children: [
         Text('$k ', style: TextStyle(fontSize: 12, color: Palette.text3)),

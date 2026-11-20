@@ -1,8 +1,7 @@
-"""App icon of Icon Formatter (Android launcher, Windows .ico, in-app logo).
+"""App icon of Icon Formatter (Android launcher, in-app logo).
 
 Source: assets/branding/app_icon_source.png, the round white icon with the
-black and red symbol. The in-app logo, the legacy launcher icon and the
-Windows .ico use it as it is. The adaptive icon splits it: a white
+black and red symbol. The in-app logo and the legacy launcher icon use it as it is. The adaptive icon splits it: a white
 background layer and the symbol alone as foreground (white keyed out),
 sized like other app symbols inside the launcher mask.
 Run:  py -3.10 tool/make_app_icon.py   (needs Pillow)
@@ -57,6 +56,4 @@ for d, legacy in (('mdpi', 48), ('hdpi', 72), ('xhdpi', 96), ('xxhdpi', 144), ('
     os.makedirs(os.path.join(res, 'mipmap-' + d), exist_ok=True)
     whole(legacy).save(os.path.join(res, 'mipmap-' + d, 'ic_launcher.png'))
     symbol(legacy * 108 // 48).save(os.path.join(res, 'mipmap-' + d, 'ic_launcher_foreground.png'))
-whole(256).save(os.path.join(root, 'windows', 'runner', 'resources', 'app_icon.ico'),
-                sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 print('symbol box', box)

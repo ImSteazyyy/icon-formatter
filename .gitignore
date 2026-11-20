@@ -13,17 +13,17 @@ icon_formatter/native/icon_core/examples/refcal.rs
 Thumbs.db
 .token-savior-cache.json
 
-# Icone di app di terzi usate come riferimento in locale (marchi e loghi dei
-# rispettivi proprietari): restano sul PC, non vanno nella repo pubblica
+# Third-party app icons kept locally as reference (trademarks and logos of the
+# respective owners): they stay on the PC and stay out of the public repo
 /*.png
 /*.webp
 
-# screenshot dei test (emulatore/telefono): possono contenere icone e marchi di terzi
+# test screenshots (emulator/phone): they may contain third-party icons and trademarks
 /screens_*/
 /release_*/
 
-# Grafo locale del codice (graphify)
+# Local code graph (graphify)
 graphify-out/
 
-# Archivio locale delle vecchie release (zip con asset e note)
+# Local archive of old releases (zips with assets and notes)
 /archivio-release/

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -40,9 +39,10 @@ class BasesScreen extends StatelessWidget {
     final pr = st.activePreset;
     final size = st.export.customSize ? st.export.size : st.translucentSize;
     try {
-      final png = await renderBackgroundPng(background: BackgroundSettings.translucent(params: pr.params), size: size);
+      final lk = pr.lucent;
+      final bg = lk != null ? BackgroundSettings.lucent(params: lk.toSettings()) : BackgroundSettings.translucent(params: pr.params);
+      final png = await renderBackgroundPng(background: bg, size: size);
       await st.addBaseFromPng(png, '${pr.name} $size', size);
-      if (context.mounted) showMsg(context, S.baseCreatoDalPreset(pr.name));
     } catch (e) {
       if (context.mounted) showMsg(context, '$e', error: true);
     }
@@ -111,7 +111,7 @@ class _BaseTile extends StatelessWidget {
                     ),
                   ]),
                 ),
-                if (selected) Icon(Icons.check_circle_rounded, size: 22, color: Theme.of(context).colorScheme.primary),
+                if (selected) Icon(Icons.check_circle_rounded, size: 22, color: Palette.selection),
                 PopupMenuButton<String>(
                   onSelected: (v) async {
                     if (v == 'cal') {
@@ -223,7 +223,6 @@ class _CalibrationPageState extends State<CalibrationPage> {
       'date': DateTime.now().toIso8601String(),
       'manual': edit!.glyphRatio != o.placement.glyphRatio || edit!.centerX != o.placement.centerX || edit!.centerY != o.placement.centerY,
     });
-    showMsg(context, S.calibrazioneSalvata(widget.base.label));
     Navigator.pop(context);
   }
 
@@ -304,6 +303,7 @@ class _CalibrationPageState extends State<CalibrationPage> {
               _test();
             },
             icon: const Icon(Icons.skip_next),
+            tooltip: S.provaSuccessiva,
           ),
         ]),
         if (testPng != null)
@@ -388,5 +388,3 @@ class _CalPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CalPainter old) => true;
 }
-
-bool fileExists(String p) => File(p).existsSync();

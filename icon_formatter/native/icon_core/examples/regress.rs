@@ -1,4 +1,4 @@
-//! Regression harness for the Lucent pipeline (same calls as the app:
+//! Regression harness for the Lightnt pipeline (same calls as the app:
 //! `segment::isolate` + `lucent::render` with the default dark params).
 //!
 //! cargo run --release --example regress -- OUT_DIR in1.png in2.png ...
